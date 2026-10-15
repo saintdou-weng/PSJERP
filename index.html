@@ -327,6 +327,13 @@ table.t.list tr.sel td{background:#FFF7ED}
 .cloud-badge.busy{background:#FFFBEB;color:#92400E;border-color:#FCD34D}
 .cloud-badge.err{background:#FEF2F2;color:#B91C1C;border-color:#FCA5A5}
 .cloud-badge.off{background:#F1F5F9;color:#64748B}
+.panel.cloud-quick{margin-bottom:14px;border-color:#93C5FD;background:#EFF6FF}
+.cq-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cq-acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.cq-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid #BFDBFE}
+.sync-pick{display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;cursor:pointer;min-height:44px}
+.sync-pick span:first-of-type{flex:1}
+.back-bar{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:28px;padding-top:16px;border-top:1px solid var(--line);flex-wrap:wrap}
 .panel.cloud-ask{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;border-color:#93C5FD;background:#EFF6FF}
 @media (max-width:860px){.cloud-badge{order:4;max-width:46vw;overflow:hidden;text-overflow:ellipsis}}
 </style>
@@ -416,7 +423,7 @@ const T={
  compare:['比對中心','Compare Center','មជ្ឈមណ្ឌលប្រៀបធៀប'], exceptions:['異常中心','Exceptions','ករណីមិនប្រក្រតី'], reports:['報告','Reports','របាយការណ៍'],
  telegram:['Telegram','Telegram','Telegram'], audit:['稽核 / 回收','Audit & Trash','សវនកម្ម / ធុងសំរាម'], settings:['設定','Settings','ការកំណត់'],
  legacy_ro:['Legacy ERP 唯讀','Legacy ERP read-only','Legacy ERP អានតែប៉ុណ្ណោះ'],
- proto_note:['v0.6.0 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.6.0 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
+ proto_note:['v0.6.1 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.6.1 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
  order_year:['年份','Year','ឆ្នាំ'], size:['尺寸','Size','ទំហំ'], color_name:['顏色名稱','Colour name','ឈ្មោះពណ៌'],
  back_portal:['回總平台','Back to portal','ត្រឡប់ទៅវិបផតថល'], prod_entry:['VRT Prod 生產系統','VRT Prod production','ប្រព័ន្ធផលិតកម្ម VRT Prod'], erp_link_prod:['ERP 對照中心（在 VRT Prod）','ERP link centre (in VRT Prod)','មជ្ឈមណ្ឌលផ្គូផ្គង ERP (ក្នុង VRT Prod)'], search_ph:['搜尋 ERP Order、自編單號、PO、款式、料品、出貨單…','Search order, self key, PO, style, material, shipment…','ស្វែងរក Order, PO, ម៉ូដ, សម្ភារៈ…'],
  user:['使用者','User','អ្នកប្រើ'], password:['密碼','Password','ពាក្យសម្ងាត់'], trust:['信任此裝置（下次免登入）','Trust this device (skip login next time)','ទុកចិត្តឧបករណ៍នេះ'],
@@ -853,16 +860,16 @@ async function pullBatch(m){
 }
 let NOTEQ=[];
 function cloudNote(ds,r){if(isDemo())return;NOTEQ=NOTEQ.filter(x=>x.id!==r.id);NOTEQ.push({id:r.id,ds,notes:r.notes||'',tags:(r.tags||[]).join(', ')});r._nat=nowStamp();if(cloudReady())cloudSync(false)}
-async function cloudSync(manual){
- if(CLOUD.busy||isDemo())return; if(!cloudReady()){cloudSetState('off');if(manual)toast(tt('請先在「設定 → 雲端同步」輸入同步密碼','Enter the sync password in Settings → Cloud sync first'));return}
+async function cloudSync(manual,only){
+ if(CLOUD.busy||isDemo())return; const want=only&&only.size?f=>only.has(REP_SHEET[f.rep]||f.sheet):()=>true; if(!cloudReady()){cloudSetState('off');if(manual)toast(tt('請先在「設定 → 雲端同步」輸入同步密碼','Enter the sync password in Settings → Cloud sync first'));return}
  CLOUD.busy=true; let pulled=0, pushed=0;
  try{
   cloudSetState('busy',tt('讀取雲端清單…','Reading cloud list…'));
   const man=await cget({action:'erp_manifest'}); CLOUD.url=man.url||''; const files=man.files||[]; CLOUD.files=files.length;
   const justPushed=new Set();
-  for(const f of (DB.erpfiles||[]).filter(f=>f.dirty||!f.version)){await pushBatch(f);justPushed.add(f.key);pushed++;persist()}
-  for(const m of files){if(justPushed.has(m.key))continue;const loc=(DB.erpfiles||[]).find(f=>f.key===m.key);if(loc&&(loc.dirty||String(loc.version)===String(m.version)))continue;await pullBatch(m);pulled++;persist()}
-  await syncTpl(man);
+  for(const f of (DB.erpfiles||[]).filter(f=>(f.dirty||!f.version)&&want(f))){await pushBatch(f);justPushed.add(f.key);pushed++;persist()}
+  for(const m of files){if(justPushed.has(m.key)||!want(m))continue;const loc=(DB.erpfiles||[]).find(f=>f.key===m.key);if(loc&&(loc.dirty||String(loc.version)===String(m.version)))continue;await pullBatch(m);pulled++;persist()}
+  if(!only)await syncTpl(man);
   for(const n of NOTEQ.splice(0)){await cpost({action:'erp_note',id:n.id,ds:n.ds,notes:n.notes,tags:n.tags,user:'paul.weng'})}
   (man.notes||[]).forEach(n=>{const arr=DB[n.ds]||[];const r=arr.find(x=>x.id===n.id);if(!r)return;if(r._nat&&r._nat>String(n.at))return;r.notes=String(n.notes||'');r.tags=String(n.tags||'').split(',').map(x=>x.trim()).filter(Boolean);r._nat=String(n.at)});
   CLOUD.last=nowStamp(); LS.set('psjerp_cloud_last',CLOUD.last); cloudSetState('ok'); persist();
@@ -884,6 +891,23 @@ function cloudPanel(){
  <div class="kv" style="margin-top:8px"><div><dt>${tt('這台裝置的 ERP 批次','ERP batches on this device')}</dt><dd>${fmt(F.length)}</dd></div><div><dt>${tt('尚未上傳','Not uploaded yet')}</dt><dd>${fmt(unsynced)}</dd></div><div><dt>${tt('雲端批次','Cloud batches')}</dt><dd>${CLOUD.files?fmt(CLOUD.files):'—'}</dd></div><div><dt>Google Sheet</dt><dd>${CLOUD.url?`<a href="${esc(CLOUD.url)}" target="_blank" rel="noopener">PSJERP_ERPDATA ↗</a>`:'—'}</dd></div></div>
  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn pri" onclick="cloudSaveKey('ckSet')">${tt('儲存並同步','Save & sync')}</button><button class="btn" onclick="cloudSync(true)">${tt('立即同步','Sync now')}</button></div></div>`;
 }
+
+/* ☁️ 首頁快速同步：全部 / 選擇資料集 */
+const SYNC_GROUPS=[['ORDERS','🧾',['訂單 / PO','Orders / PO']],['BOM','🧵',['BOM','BOM']],['PURCHASE','🛒',['採購','Purchase']],['PURCHASE_PRICE','💲',['採購單價','Purchase price']],['FABRIC','🧶',['布料','Fabric']],['ACCESS','🧷',['輔料','Accessories']],['STOCK_MOVE','🔁',['進耗存','Stock move']],['FG','📦',['成品入庫','FG stock-in']],['FG_STOCK','🏬',['成品庫存','FG stock']],['SHIP','🚢',['出貨','Shipping']],['SMV','⏱',['SMV','SMV']]];
+function cloudQuick(){
+ if(isDemo())return '';
+ if(!cloudKey())return cloudBanner();
+ const F=DB.erpfiles||[], dirty=F.filter(f=>f.dirty||!f.version).length, busy=CLOUD.state==='busy';
+ const st=CLOUD.state==='err'?stChip('crit',tt('同步失敗','Sync failed')):busy?stChip('info',CLOUD.msg||tt('同步中…','Syncing…')):stChip('good',tt('已連線','Connected'));
+ const boxes=SYNC_GROUPS.map(([sh,ic,l])=>{const n=F.filter(f=>REP_SHEET[f.rep]===sh).length;return `<label class="sync-pick"><input type="checkbox" value="${sh}"><span>${ic} ${esc(l[LANG===0?0:1])}</span><span class="small muted">${n?fmt(n)+tt(' 批',' batches'):'—'}</span></label>`}).join('');
+ return `<div class="panel cloud-quick" id="cloudQuick"><div class="cq-head"><b>☁️ ${tt('雲端同步','Cloud sync')}</b>${st}<span class="small muted">${tt('上次 ','Last ')}${esc((CLOUD.last||'—').slice(0,16))}${dirty?` · <b class="diff-neg">${fmt(dirty)} ${tt('批未上傳','not uploaded')}</b>`:''}</span>
+  <div class="cq-acts"><button class="btn sm pri" ${busy?'disabled':''} onclick="cloudSync(true)">🔄 ${tt('全部同步','Sync all')}</button><button class="btn sm" ${busy?'disabled':''} onclick="cloudSyncPicked()">☑️ ${tt('同步所選','Sync selected')}</button><button class="btn sm" onclick="togglePick()">${tt('選擇資料集','Choose datasets')} ▾</button></div></div>
+  <div class="cq-picks" id="cqPicks" hidden>${boxes}</div></div>`;
+}
+function togglePick(){const e=$('#cqPicks');if(e)e.hidden=!e.hidden}
+function cloudSyncPicked(){const picked=new Set($$('#cqPicks input:checked').map(i=>i.value));if(!picked.size){const e=$('#cqPicks');if(e)e.hidden=false;toast(tt('請先勾選要同步的資料集','Tick the datasets to sync first'));return}cloudSync(true,picked)}
+/* 每頁底部：回總覽 */
+function backBar(){return `<div class="back-bar"><a class="btn" href="#dashboard">📊 ${tt('回總覽 Dashboard','Back to Dashboard')}</a><a class="btn sm" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false">↑ ${tt('回頂端','Top')}</a></div>`}
 
 /* ---------------- multi-file queue ---------------- */
 let IMPQ=[];
@@ -1356,14 +1380,14 @@ function renderCompareView(k){
 }
 function renderPeriodView(k){
  const st=S(k);
- let h=pageHead(k,`<button class="btn sm" onclick="sendSummary('${k}')">${esc(t('send_tg'))}</button>`)+pnav(k,{views:true,snapshot:PM[k].snap,all:!PM[k].snap});
+ let h=pageHead(k,`<button class="btn sm" onclick="sendSummary('${k}')">${esc(t('send_tg'))}</button>`)+(k==='dashboard'?cloudQuick():'')+pnav(k,{views:true,snapshot:PM[k].snap,all:!PM[k].snap});
  return h+(st.view==='list'?renderList(k):st.view==='trend'?renderTrend(k):renderCompareView(k));
 }
 
 function kpi(l,v,unit,d,cls){return `<div class="kpi ${cls||''}"><div class="l">${l}</div><div class="v num">${v}${unit?`<small>${unit}</small>`:''}</div>${d?`<div class="d">${d}</div>`:''}</div>`}
 function stChip(cls,txt){return `<span class="st ${cls}">${esc(txt)}</span>`}
 const ORDER_ST={open:['info','open'],closed:['good','closed'],late:['crit','late']};
-const PAGE_BASE=(()=>{try{if(window.self!==window.top||!/^https?:/.test(location.protocol))return 'saintdou-weng.github.io/vrt-asset/';return location.host+location.pathname}catch(e){return 'saintdou-weng.github.io/vrt-asset/'}})();
+const PAGE_BASE=(()=>{try{if(window.self!==window.top||!/^https?:/.test(location.protocol))return 'saintdou-weng.github.io/PSJERP/';return location.host+location.pathname}catch(e){return 'saintdou-weng.github.io/PSJERP/'}})();
 function pageHead(k,acts=''){
  return `<div class="ph"><div style="min-width:0"><h1>${modIcon(k)} ${esc(t(k))}</h1><div class="sub">${esc(t(subKey(k)))}</div>
  <div class="url-chip" title="${esc(t('direct_url'))}">${esc(PAGE_BASE)}#${k}</div></div>
@@ -1760,7 +1784,7 @@ function renderProduction(){
 const QUICK=()=>[['orders','🧾',tt('訂單 / PO','Orders / PO')],['bom','🧵','BOM'],['fabric','🧶',tt('布料','Fabric')],['finished-goods','📦',tt('成品入庫','Finished Goods')],['shipping','🚢',tt('出貨','Shipping')],['compare','🔍',tt('資料比對','Compare')],['exceptions','⚠️',tt('異常','Exceptions')],['smart-import','🧠',tt('智慧匯入','Smart Import')]];
 function renderDashboardReal(){
  const k='dashboard', st=S(k), R=rangeOf(st);
- let h=pageHead(k,`<button class="btn sm pri" onclick="go('smart-import')">🧠 ${esc(t('smart-import'))}</button>`)+cloudBanner();
+ let h=pageHead(k,`<button class="btn sm pri" onclick="go('smart-import')">🧠 ${esc(t('smart-import'))}</button>`)+cloudQuick();
  h+=`<div class="quick-grid">${QUICK().map(([m,ic,l])=>`<a class="quick-link" href="#${m}"><span class="qi">${ic}</span><span><b>${esc(l)}</b><span>${esc(t(m))}</span></span></a>`).join('')}</div>`;
  const F=DB.erpfiles||[];
  if(!F.length)return h+`<div class="panel empty"><h2>${tt('還沒有匯入任何 ERP 資料','No ERP data imported yet')}</h2><p>${tt('之前畫面上的數字都是示範用的假資料。現在改成只顯示真實資料：到「智慧匯入」把 ERP 下載的檔案（Q2014、R2014、K01、B01…）一次拖進來即可。','The numbers shown before were sample data. Now only real data is shown: drop the ERP downloads (Q2014, R2014, K01, B01…) into Smart Import.')}</p><a class="btn pri" href="#smart-import">🧠 ${esc(t('smart-import'))}</a></div>`+coverageHTML();
@@ -1884,7 +1908,7 @@ function renderSync(){
  h+=`<div class="steps">${flow.map((f,i)=>`<span class="${i<2?'on':''}">${esc(f)}</span>`).join('<span style="border:0;background:none">→</span>')}</div>`;
  h+=`<div class="kpis">${kpi(tt('排程','Schedule'),esc(c.time),'',tt('週一至週六；週日與廠休日跳過','Mon–Sat; Sundays & factory holidays skipped'))}${kpi(tt('下一次','Next run'),'<span style="font-size:17px">'+esc(nextSyncText())+'</span>','',tt('可在設定修改時間 / 行事曆','change time / calendar in Settings'))}${kpi(tt('Legacy 寫入','Legacy writes'),'0','',tt('只允許 SELECT','SELECT only'),'good')}${kpi(tt('後端','Backend'),c.gas?'GAS':'—','',c.gas?tt('已設定 Web App','Web App set'):tt('尚未設定（設定頁）','not set (Settings)'),c.gas?'good':'warn')}</div>`;
  h+=`<div class="note crit" style="margin:12px 0">${tt('單向：Legacy ERP → PSJERP Cloud。不做反向同步。Bridge 帳號只允許 SELECT。休假日不進 Legacy ERP、不發每日摘要；手動「立即同步」仍只讀。','One-way: Legacy ERP → PSJERP Cloud. No reverse sync; the Bridge account may only SELECT. On holidays nothing touches the legacy ERP and no daily summary is sent; manual Sync now is still read-only.')}</div>`;
- if(!isDemo())h+=coverageMatrixHTML()+coverageHTML(true); else{h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>Dataset</th><th>ERP</th><th class="r">Legacy</th><th class="r">Cloud</th><th>Last sync</th><th class="r">Added</th><th class="r">Updated</th><th class="r">Errors</th><th>${esc(t('status'))}</th><th>${tt('說明','Note')}</th><th></th></tr></thead><tbody>
+ if(!isDemo())h+=cloudQuick()+coverageMatrixHTML()+coverageHTML(true); else{h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>Dataset</th><th>ERP</th><th class="r">Legacy</th><th class="r">Cloud</th><th>Last sync</th><th class="r">Added</th><th class="r">Updated</th><th class="r">Errors</th><th>${esc(t('status'))}</th><th>${tt('說明','Note')}</th><th></th></tr></thead><tbody>
  ${SYNCSETS.map((x,i)=>`<tr><td class="lead" data-l="Dataset">${modIcon(x.k)} ${esc(x.k==='smv'?'SMV':t(x.k))}</td><td class="mono small" data-l="ERP">${esc(x.fn)}</td><td class="r" data-l="Legacy">${x.legacy==null?'—':fmt(x.legacy)}</td><td class="r" data-l="Cloud">${fmt(x.cloud)}</td><td data-l="Last sync">${esc(x.last)}</td><td class="r" data-l="Added">${fmt(x.add)}</td><td class="r" data-l="Updated">${fmt(x.upd)}</td><td class="r" data-l="Errors">${x.err?`<b class="diff-neg">${fmt(x.err)}</b>`:'0'}</td><td data-l="${esc(t('status'))}">${syncChip(x.st)}</td><td class="wrap small" data-l="Note">${esc(x.note[LANG===0?0:1])}</td>
  <td data-l=""><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn sm" onclick="syncNow(${i})">Sync Now</button>${x.err||x.st==='error'?`<button class="btn sm dng" onclick="syncErr(${i})">View Error</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;}
  const runs=(DB.syncruns||[]).filter(r=>inR(r.time.slice(0,10),R));
@@ -2131,7 +2155,7 @@ function renderTelegram(){
  <div class="tg"><div class="meta">@PSJERP_Bot · VRT ERP · ${pad(d.getMonth()+1)}/${pad(d.getDate())}</div><div class="bub"><b>🏭 VRT ERP — ${pad(d.getMonth()+1)}/${pad(d.getDate())}</b><br>${tt('ERP 管理系統','ERP Management System','ប្រព័ន្ធគ្រប់គ្រង ERP')}<br>${tt('選擇要開啟的工具 / Choose a tool:','Choose a tool:','ជ្រើសរើសឧបករណ៍៖')}</div>
  <div class="kb">${TG_MENU.map(([m,ic,zh])=>`<a href="#${m}">${ic} ${esc(LANG===0?zh:t(m))}</a>`).join('')}</div></div></div>
  <div class="panel"><h2>${tt('Bot 設定','Bot configuration')}</h2><div class="kv" style="margin-top:8px">
-  <div><dt>Bot</dt><dd class="mono">@PSJERP_Bot</dd></div><div><dt>Apps Script</dt><dd class="mono">PSJERP.gs</dd></div><div><dt>Git</dt><dd class="mono">saintdou-weng/vrt-asset</dd></div><div><dt>${tt('指令','Commands')}</dt><dd class="mono">/erp /psj /psjerp</dd></div><div><dt>parse_mode</dt><dd class="mono">HTML + escapeHtml()</dd></div>
+  <div><dt>Bot</dt><dd class="mono">@PSJERP_Bot</dd></div><div><dt>Apps Script</dt><dd class="mono">PSJERP.gs</dd></div><div><dt>Git</dt><dd class="mono">saintdou-weng/PSJERP</dd></div><div><dt>${tt('指令','Commands')}</dt><dd class="mono">/erp /psj /psjerp</dd></div><div><dt>parse_mode</dt><dd class="mono">HTML + escapeHtml()</dd></div>
   <div><dt>Bot Token</dt><dd>•••••••• <span class="small muted">${tt('存於 Script Properties，不入 Git / HTML','In Script Properties — never in Git / HTML')}</span></dd></div><div><dt>Webhook</dt><dd class="mono small">…/exec</dd></div></div>
   <p class="note crit" style="margin-top:12px">${tt('絕不共用 VRT Production Bot 的 Token。兩個 Bot 可在同一群組，但程式、Log、設定完全分開。','Never reuse the VRT Production bot token. Both bots may sit in the same group, but code, logs and config stay separate.')}</p>
   <h3 style="margin-top:14px">Queue / Retry / Log</h3>${pnav('telegram',{all:true})}${(DB.tglog||[]).filter(l=>inR(String(l.time).slice(0,10),rangeOf(S('telegram')))).slice(0,30).map(l=>`<div class="small" style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line-2);flex-wrap:wrap"><span class="mono">${esc(l.time)}</span>${stChip(l.st==='sent'?'good':l.st==='retry'?'warn':'info',l.st)}<span>${esc(l.mod)} → ${esc(GROUPS[l.grp][LANG===0?0:1])}</span></div>`).join('')||'<div class="muted small">—</div>'}</div></div>`;
@@ -2149,7 +2173,7 @@ function summaryText(k,id){
  return head+`${t('kpi_open')}: ${o.filter(x=>x.status!=='closed').length} · ${t('kpi_late')}: ${o.filter(x=>x.status==='late').length}\n${t('kpi_wip')}: ${fmt(sum(live(DB.production),r=>r.cut_qty-r.fg_qty))} ${t('pcs')}`;
 }
 function sendSummary(k,id){
- const grp=routing()[k]||'prod'; const msg=summaryText(k,id);
+ const grp=routing()[k]||'prod'; const msg=summaryText(k,id)+`\n\n📊 Dashboard: https://${PAGE_BASE}#dashboard`;
  (DB.tglog=DB.tglog||[]).unshift({time:nowStamp(),mod:k,grp,st:'queued',msg}); persist();
  showModal(`<h2>${esc(t('send_tg'))}</h2><p class="small muted">→ ${esc(GROUPS[grp][LANG===0?0:1])} · ${tt('原型不實際發送；正式版由 PSJERP.gs 排隊、重試、防重複。','Prototype does not really send; production uses PSJERP.gs with queue, retry and de-duplication.')}</p>
  <div class="tg" style="max-width:none"><div class="bub" style="white-space:pre-line">${msg}</div></div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn pri" onclick="DB.tglog[0].st='sent';persist();closeDrawer();toast('${esc(tt('已排入佇列','Queued'))}');rerender()">${tt('排入佇列','Queue')}</button><button class="btn" onclick="DB.tglog.shift();persist();closeDrawer()">${esc(t('cancel'))}</button></div>`);
@@ -2230,6 +2254,7 @@ function rerender(){
  const st=S(CUR); if(st.pt==='ALL'&&st.view!=='detail')st.view='detail';
  const f=(PM[CUR]&&st.view&&st.view!=='detail')?()=>renderPeriodView(CUR):(RENDER[CUR]||(CFG[CUR]?()=>renderGeneric(CUR):renderDashboard));
  let html; try{html=f()}catch(err){console.error(err);html=pageHead(CUR)+`<div class="note crit">${tt('此頁顯示發生錯誤，已記錄。請按「本期」或換一個期間再試。','This page failed to render. Press Current or pick another period.')}<br><span class="mono small">${esc(err.message)}</span></div>`}
+ if(CUR!=='dashboard')html+=backBar();
  $('#page').innerHTML=html; renderNav(); applyStatic(); bindPage();
 }
 function go(k){if(location.hash!=='#'+k)location.hash=k;else route()}

@@ -1,5 +1,6 @@
 /**
- * PSJERP — VRT ERP Telegram + Google control layer  v0.6.0
+ * PSJERP — VRT ERP Telegram + Google control layer  v0.6.1
+ *   v0.6.1 (2026-10-15)：網址基底改為 PSJERP（舊 vrt-asset 已失效，Telegram 選單按鈕全部連不上）；webBase_() 讀到舊網址會自動修正。
  *   v0.6.0 (2026-10-07)：雲端改成「一種資料一個試算表（PSJERP_ERP_*）、一個匯入批次一個分頁」，快滿 900 萬格自動開下一本；
  *                      資料集擴充（採購、採購單價、進耗存、成品庫存、出貨、SMV、人工彙總）；新增欄位對應範本 TEMPLATES；
  *                      舊 v0.5 資料仍可讀，重匯同一批次時自動搬到新格式。Telegram 功能不變。
@@ -19,11 +20,11 @@ const SYNC_KEY_DIRECT  = '';   // ← 雲端同步密碼（網頁「設定 → �
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.6.0',
+  VERSION: '0.6.1',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
-  DEFAULT_WEB: 'https://saintdou-weng.github.io/vrt-asset/',
+  DEFAULT_WEB: 'https://saintdou-weng.github.io/PSJERP/',   // v0.6.1：repo 已由 vrt-asset 改名 PSJERP
   DEFAULT_TZ: 'Asia/Phnom_Penh',
   COMMANDS: ['/erp', '/psj', '/psjerp']
 };
@@ -44,8 +45,22 @@ function defaultChat_() {
   return v;
 }
 function webBase_() {
-  const u = cfg_('WEB_BASE_URL', APP.DEFAULT_WEB);
+  let u = String(cfg_('WEB_BASE_URL', APP.DEFAULT_WEB) || APP.DEFAULT_WEB).trim();
+  // v0.6.1：舊設定仍指向已不存在的 vrt-asset → 自動改成 PSJERP，並寫回 SETTINGS 表（Telegram 17 顆按鈕全靠這個網址）
+  if (/vrt-asset/i.test(u)) { u = APP.DEFAULT_WEB; try { setSetting_('WEB_BASE_URL', u); } catch (e) {} }
   return u.endsWith('/') ? u : u + '/';
+}
+function setSetting_(key, value) {
+  const sh = ensureDataStore_().getSheetByName('SETTINGS');
+  const vals = sh.getDataRange().getValues();
+  for (let i = 1; i < vals.length; i++) if (String(vals[i][0]) === key) { sh.getRange(i + 1, 2).setValue(value); return; }
+  sh.appendRow([key, value, '']);
+}
+/** v0.6.1 一次性：修正 WEB_BASE_URL（vrt-asset → PSJERP）。貼上新版後執行一次即可；之後 /erp 選單的所有按鈕都會指向 PSJERP。 */
+function FIX_WEB_BASE() {
+  setSetting_('WEB_BASE_URL', APP.DEFAULT_WEB);
+  log_('SETTINGS', 'OK', 'WEB_BASE_URL -> ' + APP.DEFAULT_WEB);
+  return 'WEB_BASE_URL 已改為 ' + APP.DEFAULT_WEB + '；在群組打 /erp 看新選單';
 }
 function tz_() { return cfg_('TZ', APP.DEFAULT_TZ); }
 
@@ -391,7 +406,8 @@ function buildDailySummary_(r) {
     'Legacy ERP write: NO',
     '',
     'ERP remains the official system of record.',
-    'PROD 對照 / ERP link centre: '+APP.PROD_ERP_LINK
+    'PROD 對照 / ERP link centre: '+APP.PROD_ERP_LINK,
+    '📊 Dashboard: '+webBase_()+'#dashboard'
   ].join('\n');
 }
 
