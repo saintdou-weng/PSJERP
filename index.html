@@ -2646,7 +2646,8 @@ function parseARA40(aoa,file,rep){
  const bad=rows.filter(r=>Math.abs(r.payable-r.paid-r.unpaid)>0.05).length;
  const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 家廠商 · 應付 ${money(sum(rows,'payable'),0)} · 未付 ${money(sum(rows,'unpaid'),0)}`},{ok:bad===0,msg:bad?`${bad} 列 應付 − 已沖 ≠ 未付`:'每一列 應付 − 已沖 = 未付'}];
  if(tot!=null)checks.push(ckEq('未付合計',sum(rows,'unpaid'),tot));
- const big=rows.filter(r=>r.unpaid>5e6); if(big.length)checks.push({ok:null,msg:'未付金額特別大：'+big.map(r=>r.supplier+' '+money(r.unpaid,0)).join('、')+'（可能是 ERP 資料問題）'});
+ const isParent=r=>/TACHIANG|大江/i.test(r.supplier)||r.supplier_id==='001'; const par=rows.filter(isParent); if(par.length)checks.push({ok:null,msg:'母公司大江（TACHIANG）未付 '+money(sum(par,'unpaid'),0)+'：會計在財報自行銷帳，不是 ERP 錯誤'});
+ const big=rows.filter(r=>r.unpaid>5e6&&!isParent(r)); if(big.length)checks.push({ok:null,msg:'未付金額特別大：'+big.map(r=>r.supplier+' '+money(r.unpaid,0)).join('、')});
  return {rep,rows,meta:{key:rep+'|'+asof,asof,label:'As of '+asof,range:[asof,asof],totals:{n:rows.length,amount:sum(rows,'unpaid')}},checks};
 }
 /* ---------- registry, storage, cloud sheets ---------- */
