@@ -310,6 +310,7 @@ button.kpi{font:inherit;color:inherit;border:1px solid var(--line)}
 .panel.empty{border-style:dashed;text-align:left}
 .panel.empty h2{color:var(--ink-2)}
 .list-panel h2{display:flex;align-items:center;gap:8px;font-size:15px}
+.list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}.list-head h2{margin:0}
 .bar-mark{display:inline-block;width:3px;height:14px;background:#F59E0B;border-radius:2px}
 table.t.list th{background:#F3F5F9;color:var(--ink-2);font-size:12px}
 table.t.list td{padding:10px 12px;border-bottom:1px solid var(--line-2)}
@@ -423,7 +424,7 @@ const T={
  compare:['比對中心','Compare Center','មជ្ឈមណ្ឌលប្រៀបធៀប'], exceptions:['異常中心','Exceptions','ករណីមិនប្រក្រតី'], reports:['報告','Reports','របាយការណ៍'],
  telegram:['Telegram','Telegram','Telegram'], audit:['稽核 / 回收','Audit & Trash','សវនកម្ម / ធុងសំរាម'], settings:['設定','Settings','ការកំណត់'],
  legacy_ro:['Legacy ERP 唯讀','Legacy ERP read-only','Legacy ERP អានតែប៉ុណ្ណោះ'],
- proto_note:['v0.7.0 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.7.0 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
+ proto_note:['v0.7.1 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.7.1 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
  order_year:['年份','Year','ឆ្នាំ'], size:['尺寸','Size','ទំហំ'], color_name:['顏色名稱','Colour name','ឈ្មោះពណ៌'],
  back_portal:['回總平台','Back to portal','ត្រឡប់ទៅវិបផតថល'], prod_entry:['VRT Prod 生產系統','VRT Prod production','ប្រព័ន្ធផលិតកម្ម VRT Prod'], erp_link_prod:['ERP 對照中心（在 VRT Prod）','ERP link centre (in VRT Prod)','មជ្ឈមណ្ឌលផ្គូផ្គង ERP (ក្នុង VRT Prod)'], search_ph:['搜尋 ERP Order、自編單號、PO、款式、料品、出貨單…','Search order, self key, PO, style, material, shipment…','ស្វែងរក Order, PO, ម៉ូដ, សម្ភារៈ…'],
  user:['使用者','User','អ្នកប្រើ'], password:['密碼','Password','ពាក្យសម្ងាត់'], trust:['信任此裝置（下次免登入）','Trust this device (skip login next time)','ទុកចិត្តឧបករណ៍នេះ'],
@@ -1224,9 +1225,10 @@ const SRCS={
  recv:{rows:()=>live(DB.receiving),date:r=>r.recv_date},
 };
 const GC=new Map();
-function rowsIn(src,R){const S2=SRCS[src];if(R.all)return S2.rows();return S2.rows().filter(r=>{const d=S2.date(r);if(d)return inR(d,R);return S2.year?yearCovers(S2.year(r),R):false})}
+const okD=d=>(typeof d==='string'&&/^\d{4}-\d{2}/.test(d))?d:null;
+function rowsIn(src,R){const S2=SRCS[src];if(R.all)return S2.rows();return S2.rows().filter(r=>{const d=okD(S2.date(r));if(d)return inR(d,R);return S2.year?yearCovers(S2.year(r),R):false})}
 function groupBy(src,unit){const key=src+'|'+unit;if(GC.has(key))return GC.get(key);const S2=SRCS[src];const m=new Map();
- for(const r of S2.rows()){const d=S2.date(r);let k=null;if(d)k=unit==='Y'?d.slice(0,4):d.slice(0,7);else if(S2.year&&S2.year(r))k=unit==='Y'?String(S2.year(r)):'Y'+S2.year(r);if(!k)continue;let a=m.get(k);if(!a){a=[];m.set(k,a)}a.push(r)}
+ for(const r of S2.rows()){const d=okD(S2.date(r));let k=null;if(d)k=unit==='Y'?d.slice(0,4):d.slice(0,7);else if(S2.year&&S2.year(r))k=unit==='Y'?String(S2.year(r)):'Y'+S2.year(r);if(!k)continue;let a=m.get(k);if(!a){a=[];m.set(k,a)}a.push(r)}
  GC.set(key,m);return m}
 const flowOrders=R=>rowsIn('orders',R);
 const uniq=(rows,f)=>new Set(rows.map(f).filter(Boolean)).size;
@@ -1343,13 +1345,45 @@ function renderList(k){
  const chron=rows.filter(r=>!/^Y/.test(r.key)).slice().reverse().slice(-36);
  if(chron.length>1)h+=`<div class="panel mt"><h2>${esc(pm.l())} · ${unit==='Y'?tt('年報','by year'):tt('月報','by month')}</h2><p class="hint">${P.snap?tt('每期期末時點值','period-end values'):tt('每期累計','period totals')} · ${tt('點長條選該期，點表格列看明細','tap a bar to select, tap a row for detail')}</p>${barChart(chron.map(r=>Math.max(0,+r.v[pi]||0)),chron.map(r=>unit==='Y'?r.key:r.key.slice(2)),pm.l(),{full:1,hl:chron.map(r=>r.key===selKey),drill:chron.map(r=>`navSet('${k}','${ymd(r.R.from)}')`)})}</div>`;
  const addable=ms.map(m=>m.add&&m.ty!=='pct'&&m.ty!=='text');
- h+=`<div class="panel mt list-panel"><h2><span class="bar-mark"></span>${unit==='Y'?tt('年別報表','Yearly report'):tt('月別報表','Monthly report')}</h2>
- <div class="tbl-wrap"><table class="t list"><thead><tr><th>${tt('期間','Period')}</th>${ms.map(m=>`<th class="r">${esc(m.l())}</th>`).join('')}</tr></thead><tbody>
+ if(st.dim&&st.dim!=='period'&&!P.snap){h+=dimTableHTML(k,ms,pi,unit,sel);return h}
+ h+=`<div class="panel mt list-panel"><div class="list-head"><h2><span class="bar-mark"></span>${unit==='Y'?tt('年別報表','Yearly report'):tt('月別報表','Monthly report')}</h2>${xlsBtn(k)}</div>${P.snap?'':dimBar(k,ms)}
+ <div class="tbl-wrap"><table class="t list" id="lt_${k}"><thead><tr><th>${tt('期間','Period')}</th>${ms.map(m=>`<th class="r">${esc(m.l())}</th>`).join('')}</tr></thead><tbody>
  ${rows.map(r=>`<tr class="click ${r.key===selKey?'sel':''}" onclick="drill('${k}','${unit}','${ymd(r.R.from)}')"><td class="per">${/^Y/.test(r.key)?r.key.slice(1)+` <span class="small muted">${tt('（無月份）','(no month)')}</span>`:esc(r.key)}${P.snap?` <span class="small muted">As of ${esc(ymd(asOfDate({to:r.R.to})))}</span>`:''}</td>${r.v.map((v,i)=>`<td class="r ${i===pi?'pm':''}">${ms[i].ty==='pct'&&v!=null?`<span class="pill">${fmt(v,1)}%</span>`:fmtM(v,ms[i].ty)}</td>`).join('')}</tr>`).join('')}</tbody>
  ${P.snap?'':`<tfoot><tr><td>${esc(t('total'))}</td>${ms.map((m,i)=>`<td class="r">${addable[i]?fmtM(sum(rows,r=>+r.v[i]||0),m.ty):''}</td>`).join('')}</tr></tfoot>`}</table></div>
  ${rows.some(r=>/^Y/.test(r.key))?`<p class="small muted" style="margin:8px 0 0">${tt('「無月份」：只有年份的資料（W_COD690 訂單統計表、進耗存年度總表）只能算進年報；訂單匯入 W_COD700 後會自動分到月份。','"No month": year-only data (W_COD690, yearly movement reports) counts in the yearly report only; importing W_COD700 assigns orders to months.')}</p>`:''}</div>`;
  return h;
 }
+
+
+/* ---------- v0.7.1 年／月報表：可改「依客戶、款式、廠商…」分組，並匯出 Excel ---------- */
+const DIMS=[['cust','客戶','Customer'],['style','款式','Style'],['supplier','廠商','Supplier'],['team','組別','Team'],['sales','業務','Sales'],['type','類別','Type'],['material','料品','Material'],['currency','幣別','Currency']];
+function dimsFor(k,ms){const srcs=[...new Set(ms.filter(m=>m.src).map(m=>m.src))];const ok=[];
+ DIMS.forEach(d=>{if(srcs.some(sr=>{const a=SRCS[sr].rows();for(let i=0;i<Math.min(a.length,400);i+=7){const v=a[i]&&a[i][d[0]];if(v!=null&&String(v).trim()!=='')return true}return false}))ok.push(d)});return ok}
+function dimBar(k,ms){const ds=dimsFor(k,ms);if(!ds.length)return '';const cur=S(k).dim||'period';
+ const chip=(v,l)=>`<button class="btn sm ${cur===v?'pri':''}" onclick="S('${k}').dim='${v}';rerender()">${esc(l)}</button>`;
+ return `<div class="dim-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 10px"><span class="small muted">${tt('依：','By: ')}</span>${chip('period',tt('期間','Period'))}${ds.map(d=>chip(d[0],LANG===0?d[1]:d[2])).join('')}</div>`}
+function xlsBtn(k){return `<button class="btn sm" onclick="exportListXlsx('${k}')">⬇ ${tt('匯出 Excel','Export Excel')}</button>`}
+function exportListXlsx(k){const tb=document.getElementById('lt_'+k);if(!tb||!window.XLSX){toast(tt('沒有表格可匯出','Nothing to export'));return}
+ const wb=XLSX.utils.table_to_book(tb,{raw:false});XLSX.writeFile(wb,'VRT_ERP_'+k+'_'+(S(k).dim||'period')+'_'+ymd(TODAY)+'.xlsx')}
+function dimTableHTML(k,ms,pi,unit,sel){
+ const st=S(k), dim=st.dim, D=DIMS.find(d=>d[0]===dim)||[dim,dim,dim]; const R=st.pt==='ALL'?{all:true}:(sel?keyRange(sel.key):rangeOf(st));
+ const plab=st.pt==='ALL'?tt('全部期間','All periods'):(sel?(/^Y/.test(sel.key)?sel.key.slice(1):sel.key):'');
+ const groups=new Map(); const blank=tt('（未填）','(blank)');
+ ms.forEach((m,i)=>{if(!m.src)return; const by=new Map(); for(const r of rowsIn(m.src,R)){const g=String(r[dim]==null||r[dim]===''?blank:r[dim]).trim()||blank;let a=by.get(g);if(!a){a=[];by.set(g,a)}a.push(r)}
+  by.forEach((a,g)=>{let x=groups.get(g);if(!x){x=new Array(ms.length).fill(null);groups.set(g,x)}x[i]=m.g(a)})});
+ let rows=[...groups.entries()].map(([g,v])=>({g,v})); rows.sort((a,b)=>(+b.v[pi]||0)-(+a.v[pi]||0));
+ {const keep=ms.map((m,i)=>i===pi||!(rows.length>1&&rows.every(r=>r.v[i]===1)));const ms2=ms.filter((m,i)=>keep[i]);pi=ms2.indexOf(ms[pi]);rows=rows.map(r=>({g:r.g,v:r.v.filter((x,i)=>keep[i])}));ms=ms2}
+ const n=rows.length; const show=rows.slice(0,300);
+ const addable=ms.map(m=>m.src&&m.add&&m.ty!=='pct'&&m.ty!=='text');
+ const canFilter=dim==='cust'&&CFG[k]&&CFG[k].cust;
+ let h=`<div class="panel mt list-panel"><div class="list-head"><h2><span class="bar-mark"></span>${esc(LANG===0?D[1]:D[2])}${tt('別報表','')} · ${esc(plab)}</h2>${xlsBtn(k)}</div>${dimBar(k,ms)}
+ <p class="hint">${tt('依「','Sorted by ')}${esc(ms[pi].l())}${tt('」由大到小；上面選年／月就是這張表的期間；選「全部」看所有年份。','; pick a year / month above to change the period, or "All".')}${n>300?tt('（只列前 300 個）',' (top 300 shown)'):''}</p>
+ <div class="tbl-wrap"><table class="t list" id="lt_${k}"><thead><tr><th>${esc(LANG===0?D[1]:D[2])}</th>${ms.map(m=>`<th class="r">${esc(m.l())}</th>`).join('')}<th class="r">${tt('占比','Share')}</th></tr></thead><tbody>`;
+ const tot=sum(rows,r=>+r.v[pi]||0);
+ h+=show.map(r=>`<tr${canFilter?` class="click" onclick="S('${k}').cust=${JSON.stringify(r.g).replace(/"/g,'&quot;')};S('${k}').view='detail';rerender()"`:''}><td class="per">${esc(r.g)}</td>${r.v.map((v,i)=>`<td class="r ${i===pi?'pm':''}">${!ms[i].src?'—':ms[i].ty==='pct'&&v!=null?`<span class="pill">${fmt(v,1)}%</span>`:fmtM(v,ms[i].ty)}</td>`).join('')}<td class="r small">${tot?fmt((+r.v[pi]||0)/tot*100,1)+'%':''}</td></tr>`).join('');
+ h+=`</tbody><tfoot><tr><td>${esc(t('total'))} · ${fmt(n)}</td>${ms.map((m,i)=>`<td class="r">${addable[i]?fmtM(sum(rows,r=>+r.v[i]||0),m.ty):''}</td>`).join('')}<td></td></tr></tfoot></table></div>
+ ${ms.some(m=>!m.src)?`<p class="small muted" style="margin:8px 0 0">${tt('「—」：這個指標不是逐筆資料算的，不能分組。','"—": this metric cannot be split by group.')}</p>`:''}</div>`;
+ return h}
 
 /* =================== Trend & Compare views =================== */
 function renderTrend(k){
@@ -2301,7 +2335,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.7.0';
+const APP_VER='0.7.1';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
