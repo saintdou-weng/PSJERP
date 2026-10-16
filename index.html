@@ -423,7 +423,7 @@ const T={
  compare:['比對中心','Compare Center','មជ្ឈមណ្ឌលប្រៀបធៀប'], exceptions:['異常中心','Exceptions','ករណីមិនប្រក្រតី'], reports:['報告','Reports','របាយការណ៍'],
  telegram:['Telegram','Telegram','Telegram'], audit:['稽核 / 回收','Audit & Trash','សវនកម្ម / ធុងសំរាម'], settings:['設定','Settings','ការកំណត់'],
  legacy_ro:['Legacy ERP 唯讀','Legacy ERP read-only','Legacy ERP អានតែប៉ុណ្ណោះ'],
- proto_note:['v0.6.1 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.6.1 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
+ proto_note:['v0.7.0 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.7.0 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
  order_year:['年份','Year','ឆ្នាំ'], size:['尺寸','Size','ទំហំ'], color_name:['顏色名稱','Colour name','ឈ្មោះពណ៌'],
  back_portal:['回總平台','Back to portal','ត្រឡប់ទៅវិបផតថល'], prod_entry:['VRT Prod 生產系統','VRT Prod production','ប្រព័ន្ធផលិតកម្ម VRT Prod'], erp_link_prod:['ERP 對照中心（在 VRT Prod）','ERP link centre (in VRT Prod)','មជ្ឈមណ្ឌលផ្គូផ្គង ERP (ក្នុង VRT Prod)'], search_ph:['搜尋 ERP Order、自編單號、PO、款式、料品、出貨單…','Search order, self key, PO, style, material, shipment…','ស្វែងរក Order, PO, ម៉ូដ, សម្ភារៈ…'],
  user:['使用者','User','អ្នកប្រើ'], password:['密碼','Password','ពាក្យសម្ងាត់'], trust:['信任此裝置（下次免登入）','Trust this device (skip login next time)','ទុកចិត្តឧបករណ៍នេះ'],
@@ -652,7 +652,7 @@ const IDB={_db:null,
  set(k,v){return new Promise(res=>{if(!this._db)return res(false);try{const tx=this._db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);tx.onabort=()=>res(false)}catch(e){console.error(e);res(false)}})}};
 let MODE=LS.get('psjerp_mode','real'); if(MODE!=='demo')MODE='real';
 function emptyDB(){return {_v:5,_mode:'real',orders:[],bom:[],purchase:[],receiving:[],fabric:[],accessories:[],shipping:[],production:[],fg:[],factorycost:[],accwip:[],
- importlog:[],audit:[],trash:[],cmpres:[],syncruns:[],tglog:[],holidays:[],erpfiles:[],fabsnaps:{},accsnaps:{},asof:{},ordidx:{},smv:[],price:[],stockmove:[],fgstock:[],fgsnaps:{},labor:[],tpl:[]}}
+ importlog:[],audit:[],trash:[],cmpres:[],syncruns:[],tglog:[],holidays:[],erpfiles:[],fabsnaps:{},accsnaps:{},asof:{},ordidx:{},smv:[],price:[],stockmove:[],fgstock:[],fgsnaps:{},labor:[],tpl:[],prodorders:[],invoices:[],payables:[],apsum:[],apsnaps:{}}}
 let DB=emptyDB();
 const dbKey=()=>MODE==='demo'?'db_demo_v5':'db_real_v5';
 let SAVE_OK=true;
@@ -795,7 +795,7 @@ function buildRecords(P,fileName){
  if(P.rep==='cod550')return P.rows.map(r=>({id:nid('b'),...r,...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cod700')return P.rows.map(r=>({id:nid('o'),...r,cut_qty:0,fg_qty:0,status:r.closed_date?'closed':'open',...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cst302')return P.rows.map(r=>({id:nid('k'),...r,...erpMeta(fileName,P,r._row)}));
- if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
+ if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190','codk75','cpu320','cbl140','ar700','ara40'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v',codk75:'mo',cpu320:'rv',cbl140:'iv',ar700:'ap',ara40:'as'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
  return [];
 }
 /* put one batch of finished records into the store (used by import and by cloud download) */
@@ -1395,7 +1395,7 @@ function pageHead(k,acts=''){
 }
 const subKey=k=>({dashboard:'sub_dashboard',orders:'sub_orders',bom:'sub_bom',purchase:'sub_purchase',receiving:'sub_receiving',fabric:'sub_fabric',accessories:'sub_accessories',
  production:'sub_production',shipping:'sub_shipping',wip:'sub_wip','finished-goods':'sub_fg','factory-cost':'sub_fc',costing:'sub_costing',sync:'sub_sync',compare:'sub_compare',
- exceptions:'sub_exc','smart-import':'sub_import',reports:'sub_reports',telegram:'sub_tg',audit:'sub_audit',settings:'sub_settings'}[k]);
+ exceptions:'sub_exc',prodorders:'sub_prodorders',invoices:'sub_invoices',payables:'sub_payables',apsum:'sub_apsum',pprice:'sub_pprice',stockmove:'sub_stockmove',fgstock:'sub_fgstock',labor:'sub_labor','smart-import':'sub_import',reports:'sub_reports',telegram:'sub_tg',audit:'sub_audit',settings:'sub_settings'}[k]);
 let toastT; function toast(m){const el=$('#toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
 function live(arr){return arr.filter(r=>!r.deleted_at)}
 function sum(a,f){return a.reduce((s,r)=>s+(+(typeof f==='function'?f(r):r[f])||0),0)}
@@ -2301,7 +2301,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.6.0';
+const APP_VER='0.7.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -2540,9 +2540,11 @@ DS.labor={l:['人工彙總','Labour summary'],keys:[['month_date','dept']],kw:['
 Object.assign(FIELD_SYN,{month_date:['month','月份'],dept:['dept','部門','線別','line'],headcount:['headcount','人數'],work_hours:['work hours','正常工時','工時'],ot_hours:['ot hours','加班工時'],dl_cost:['dl','dl cost','直接人工'],idl_cost:['idl','idl cost','間接人工']});
 Object.assign(NEED,{orders:['cod700','cod690'],purchase:['cpu350','cpu340'],pprice:['cpu795'],shipping:['cbl300'],stockmove:['cst541','cst551'],fgstock:['cst302'],labor:['Account Flow / HRA-PAY 每月人工彙總（可用智慧匯入或手動新增）']});
 
+
 /* ---------- KPI rows for the new pages ---------- */
 function kpisFor6(k,rows){
  if(!isDemo()){
+  const k7=kpisFor7(k,rows); if(k7!=null)return k7;
   if(k==='purchase')return kpi(tt('採購列','Lines'),fmt(rows.length),'',fmt(uniq(rows,x=>x.purchase_no))+tt(' 張採購單',' POs'))+kpi(tt('採購金額','Ordered value'),money(sum(rows,x=>(x.qty||0)*(x.price||0)),0))+kpi(tt('進貨金額','Received value'),money(sum(rows,'amount'),0),'',tt('= ERP 金額欄','= ERP amount'))+kpi(tt('主料採購','Fabric ordered'),fmt(sum(rows.filter(x=>x.type==='main'&&isYD(x)),'qty')),t('yd'))+kpi(tt('差異／不足量列','Short lines'),fmt(rows.filter(x=>(x.outstanding||0)>0).length),'','',rows.some(x=>(x.outstanding||0)>0)?'warn':'')+kpi(tt('單價為 0','Zero price'),fmt(rows.filter(x=>!x.price).length),'','',rows.some(x=>!x.price)?'warn':'');
   if(k==='pprice')return kpi(tt('採購列','Lines'),fmt(rows.length))+kpi(tt('採購單','POs'),fmt(uniq(rows,x=>x.purchase_no)))+kpi(tt('廠商','Suppliers'),fmt(uniq(rows,x=>x.supplier)))+kpi(tt('料號','Items'),fmt(uniq(rows,x=>x.material_no)))+kpi(tt('採購金額','Value'),money(sum(rows,x=>(x.qty||0)*(x.price||0)),0));
   if(k==='stockmove'){const m=rows.filter(x=>x.type==='main'&&isYD(x)),tr=rows.filter(x=>x.type==='trim');return kpi(tt('料號列','Lines'),fmt(rows.length),'',fmt(m.length)+tt(' 主料 / ',' fabric / ')+fmt(tr.length)+tt(' 副料',' trim'))+kpi(tt('主料入庫','Fabric in'),fmt(sum(m,'in_qty')),t('yd'))+kpi(tt('主料出庫','Fabric out'),fmt(sum(m,'out_qty')),t('yd'))+kpi(tt('主料結存','Fabric closing'),fmt(sum(m,'close')),t('yd'))+kpi(tt('結存為負','Negative closing'),fmt(rows.filter(x=>x.close<0).length),'','',rows.some(x=>x.close<0)?'crit':'')}
@@ -2583,6 +2585,148 @@ function coverageMatrixHTML(){
  let h=`<div class="panel mt"><h2>${tt('資料覆蓋表','Data coverage')}</h2><p class="hint">${tt('每一格＝這一年有沒有上傳這種 ERP 報表（數字＝筆數）。空白格就是還缺的檔。','Each cell shows whether that ERP report is uploaded for the year (number = rows). Blank cells are missing files.')}</p><div class="tbl-wrap"><table class="t cover"><thead><tr><th>${tt('報表','Report')}</th>${years.map(y=>`<th class="r">${String(y).slice(2)}</th>`).join('')}</tr></thead><tbody>`;
  COVER.forEach(([pg,rep,lab])=>{h+=`<tr><td class="lead small">${pg?`<a href="#${pg}">${esc(lab)}</a>`:esc(lab)}</td>${years.map(y=>{if(rep==='cba190'){const f=F.find(x=>x.rep==='cba190');return y===y1?`<td class="r small">${f?'✅ '+fmt(f.rows):'⬜'}</td>`:'<td></td>'}const c=cellFor(rep,y);return `<td class="r small ${c?'ok':'miss'}" title="${c?fmt(c.n)+tt(' 筆',' rows'):tt('沒有','none')}">${c?(c.n>=1000?fmt(c.n/1000,0)+'k':fmt(c.n)):'⬜'}</td>`}).join('')}</tr>`});
  return h+`</tbody></table></div><p class="small muted" style="margin:6px 0 0">${tt('庫存類（K01／K02／K04）是時點快照，只標在快照日期那一年。','Stock reports (K01/K02/K04) are snapshots, marked in the year of the snapshot date.')}</p></div>`}
+
+/* ===================== v0.7.0 (2026-10-16) — 製單、進貨驗收、INVOICE、應付帳款 ===================== */
+const dayOf=v=>{const s=cellS(v);if(!s)return '';const d=dmy(s.split(' ')[0]);return d||dmy(v)};
+const ymOf=v=>{const s=cellS(v).replace(/[^\d]/g,'');return s.length>=6?s.slice(0,4)+'-'+s.slice(4,6):''};
+/* ---------- W_CODK75 製單資料綜合查詢（CODK75.txt） ---------- */
+function parseCODK75(aoa,file,rep){
+ const hi=hdrIdx(aoa,['type_name','my_no','mclose_yn'],5); if(hi<0)throw new Error('找不到表頭（type_name / my_no / mclose_yn）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[];
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const my=cellS(g(r,'my_no')); if(!my)continue;
+  const od=dayOf(g(r,'od_date'));
+  rows.push({my_no:my,od_no:cellS(g(r,'od_no')),type:cellS(g(r,'type_name')),order_date:od,order_year:od?+od.slice(0,4):null,cust:cellS(g(r,'cust_abbr')),style:cellS(g(r,'style_id')),style_name:cellS(g(r,'style_name')),
+   qty:numV(g(r,'od_qty')),fg_qty:numV(g(r,'fin_qty')),adj_qty:numV(g(r,'adj_qty')),transfer_qty:numV(g(r,'seup_qty')),prod_qty:numV(g(r,'ps_qty')),
+   closed:cellS(g(r,'mclose_yn'))==='Y',closed_date:dayOf(g(r,'mclose_date')),closed_by:cellS(g(r,'mclose_user')),close_note:cellS(g(r,'mclose_note')),edit_date:dayOf(g(r,'edit_date')),edit_user:cellS(g(r,'user_name')),_row:i+1});
+ }
+ const dr=minmax(rows.map(r=>r.order_date)); const open=rows.filter(r=>!r.closed).length; const by={};rows.forEach(r=>by[r.type||'—']=(by[r.type||'—']||0)+1);
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 張製單 · 訂單量 ${fmt(sum(rows,'qty'))} · 生產件數 ${fmt(sum(rows,'prod_qty'))} · 累計入庫 ${fmt(sum(rows,'fg_qty'))}`},{ok:null,msg:Object.entries(by).map(([k,v])=>k+' '+fmt(v)).join('／')},{ok:null,msg:`未結案 ${fmt(open)} 張；txt 沒有合計列，以逐筆加總為準`}];
+ return {rep,rows,meta:{key:rep+'|'+dr[0]+'|'+dr[1],label:`接單日 ${dr[0]} ～ ${dr[1]}`,range:dr,totals:{n:rows.length,qty:sum(rows,'qty')},dataRange:dr},checks};
+}
+/* ---------- W_CPU320 採購進貨（驗收）（N06–N10.txt） ---------- */
+function parseCPU320(aoa,file,rep){
+ const hi=hdrIdx(aoa,['mu_date','mu_no','mas_id','t_qty'],5); if(hi<0)throw new Error('找不到表頭（mu_date / mu_no / mas_id / t_qty）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[];
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const no=cellS(g(r,'mu_no')); if(!no)continue;
+  const qty=numV(g(r,'t_qty')), price=numV(g(r,'price'));
+  rows.push({recv_no:no,seq:numV(g(r,'mu_seq')),type:/^D[MR]/i.test(no)?'main':'trim',recv_date:dayOf(g(r,'mu_date')),pay_month:ymOf(g(r,'pay_yymm')),purchase_no:cellS(g(r,'pu_no')),supplier:cellS(g(r,'co_vend_abbr'))||cellS(g(r,'vend_id')),supplier_id:cellS(g(r,'vend_id')),
+   material_no:cellS(g(r,'mas_id')),material:cellS(g(r,'mas_name')),color:cellS(g(r,'color_no')),color_name:cellS(g(r,'color_name2'))||cellS(g(r,'color_name3')),size:cellS(g(r,'size')),unit:cellS(g(r,'unit_id')),
+   qty,foc:numV(g(r,'qty_foc')),de_qty:numV(g(r,'de_qty')),whs:cellS(g(r,'whs_id')),loc:cellS(g(r,'loc_id')),my_no:cellS(g(r,'my_no')),od_no:cellS(g(r,'od_no')),order_date:dayOf(g(r,'od_date')),currency:cellS(g(r,'curr_id')),price,amount:Math.round(qty*price*10000)/10000,_row:i+1});
+ }
+ const dr=minmax(rows.map(r=>r.recv_date)); const nm=rows.filter(r=>r.type==='main').length; const tp=nm*2>=rows.length?'main':'trim';
+ const z=rows.filter(r=>!r.price).length; const nd=rows.filter(r=>!r.recv_date).length;
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 列 · ${fmt(uniq(rows,r=>r.recv_no))} 張驗收單 · ${tp==='main'?'主料':tp==='trim'?'副料':'主副料'}`},{ok:null,msg:'txt 沒有合計列，以逐筆加總為準；金額 = 數量 × 單價（原幣）'}];
+ if(z)checks.push({ok:null,msg:`${fmt(z)} 列單價為 0`}); if(nd)checks.push({ok:false,msg:`${nd} 列沒有驗收日期`});
+ const y0=dr[0].slice(0,4), y1=dr[1].slice(0,4);
+ return {rep,rows,meta:{key:rep+'|'+tp+'|'+dr[0]+'|'+dr[1],label:`${tp==='main'?'主料':tp==='trim'?'副料':''}進貨 ${y0}${y1!==y0?'–'+y1:''}`,range:dr,totals:{n:rows.length,qty:sum(rows,'qty'),amount:sum(rows,'amount')},dataRange:dr},checks};
+}
+/* ---------- W_CBL140 INVOICE 查詢（N11–N14.txt） ---------- */
+function parseCBL140(aoa,file,rep){
+ const hi=hdrIdx(aoa,['po_no','in_no','bl_date','qty'],5); if(hi<0)throw new Error('找不到表頭（po_no / in_no / bl_date / qty）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[];
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const inv=cellS(g(r,'in_no')); if(!inv)continue;
+  const qty=numV(g(r,'qty')), price=numV(g(r,'price'));
+  rows.push({invoice:inv,seq:numV(g(r,'bl_seq')),inv_date:dayOf(g(r,'bl_date')),cust:cellS(g(r,'cust_id')),cust_name:cellS(g(r,'co_cust_abbr')),po_no:cellS(g(r,'po_no')),style:cellS(g(r,'style_id')),clr_no:cellS(g(r,'clr_no')),clr:cellS(g(r,'clr_name')),cust_clr:cellS(g(r,'cust_clrname')),
+   od_no:cellS(g(r,'od_no')),my_no:cellS(g(r,'my_no')),qty,price,price_fob:numV(g(r,'price_fob')),currency:cellS(g(r,'curr_id'))||'USD',rate:numV(g(r,'exch_no'))||1,amount:Math.round(qty*price*10000)/10000,_row:i+1});
+ }
+ const dr=minmax(rows.map(r=>r.inv_date)); const y0=dr[0].slice(0,4), y1=dr[1].slice(0,4); const z=rows.filter(r=>!r.price).length;
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 列 · ${fmt(uniq(rows,r=>r.invoice))} 張 INVOICE · ${fmt(sum(rows,'qty'))} 件 · ${money(sum(rows,'amount'),0)}`},{ok:null,msg:'txt 沒有合計列，以逐筆加總為準；金額 = 數量 × 單價'}];
+ if(z)checks.push({ok:null,msg:`${fmt(z)} 列單價為 0（多為樣品）`});
+ return {rep,rows,meta:{key:rep+'|'+dr[0]+'|'+dr[1],label:`INVOICE ${y0}${y1!==y0?'–'+y1:''}`,range:dr,totals:{n:rows.length,qty:sum(rows,'qty'),amount:sum(rows,'amount')},dataRange:dr},checks};
+}
+/* ---------- W_ARA40 應付帳款彙總（廠商應付帳款彙總表，N18.XLS） ---------- */
+function parseARA40(aoa,file,rep){
+ const hi=hdrIdx(aoa,['序','廠商','應付帳款','未付金額']); if(hi<0)throw new Error('找不到表頭（序 / 廠商 / 應付帳款 / 未付金額）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[]; let tot=null;
+ const head=aoa.slice(0,hi).map(r=>r.map(cellS).join(' ')).join(' '); const am=head.match(/列表日期[:：]?\s*(\d{4}-\d{2}-\d{2})/); const asof=am?am[1]:ymd(TODAY);
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const s=r.map(cellS); if(s.some(x=>/合計|總計/.test(x))){tot=numV(g(r,'未付金額'))||lastNum(r);continue}
+  if(!isNumLike(g(r,'序'))||!cellS(g(r,'廠商')))continue;
+  rows.push({supplier_id:cellS(g(r,'廠商')),supplier:cellS(g(r,'廠商名稱')),currency:cellS(g(r,'幣別')),payable:numV(g(r,'應付帳款')),paid:numV(g(r,'已沖金額')),unpaid:numV(g(r,'未付金額')),_row:i+1});
+ }
+ const bad=rows.filter(r=>Math.abs(r.payable-r.paid-r.unpaid)>0.05).length;
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 家廠商 · 應付 ${money(sum(rows,'payable'),0)} · 未付 ${money(sum(rows,'unpaid'),0)}`},{ok:bad===0,msg:bad?`${bad} 列 應付 − 已沖 ≠ 未付`:'每一列 應付 − 已沖 = 未付'}];
+ if(tot!=null)checks.push(ckEq('未付合計',sum(rows,'unpaid'),tot));
+ const big=rows.filter(r=>r.unpaid>5e6); if(big.length)checks.push({ok:null,msg:'未付金額特別大：'+big.map(r=>r.supplier+' '+money(r.unpaid,0)).join('、')+'（可能是 ERP 資料問題）'});
+ return {rep,rows,meta:{key:rep+'|'+asof,asof,label:'As of '+asof,range:[asof,asof],totals:{n:rows.length,amount:sum(rows,'unpaid')}},checks};
+}
+/* ---------- registry, storage, cloud sheets ---------- */
+(function(){
+ REPORTS.unshift({k:'codk75',fn:'W_CODK75',zh:'製單資料綜合查詢',en:'Production orders',ds:'prodorders',parser:'parseCODK75',hdr:['type_name','my_no','mclose_yn'],use:['製單類別、生產件數、結案人員與日期','Order type, produced qty, closing'],file:'CODK75.txt',sop:'—'}); REPORTS.push(
+  {k:'cpu320',fn:'W_CPU320',zh:'採購進貨（驗收）',en:'Material receipts',ds:'receiving',parser:'parseCPU320',hdr:['mu_date','mu_no','mas_id','t_qty'],use:['實際進貨量、驗收日、付款年月、單價','Received qty, date, pay month, price'],file:'N06（主料）、N07–N10（副料）',sop:'—'},
+  {k:'cbl140',fn:'W_CBL140',zh:'INVOICE 查詢',en:'Invoices',ds:'invoices',parser:'parseCBL140',hdr:['po_no','in_no','bl_date','qty'],use:['INVOICE 件數、單價、金額（＝應收）','Invoice qty, price, amount (= receivables)'],file:'N11–N14',sop:'—'},
+  {k:'ar700',fn:'W_AR700',zh:'廠商結帳明細表',en:'Supplier statements',ds:'payables',parser:'parseAR700',title:/廠商結帳明細/,use:['每月應付憑單、發票、驗收單明細','Monthly payable vouchers by supplier'],file:'AR2014–AR2026.XLS',sop:'—',yearly:1},
+  {k:'ara40',fn:'W_ARA40',zh:'應付帳款彙總',en:'Payables summary',ds:'apsum',parser:'parseARA40',title:/廠商應付帳款彙總/,use:['各廠商應付、已沖、未付（時點值）','Payable / paid / unpaid by supplier (snapshot)'],file:'N18.XLS',sop:'—'});
+ Object.assign(PARSERS,{parseCODK75,parseCPU320,parseCBL140,parseARA40,parseAR700});
+ Object.assign(REP_DS,{codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum'});
+ Object.assign(REP_SHEET,{codk75:'PROD_ORDER',cpu320:'RECEIVING',cbl140:'INVOICE',ar700:'AP',ara40:'AP_SUM'});
+ SNAPREP.ara40=['apsum','apsnaps']; SNAPK.apsum=['apsum','apsnaps'];
+ COVER.splice(COVER.findIndex(c=>c[1]==='cpu795')+1,0,['receiving','cpu320','W_CPU320 進貨驗收']);
+ COVER.splice(COVER.findIndex(c=>c[1]==='cod690')+1,0,['prodorders','codk75','W_CODK75 製單']);
+ COVER.splice(COVER.findIndex(c=>c[1]==='cbl300')+1,0,['invoices','cbl140','W_CBL140 INVOICE'],['payables','ar700','W_AR700 應付明細'],['apsum','ara40','W_ARA40 應付彙總']);
+ const at=(after,row)=>{const i=MODS.findIndex(m=>m[0]===after);MODS.splice(i+1,0,row)};
+ at('orders',['prodorders','📋','g_mat']); at('shipping',['invoices','🧾','g_prod']); at('labor',['payables','💳','g_cost']); at('payables',['apsum','📒','g_cost']);
+ Object.assign(T,{prodorders:['製單','Production orders','បញ្ជាផលិត'],invoices:['INVOICE','Invoices','វិក្កយបត្រ'],payables:['應付明細','Payables','ប្រាក់ត្រូវបង់'],apsum:['應付彙總','Payables summary','សង្ខេបប្រាក់ត្រូវបង់'],
+  sub_prodorders:['W_CODK75 製單資料：類別（大貨／樣品／CMT）、訂單量、生產件數、結案','W_CODK75: order type, order qty, produced qty, closing'],
+  sub_invoices:['W_CBL140 INVOICE 明細：件數、單價、金額（年度應收與此一致）','W_CBL140 invoice lines: qty, price, amount'],
+  sub_payables:['W_AR700 廠商結帳明細：每月應付憑單、發票、驗收單','W_AR700 supplier statements by month'],
+  sub_apsum:['W_ARA40 各廠商應付、已沖、未付（時點值）','W_ARA40 payable / paid / unpaid by supplier (snapshot)'],
+  sub_receiving:['W_CPU320 採購進貨（驗收）：驗收日、實際進貨量、單價、付款年月','W_CPU320 material receipts: date, qty, price, pay month'],
+  sub_pprice:['W_CPU795 每次採購單價（料價、廠商、幣別）','W_CPU795 purchase price per order line']});
+ Object.assign(NEED,{prodorders:['codk75'],receiving:['cpu320'],invoices:['cbl140'],payables:['ar700'],apsum:['ara40']});
+ CFG.prodorders={data:()=>DB.prodorders,date:'order_date',title:'my_no',cust:true,cols:[COL('my_no','my_no',{lead:1,mono:1}),COL('od_no','od_no',{mono:1}),COL('type','類別'),COL('order_date','order_date',{tp:'date'}),COL('cust','customer'),COL('style','style',{mono:1}),COL('style_name','style',{wrap:1}),
+  COL('qty','order_qty',{tp:'num'}),COL('prod_qty','生產件數',{tp:'num'}),COL('fg_qty','累計入庫',{tp:'num'}),COL('adj_qty','累計調整',{tp:'num'}),COL('closed_date','結案日'),COL('closed_by','結案人員'),COL('source_system','source',{tp:'src'})]};
+ CFG.receiving.cols=[COL('recv_no','驗收單號',{lead:1,mono:1}),COL('seq','序',{tp:'num'}),COL('recv_date','驗收日',{tp:'date'}),COL('type','type',{tp:'bt'}),COL('pay_month','付款年月'),COL('supplier','supplier'),COL('purchase_no','purchase_no',{mono:1}),COL('material_no','material_no',{mono:1}),COL('material','material',{wrap:1}),
+  COL('color','color'),COL('color_name','color_name'),COL('qty','qty',{tp:'num'}),COL('unit','unit'),COL('price','price',{tp:'money3'}),COL('currency','幣別'),COL('amount','amount',{tp:'money'}),COL('source_system','source',{tp:'src'})];
+ CFG.invoices={data:()=>DB.invoices,date:'inv_date',title:'invoice',cust:true,cols:[COL('invoice','invoice',{lead:1,mono:1}),COL('seq','序',{tp:'num'}),COL('inv_date','date',{tp:'date'}),COL('cust','customer'),COL('po_no','po_no',{mono:1}),COL('my_no','my_no',{mono:1}),COL('style','style',{mono:1}),COL('clr','color'),
+  COL('qty','qty',{tp:'num'}),COL('price','price',{tp:'money3'}),COL('currency','幣別'),COL('amount','amount',{tp:'money'}),COL('source_system','source',{tp:'src'})]};
+ CFG.payables={data:()=>DB.payables,date:null,yearF:'year',title:'voucher',cols:[COL('voucher','應付憑單',{lead:1,mono:1}),COL('year','帳款年'),COL('pay_no','付款單號',{mono:1}),COL('pay_date','付款日期',{tp:'date'}),COL('supplier_id','廠商'),COL('supplier','supplier'),COL('invoice_no','發票號碼',{mono:1}),COL('recv_no','驗收單號',{mono:1}),COL('recv_date','進貨日期',{tp:'date'}),COL('my_no','my_no',{mono:1}),COL('purchase_no','purchase_no',{mono:1}),
+  COL('material_no','material_no',{mono:1}),COL('material','material',{wrap:1}),COL('color','color'),COL('currency','幣別'),COL('qty','qty',{tp:'num'}),COL('price','price',{tp:'money3'}),COL('amount','amount',{tp:'money'}),COL('source_system','source',{tp:'src'})]};
+ CFG.apsum={data:()=>DB.apsum,title:'supplier',nodate:1,snap:1,cols:[COL('supplier_id','廠商',{lead:1,mono:1}),COL('supplier','supplier'),COL('currency','幣別'),COL('payable','應付帳款',{tp:'money'}),COL('paid','已沖金額',{tp:'money'}),COL('unpaid','未付金額',{tp:'money'}),COL('source_system','source',{tp:'src'})]};
+ SRCS.recv={rows:()=>live(DB.receiving),date:r=>r.recv_date};
+ PM.receiving={metrics:mk([
+  M({l:()=>tt('驗收列','Lines'),src:'recv',g:r=>r.length,add:1}),
+  M({l:()=>tt('驗收單','Receipts'),src:'recv',g:r=>uniq(r,x=>x.recv_no),add:1}),
+  M({l:()=>tt('主料進貨(碼)','Fabric in (yd)'),src:'recv',g:r=>sum(r.filter(x=>x.type==='main'&&/^Y/i.test(x.unit||'')),'qty'),p:1,add:1}),
+  M({l:()=>tt('進貨金額(USD)','Received USD'),src:'recv',g:r=>sum(r.filter(x=>!x.currency||x.currency==='USD'),'amount'),ty:'money',add:1}),
+  M({l:()=>tt('廠商數','Suppliers'),src:'recv',g:r=>uniq(r,x=>x.supplier)})])};
+})();
+/* ---------- W_AR700 廠商結帳明細表（AR2014.XLS…；Excel 只有第一頁有廠商，所以用驗收單／採購單補廠商） ---------- */
+function parseAR700(aoa,file,rep){
+ const hi=hdrIdx(aoa,['應付憑單號','驗收單號','金額']); if(hi<0)throw new Error('找不到表頭（應付憑單號 / 驗收單號 / 金額）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:'';
+ const head=aoa.slice(0,hi).map(r=>r.map(cellS).filter(Boolean).join(' ')).join(' ');
+ const ym=head.match(/帳款年月[:：]?\s*(\d{4})\/(\d{2})\s*～\s*(\d{4})\/(\d{2})/); const y=ym?+ym[1]:fileYear(file.name);
+ const sup=new Map(); live(DB.receiving||[]).forEach(r=>{if(r.recv_no&&r.supplier&&!sup.has('R'+r.recv_no))sup.set('R'+r.recv_no,[r.supplier_id||'',r.supplier])});
+ [...live(DB.price||[]),...live(DB.purchase||[])].forEach(r=>{if(r.purchase_no&&r.supplier&&!sup.has('P'+r.purchase_no))sup.set('P'+r.purchase_no,['',r.supplier])});
+ const rows=[]; let sub=0, cur=[]; const pays=[];
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const s=r.map(cellS); const line=s.filter(Boolean).join(' ');
+  if(/小計[:：]/.test(line)){sub+=numV(g(r,'金額'));continue}
+  if(/付款單號[:：]/.test(line)){const j=s.findIndex(x=>/付款單號/.test(x)),k=s.findIndex(x=>/付款日期/.test(x)); const pno=s.slice(j+1).find(Boolean)||'', pd=k>=0?dayOf(s.slice(k+1).find(Boolean)):'';
+   cur.forEach(x=>{x.pay_no=pno;x.pay_date=pd}); continue}
+  if(/憑單總金額/.test(line)){const nx=(aoa[i+1]||[]).map(cellS); const ti=s.findIndex(x=>/實付金額/.test(x)); const paid=ti>=0?numV(nx[ti]):null; cur.forEach(x=>x.paid_total=paid); cur=[]; i++; continue}
+  const v=cellS(g(r,'應付憑單號')); const amtS=cellS(g(r,'金額')); if(!v||!/^[A-Z]{1,3}\d{6,}/i.test(v)||amtS===''||isNaN(+amtS.replace(/,/g,'')))continue;
+  const rv=cellS(g(r,'驗收單號')), pu=cellS(g(r,'採購單號')); const sp=sup.get('R'+rv)||sup.get('P'+pu)||['',''];
+  if(cur.length&&cur[0].voucher!==v)cur=[];
+  const rec={voucher:v,invoice_no:cellS(g(r,'發票號碼')),invoice_amt:numV(g(r,'發票金額')),invoice_tax:numV(g(r,'發票稅額')),recv_no:rv,recv_date:dayOf(g(r,'進貨日期')),my_no:cellS(g(r,'自編單號')),purchase_no:pu,
+   material_no:cellS(g(r,'料品代號')),material:cellS(g(r,'料品名稱說明')),color:cellS(g(r,'顏色')),currency:cellS(g(r,'幣別'))||'USD',qty:numV(g(r,'數量')),price:numV(g(r,'單價')),amount:numV(amtS),
+   supplier_id:sp[0],supplier:sp[1],year:y,ap_from:ym?ym[1]+'-'+ym[2]:'',ap_to:ym?ym[3]+'-'+ym[4]:'',pay_no:'',pay_date:'',paid_total:null,_row:i+1};
+  rows.push(rec); cur.push(rec);
+ }
+ const tot=sum(rows,'amount'); const nos=rows.filter(r=>!r.supplier).length;
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 列 · ${fmt(uniq(rows,r=>r.voucher))} 張應付憑單 · ${money(tot,0)}`},ckEq('金額',tot,sub,Math.max(0.05,Math.abs(sub)*1e-6)),
+  {ok:null,msg:'Excel 匯出只有第一頁有廠商名稱；廠商用驗收單（W_CPU320）或採購單補上'+(nos?`，${fmt(nos)} 列找不到廠商（先匯入 N06–N10 再重匯可補上）`:'')}];
+ const dr=minmax(rows.map(r=>r.recv_date));
+ return {rep,rows,meta:{key:rep+'|'+(y||file.name),year:y,label:(ym?`帳款年月 ${ym[1]}/${ym[2]} ～ ${ym[3]}/${ym[4]}`:(y+' 年應付')),range:y?yearRange(y):dr,totals:{n:rows.length,amount:tot},dataRange:dr},checks};
+}
+function kpisFor7(k,rows){
+ if(k==='prodorders'){const op=rows.filter(x=>!x.closed);return kpi(tt('製單','Orders'),fmt(rows.length),'',fmt(uniq(rows,x=>x.cust))+tt(' 個客戶',' customers'))+kpi(t('order_qty'),fmt(sum(rows,'qty')),t('pcs'))+kpi(tt('生產件數','Produced'),fmt(sum(rows,'prod_qty')),t('pcs'))+kpi(tt('累計入庫','FG in'),fmt(sum(rows,'fg_qty')),t('pcs'))+kpi(tt('未結案','Open'),fmt(op.length),'',fmt(sum(op,'qty'))+' '+t('pcs'),op.length?'warn':'')}
+ if(k==='receiving'){const u=rows.filter(x=>!x.currency||x.currency==='USD');return kpi(tt('驗收列','Lines'),fmt(rows.length),'',fmt(uniq(rows,x=>x.recv_no))+tt(' 張驗收單',' receipts'))+kpi(tt('主料進貨','Fabric in'),fmt(sum(rows.filter(x=>x.type==='main'&&/^Y/i.test(x.unit||'')),'qty')),t('yd'))+kpi(tt('進貨金額','Value'),money(sum(u,'amount'),0),'',tt('只算 USD','USD only'))+kpi(tt('廠商','Suppliers'),fmt(uniq(rows,x=>x.supplier)))}
+ if(k==='invoices'){const u=rows.filter(x=>!x.currency||x.currency==='USD');return kpi(tt('INVOICE','Invoices'),fmt(uniq(rows,x=>x.invoice)))+kpi(tt('件數','Pieces'),fmt(sum(rows,'qty')),t('pcs'))+kpi(t('amount'),money(sum(u,'amount'),0),'',tt('只算 USD','USD only'))+kpi(tt('客戶','Customers'),fmt(uniq(rows,x=>x.cust)))}
+ if(k==='payables'){const u=rows.filter(x=>!x.currency||x.currency==='USD');return kpi(tt('明細列','Lines'),fmt(rows.length))+kpi(tt('應付憑單','Vouchers'),fmt(uniq(rows,x=>x.voucher)))+kpi(tt('應付金額','Payable'),money(sum(u,'amount'),0),'',tt('只算 USD','USD only'))+kpi(tt('廠商','Suppliers'),fmt(uniq(rows,x=>x.supplier_id)))}
+ if(k==='apsum')return kpi(tt('廠商','Suppliers'),fmt(rows.length))+kpi(tt('應付帳款','Payable'),money(sum(rows,'payable'),0))+kpi(tt('已沖金額','Paid'),money(sum(rows,'paid'),0))+kpi(tt('未付金額','Unpaid'),money(sum(rows,'unpaid'),0),'','',sum(rows,'unpaid')>0?'warn':'');
+ return null;
+}
+
 
 /* ---------- "what is missing" card with SOP + drop zone ---------- */
 function needHTML(k){
@@ -2635,7 +2779,7 @@ function erpQueueHTML(){
  <p class="small muted" style="margin:8px 0 0">${tt('只寫入 PSJERP 雲端資料；不寫回 clothes.exe。','Writes to PSJERP cloud data only; never back to clothes.exe.')}</p></div>`;
  return h;
 }
-function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove'}[rep]||'dashboard'}
+function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum'}[rep]||'dashboard'}
 function confirmERPAll(){
  const done=[]; IMPQ.filter(q=>q.P&&!q.done&&!q.skip).forEach(q=>{const r=applyERP(q.P,q.file);q.done=r;done.push(q)});
  COSTC.clear(); GC.clear(); toast(tt('已匯入 ','Imported ')+done.length+tt(' 個檔','files'));

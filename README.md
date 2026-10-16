@@ -13,6 +13,19 @@
 | `CLAUDE_INSTRUCTIONS.md` | 主指令（V2 + V3 追加，最新 V3.6） |
 | `.nojekyll` | 讓 GitHub Pages 原樣提供檔案 |
 
+## v0.7.0 重點：再加 5 種 ERP 報表（2026-10-16）
+
+| 報表 | 檔名 | 頁面 | 雲端資料集 |
+|---|---|---|---|
+| W_CODK75 製單資料綜合查詢 | `CODK75.txt` | 📋 製單 | PROD_ORDER |
+| W_CPU320 採購進貨（驗收） | `N06.txt`（主料）、`N07–N10.txt`（副料） | 📥 進貨驗收 | RECEIVING |
+| W_CBL140 INVOICE 查詢 | `N11–N14.txt` | 🧾 INVOICE | INVOICE |
+| W_AR700 廠商結帳明細表 | `AR2014.XLS … AR2026.XLS`（一年一檔） | 💳 應付明細 | AP |
+| W_ARA40 應付帳款彙總 | `N18.XLS` | 📒 應付彙總（時點值） | AP_SUM |
+
+- W_AR700 的 Excel 只有第一頁印廠商，所以每一列的廠商用驗收單號（W_CPU320）或採購單號補上：**先匯入 N06–N10，再匯入 AR 檔**。
+- Apps Script 要同步更新到 v0.7.0（`ERP_SHEETS` 多了 5 個資料集），否則雲端會回 BAD_SHEET。
+
 ## v0.6.0 重點：下載的 ERP 檔全部能直接丟進來
 
 - **任何一頁都能拖檔**：把 `下載\ERP_export` 的檔案拖到畫面上就好，不用先選分頁；每個檔一列，一個都不會漏。

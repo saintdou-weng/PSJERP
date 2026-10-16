@@ -1,5 +1,6 @@
 /**
  * PSJERP — VRT ERP Telegram + Google control layer  v0.6.1
+ *   v0.7.0 (2026-10-16)：雲端資料集新增 製單 PROD_ORDER（W_CODK75）、進貨驗收 RECEIVING（W_CPU320）、INVOICE（W_CBL140）、應付明細 AP（W_AR700）、應付彙總 AP_SUM（W_ARA40）。
  *   v0.6.1 (2026-10-15)：網址基底改為 PSJERP（舊 vrt-asset 已失效，Telegram 選單按鈕全部連不上）；webBase_() 讀到舊網址會自動修正。
  *   v0.6.0 (2026-10-07)：雲端改成「一種資料一個試算表（PSJERP_ERP_*）、一個匯入批次一個分頁」，快滿 900 萬格自動開下一本；
  *                      資料集擴充（採購、採購單價、進耗存、成品庫存、出貨、SMV、人工彙總）；新增欄位對應範本 TEMPLATES；
@@ -20,7 +21,7 @@ const SYNC_KEY_DIRECT  = '';   // ← 雲端同步密碼（網頁「設定 → �
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.6.1',
+  VERSION: '0.7.0',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -448,7 +449,7 @@ function erpSS_() {
   if (!ss) { ss = SpreadsheetApp.create('PSJERP_ERPDATA'); p.setProperty('ERP_SHEET_ID', ss.getId()); }
   return ss;
 }
-const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY'];
+const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY','PROD_ORDER','RECEIVING','INVOICE','AP','AP_SUM'];
 const FILE_COLS = ['key','rep','sheet','fn','file','rows','label','range','asof','year','totals','checks','at','batch','version','cols','types','user','sheet_id','tab'];
 const CELL_LIMIT = 9000000;   // Google 試算表上限 1,000 萬格，留 10% 空間
 function sheetOf_(ss, name, header) {
