@@ -800,6 +800,15 @@ function buildRecords(P,fileName){
  return [];
 }
 /* put one batch of finished records into the store (used by import and by cloud download) */
+/* v0.7.2：每週重抓「今年」時，新檔範圍包住舊檔 → 舊批次作廢（本機刪掉，雲端也刪），避免同一段資料算兩次 */
+const SUPERSEDE=new Set(['cod700','codk75','cpu320','cbl140','cst541','cst551','cst580','cbl300','cod690']);
+function rngOf(m){const r=m&&m.range;if(!r||!r[0]||!r[1])return null;return [String(r[0]).slice(0,10),String(r[1]).slice(0,10)]}
+function supersede(rep,key,meta){
+ if(!SUPERSEDE.has(rep)||SNAPREP[rep])return 0; const nr=rngOf(meta); if(!nr)return 0; const sub=k=>rep==='cpu320'?String(k).split('|')[1]:'';
+ const old=(DB.erpfiles||[]).filter(f=>f.key!==key&&f.rep===rep&&sub(f.key)===sub(key)&&(()=>{const r=rngOf(f);return r&&r[0].slice(0,7)>=nr[0].slice(0,7)&&r[1]<=nr[1]})());
+ let n=0; old.forEach(f=>{n+=dropLocalBatch(f);if(f.version)(DB.dropq=DB.dropq||[]).push(f.key)}); return n}
+function dropLocalBatch(f){const ds=REP_DS[f.rep];let n=0;if(ds&&!SNAPREP[f.rep]&&DB[ds]){const b=DB[ds].length;DB[ds]=DB[ds].filter(x=>x.import_key!==f.key);n=b-DB[ds].length}
+ DB.erpfiles=(DB.erpfiles||[]).filter(x=>x.key!==f.key);return n}
 function storeBatch(rep,key,meta,recs){
  let removed=0; const ds=REP_DS[rep];
  if(SNAPREP[rep]){const sn=SNAPREP[rep][1]; DB[sn]=DB[sn]||{}; const asof=meta.asof; const cur=DB.asof[ds];
@@ -811,6 +820,7 @@ function storeBatch(rep,key,meta,recs){
  if(rep==='cod550'){DB.ordidx=DB.ordidx||{};recs.forEach(b=>{if(b.my_no&&!DB.ordidx[keyN(b.my_no)])DB.ordidx[keyN(b.my_no)]={od_no:b.od_no,date:b.order_date,cust:b.cust,style:b.style}})}
  const updated=enrichOrders();
  DB.erpfiles=(DB.erpfiles||[]).filter(f=>f.key!==key); DB.erpfiles.unshift(meta);
+ const sup=supersede(rep,key,meta); removed+=sup;
  updateDataRange(); GC.clear(); COSTC.clear();
  return {added:recs.length,removed,updated};
 }
@@ -866,7 +876,9 @@ async function cloudSync(manual,only){
  CLOUD.busy=true; let pulled=0, pushed=0;
  try{
   cloudSetState('busy',tt('讀取雲端清單…','Reading cloud list…'));
+  for(const k of (DB.dropq||[]).slice()){await cpost({action:'erp_drop',key:k});DB.dropq=DB.dropq.filter(x=>x!==k);persist()}
   const man=await cget({action:'erp_manifest'}); CLOUD.url=man.url||''; const files=man.files||[]; CLOUD.files=files.length;
+  if(files.length&&!only){const inCloud=new Set(files.map(m=>String(m.key)));const gone=(DB.erpfiles||[]).filter(f=>f.version&&!f.dirty&&!inCloud.has(String(f.key))&&!SNAPREP[f.rep]);if(gone.length&&gone.length<=Math.max(3,files.length*0.2)){gone.forEach(dropLocalBatch);updateDataRange();GC.clear();COSTC.clear();persist()}}
   const justPushed=new Set();
   for(const f of (DB.erpfiles||[]).filter(f=>(f.dirty||!f.version)&&want(f))){await pushBatch(f);justPushed.add(f.key);pushed++;persist()}
   for(const m of files){if(justPushed.has(m.key)||!want(m))continue;const loc=(DB.erpfiles||[]).find(f=>f.key===m.key);if(loc&&(loc.dirty||String(loc.version)===String(m.version)))continue;await pullBatch(m);pulled++;persist()}
