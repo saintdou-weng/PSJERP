@@ -471,7 +471,7 @@ const T={
  sub_shipping:['來源 W_CBL300 / W_CBL510 / W_CBL520。','From W_CBL300 / 510 / 520.','ពី W_CBL300។'],
  sub_wip:['數量 WIP 與金額 WIP 分開，不相加。ERP 推算 WIP 顯示公式與來源。','Quantity WIP and value WIP are kept apart. ERP-derived WIP shows its formula and sources.','WIP បរិមាណ និង WIP តម្លៃ ដាច់ពីគ្នា។'],
  sub_fg:['Legacy ERP（W_CST580 / W_COD690）、Account Flow smart_fg、VRT Prod 三方比對。','Legacy ERP (W_CST580 / W_COD690) vs Account Flow smart_fg vs VRT Prod.','ប្រៀបធៀប ៣ ប្រភព។'],
- sub_fc:['Account Flow 製造費用為主來源；不執行 W_CCS650 分攤、不按 W_CCS510 重新計算。','Account Flow factory cost is the primary source. W_CCS650 allocation and W_CCS510 recalculation are never run.','ប្រភពចម្បងគឺ Account Flow។'],
+ sub_fc:['ERP W_CCS450 每月製造費用（20 項）÷ 當月成品入庫件數；不執行 W_CCS650 分攤、不按 W_CCS510 重新計算。','Monthly overhead from ERP W_CCS450 (20 categories) ÷ FG pieces that month. W_CCS650 allocation and W_CCS510 recalculation are never run.','ប្រភពចម្បងគឺ Account Flow។'],
  sub_costing:['料 + 工 + 費 + 運 + 其他 = 預估成本，對比售價算毛利。預估與實際分開顯示。','Material + labour + overhead + freight + other = estimated cost, against selling price. Estimated and actual are never mixed.','ថ្លៃដើមប៉ាន់ធៀបតម្លៃលក់។'],
  sub_sync:['Legacy ERP → PSJERP Bridge（唯讀）→ Google Cloud。排程每週一、四 09:00 更新，完成後在 Telegram 發更新摘要；廠休日跳過。','Legacy ERP → PSJERP Bridge (read-only) → Google cloud. Updated every Monday and Thursday at 09:00, then an update summary goes to Telegram; factory holidays are skipped.','Legacy ERP → PSJERP Bridge។'],
  sub_compare:['任一資料集、任兩個以上來源，依 Order / 自編單號 / PO / 款式 / 料品比對。','Any dataset, two or more sources, matched by order / self key / PO / style / material.','ប្រៀបធៀបប្រភពច្រើន។'],
@@ -796,7 +796,7 @@ function buildRecords(P,fileName){
  if(P.rep==='cod550')return P.rows.map(r=>({id:nid('b'),...r,...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cod700')return P.rows.map(r=>({id:nid('o'),...r,cut_qty:0,fg_qty:0,status:r.closed_date?'closed':'open',...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cst302')return P.rows.map(r=>({id:nid('k'),...r,...erpMeta(fileName,P,r._row)}));
- if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190','codk75','cpu320','cbl140','ar700','ara40'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v',codk75:'mo',cpu320:'rv',cbl140:'iv',ar700:'ap',ara40:'as'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
+ if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190','codk75','cpu320','cbl140','ar700','ara40','ccs450'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v',codk75:'mo',cpu320:'rv',cbl140:'iv',ar700:'ap',ara40:'as',ccs450:'oh'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
  return [];
 }
 /* put one batch of finished records into the store (used by import and by cloud download) */
@@ -1221,12 +1221,13 @@ function innerBuckets(pt,R){
 /* =================== metric registry (v0.5: grouped, fast, real-data aware) ===================
    Each metric reads one source (src) and aggregates a group of rows (g).  f(R) is derived.
    Metrics without src (demo-only production / factory cost / snapshots) keep f(R). */
-const fcTot=r=>r.payroll+r.ot+r.electricity+r.water+r.repair+r.spare+r.consumables+r.depreciation+r.other;
+const fcTot=r=>r.erp?(r.total||0):r.payroll+r.ot+r.electricity+r.water+r.repair+r.spare+r.consumables+r.depreciation+r.other;
+let FGM=null; const fcPcs=r=>r.erp?((FGM||(FGM=FG_BY_MONTH()))[r.month]||0):r.prod_qty;
 function fcIn(R){
  let tot=0,pcs=0,smv=0;
  live(DB.factorycost).forEach(r=>{const [y,m]=r.month.split('-').map(Number);const ms=new Date(y,m-1,1),me=new Date(y,m,0);
   const f=new Date(Math.max(ms,R.from)),to=new Date(Math.min(me,R.to));if(f>to)return;const share=(Math.round((to-f)/864e5)+1)/me.getDate();
-  tot+=fcTot(r)*share;pcs+=r.prod_qty*share;smv+=r.smv_min*share});
+  tot+=fcTot(r)*share;pcs+=fcPcs(r)*share;smv+=(r.smv_min||0)*share});
  return {tot,pcs,smv};
 }
 const SRCS={
@@ -1896,25 +1897,25 @@ function exportFG(){const rows=live(DB.fg);showCSV('finished_goods.csv',[['fg_da
 
 /* ================= Factory cost ================= */
 const FC_CATS=[['payroll','Payroll','薪資'],['ot','OT','加班'],['electricity','Electricity','電費'],['water','Water','水費'],['repair','Repair','維修'],['spare','Spare parts','零件'],['consumables','Consumables','耗材'],['depreciation','Depreciation','折舊'],['other','Other expense','其他費用']];
-const fcTotal=r=>FC_CATS.reduce((s,c)=>s+r[c[0]],0);
+const fcTotal=r=>r.erp?(r.total||0):FC_CATS.reduce((s,c)=>s+r[c[0]],0);
 function renderFC(){
  if(!isDemo()&&!live(DB.factorycost).length)return pageHead('factory-cost')+needHTML('factory-cost');
  const k='factory-cost', st=S(k), Rg=rangeOf(st); const Rr=rates();
- const fcAll=live(DB.factorycost); const months=fcAll.filter(r=>{const [y,m]=r.month.split('-').map(Number);return new Date(y,m-1,1)<=Rg.to&&new Date(y,m,0)>=Rg.from});
+ FGM=null; const fcAll=live(DB.factorycost); const ERPFC=fcAll.some(r=>r.erp); const CATS=ERPFC?OH_CATS:FC_CATS; const months=fcAll.filter(r=>{const [y,m]=r.month.split('-').map(Number);return new Date(y,m-1,1)<=Rg.to&&new Date(y,m,0)>=Rg.from});
  const X=fcIn(Rg); const partial=st.pt==='D'||st.pt==='W'||(st.pt==='C'&&months.length&&((Rg.to-Rg.from)/864e5<27));
  const share=r=>{const [y,m]=r.month.split('-').map(Number);const ms=new Date(y,m-1,1),me=new Date(y,m,0);const f=new Date(Math.max(ms,Rg.from)),to=new Date(Math.min(me,Rg.to));return f>to?0:(Math.round((to-f)/864e5)+1)/me.getDate()};
- const cat=c=>sum(months,r=>r[c]*share(r)); const lab=sum(months,r=>(r.payroll+r.ot)*share(r)), hrs=sum(months,r=>r.labor_hours*share(r));
+ const cat=c=>sum(months,r=>r[c]*share(r)); const lab=sum(months,r=>(r.erp?0:(r.payroll+r.ot))*share(r)), hrs=sum(months,r=>(r.labor_hours||0)*share(r));
  let h=pageHead(k,`<button class="btn sm pri" onclick="go('smart-import')">🧠 ${esc(t('smart-import'))}</button><button class="btn sm" onclick="sendSummary('factory-cost')">${esc(t('send_tg'))}</button>`)+pnav(k,{views:true});
  h+=`<div class="note crit" style="margin-bottom:12px">🔴 ${tt('W_CCS650 製造費用分攤、W_CCS510 重新計算：禁止執行（會寫入 Legacy ERP）。本頁全部在雲端計算。','W_CCS650 allocation and W_CCS510 recalculation are prohibited (they write to the legacy ERP). Everything here is computed in the cloud.')}</div>`;
  if(partial)h+=`<p class="note info small" style="margin:0 0 12px">${tt('製造費用是月資料；日 / 週期間按天數攤分。','Factory cost is monthly; day / week periods are prorated by days.')}</p>`;
- h+=`<div class="kpis">${kpi(tt('製造費用','Factory cost'),money(X.tot,0),'',srcBadge('ACCOUNT_FLOW'))}${kpi(tt('製費 / 件','Cost / piece'),X.pcs?money(X.tot/X.pcs,3):'—','',fmt(X.pcs)+' '+t('pcs'))}
+ h+=`<div class="kpis">${kpi(tt('製造費用','Factory cost'),money(X.tot,0),'',ERPFC?'W_CCS450':srcBadge('ACCOUNT_FLOW'))}${kpi(tt('製費 / 件','Cost / piece'),X.pcs?money(X.tot/X.pcs,3):'—','',fmt(X.pcs)+' '+t('pcs'))}
   ${kpi(tt('製費 / SMV 分鐘','Cost / SMV minute'),X.smv?money(X.tot/X.smv,4):'—','',fmt(X.smv)+' SMV min')}${kpi(tt('工資 / SMV 分','Labour / SMV min'),X.smv?money(lab/X.smv,4):'—')}${kpi(tt('製造費用 / SMV 分','Overhead / SMV min'),X.smv?money((X.tot-lab)/X.smv,4):'—')}
   ${kpi(tt('製費 / 人工時','Cost / labour hour'),hrs?money(X.tot/hrs,2):'—')}</div>`;
  const yr=(Rg.to>TODAY?TODAY:Rg.to).getFullYear(); const fy=fcAll.filter(r=>r.month.startsWith(String(yr)));
- h+=`<div class="grid2 mt"><div class="panel"><h2>${tt('費用結構','Cost structure')} · ${esc(periodLabel(st.pt,Rg))}</h2><p class="hint">${money(X.tot,0)}</p>${months.length?FC_CATS.map(c=>meterRow(LANG===0?c[2]:c[1],cat(c[0]),X.tot,money(cat(c[0]),0))).join(''):`<div class="note">${esc(t('no_data'))}</div>`}</div>
-  <div class="panel"><h2>${tt('製費 / 千件（月）','Cost per 1,000 pcs by month')} · ${yr}</h2><p class="hint">${tt('製費 ÷ 當月產量 · 點長條看該月','factory cost ÷ pieces · tap a bar for that month')}</p>${fy.length?barChart(fy.map(r=>Math.round(fcTotal(r)/r.prod_qty*1000)),fy.map(r=>r.month.slice(5)),'USD',{hl:fy.map(r=>months.includes(r)),drill:fy.map(r=>`drill('${k}','M','${r.month}-01')`)}):`<div class="note">${esc(t('no_data'))}</div>`}</div></div>`;
- h+=`<div class="panel mt"><h2>${tt('每月明細','Monthly detail')}</h2><p class="hint">Account Flow · ${esc(t('demo'))} · ${tt('期間內的月份','months in the period')}</p>${months.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th>${tt('月份','Month')}</th>${FC_CATS.map(c=>`<th class="r">${LANG===0?c[2]:c[1]}</th>`).join('')}<th class="r">${esc(t('total'))}</th><th class="r">${tt('產量','Pieces')}</th><th class="r">SMV min</th><th class="r">${tt('/件','/pc')}</th><th class="r">${tt('/SMV分','/SMV min')}</th></tr></thead><tbody>
- ${months.map(r=>`<tr class="click" onclick="drill('${k}','M','${r.month}-01')"><td class="mono">${r.month}</td>${FC_CATS.map(c=>`<td class="r">${fmt(r[c[0]])}</td>`).join('')}<td class="r"><b>${fmt(fcTotal(r))}</b></td><td class="r">${fmt(r.prod_qty)}</td><td class="r">${fmt(r.smv_min)}</td><td class="r">${money(fcTotal(r)/r.prod_qty,3)}</td><td class="r">${money(fcTotal(r)/r.smv_min,4)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="note">${tt('此期間還沒有月結製造費用（本月資料月底後由 Account Flow 匯入）。','No month-end factory cost for this period yet (Account Flow posts it after month-end).')}</div>`}</div>`;
+ h+=`<div class="grid2 mt"><div class="panel"><h2>${tt('費用結構','Cost structure')} · ${esc(periodLabel(st.pt,Rg))}</h2><p class="hint">${money(X.tot,0)}</p>${months.length?CATS.map(c=>meterRow(LANG===0?c[2]:c[1],cat(c[0]),X.tot,money(cat(c[0]),0))).join(''):`<div class="note">${esc(t('no_data'))}</div>`}</div>
+  <div class="panel"><h2>${tt('製費 / 千件（月）','Cost per 1,000 pcs by month')} · ${yr}</h2><p class="hint">${tt('製費 ÷ 當月產量 · 點長條看該月','factory cost ÷ pieces · tap a bar for that month')}</p>${fy.length?barChart(fy.map(r=>Math.round(fcPcs(r)?fcTotal(r)/fcPcs(r)*1000:0)),fy.map(r=>r.month.slice(5)),'USD',{hl:fy.map(r=>months.includes(r)),drill:fy.map(r=>`drill('${k}','M','${r.month}-01')`)}):`<div class="note">${esc(t('no_data'))}</div>`}</div></div>`;
+ h+=`<div class="panel mt"><h2>${tt('每月明細','Monthly detail')}</h2><p class="hint">${ERPFC?'ERP W_CCS450 製造費用（費用資料維護）':'Account Flow · '+esc(t('demo'))} · ${tt('期間內的月份','months in the period')}</p>${months.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th>${tt('月份','Month')}</th>${CATS.map(c=>`<th class="r">${LANG===0?c[2]:c[1]}</th>`).join('')}<th class="r">${esc(t('total'))}</th><th class="r">${tt('產量','Pieces')}</th><th class="r">SMV min</th><th class="r">${tt('/件','/pc')}</th><th class="r">${tt('/SMV分','/SMV min')}</th></tr></thead><tbody>
+ ${months.map(r=>`<tr class="click" onclick="drill('${k}','M','${r.month}-01')"><td class="mono">${r.month}</td>${CATS.map(c=>`<td class="r">${fmt(r[c[0]])}</td>`).join('')}<td class="r"><b>${fmt(fcTotal(r))}</b></td><td class="r">${fmt(fcPcs(r))}</td><td class="r">${fmt(r.smv_min)}</td><td class="r">${(fcPcs(r)?money(fcTotal(r)/fcPcs(r),3):"—")}</td><td class="r">${money(fcTotal(r)/r.smv_min,4)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="note">${tt('此期間還沒有月結製造費用（本月資料月底後由 Account Flow 匯入）。','No month-end factory cost for this period yet (Account Flow posts it after month-end).')}</div>`}</div>`;
  const rate=X.smv?X.tot/X.smv:Rr.total;
  const by=(key)=>{const m={};live(DB.shipping).filter(x=>inR(x.ship_date,Rg)).forEach(s2=>{const o=DB.orders.find(x=>x.od_no===s2.od_no);if(!o||!(o.smv>0.01))return;const g=m[s2[key]]=m[s2[key]]||{q:0,min:0};g.q+=s2.qty;g.min+=s2.qty*o.smv});return Object.entries(m).sort((a,b)=>b[1].min-a[1].min)};
  const tbl=(arr,lab2)=>arr.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th>${lab2}</th><th class="r">${tt('出貨件','Pcs shipped')}</th><th class="r">SMV min</th><th class="r">${tt('分攤製費','Allocated cost')}</th><th class="r">${tt('/件','/pc')}</th></tr></thead><tbody>${arr.map(([k2,v])=>`<tr><td class="mono">${esc(k2)}</td><td class="r">${fmt(v.q)}</td><td class="r">${fmt(v.min)}</td><td class="r">${money(v.min*rate,0)}</td><td class="r">${money(v.min*rate/v.q,3)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="note">${esc(t('no_data'))}</div>`;
@@ -2728,9 +2729,10 @@ function parseARA40(aoa,file,rep){
   {k:'cbl140',fn:'W_CBL140',zh:'INVOICE 查詢',en:'Invoices',ds:'invoices',parser:'parseCBL140',hdr:['po_no','in_no','bl_date','qty'],use:['INVOICE 件數、單價、金額（＝應收）','Invoice qty, price, amount (= receivables)'],file:'N11–N14',sop:'—'},
   {k:'ar700',fn:'W_AR700',zh:'廠商結帳明細表',en:'Supplier statements',ds:'payables',parser:'parseAR700',title:/廠商結帳明細/,use:['每月應付憑單、發票、驗收單明細','Monthly payable vouchers by supplier'],file:'AR2014–AR2026.XLS',sop:'—',yearly:1},
   {k:'ara40',fn:'W_ARA40',zh:'應付帳款彙總',en:'Payables summary',ds:'apsum',parser:'parseARA40',title:/廠商應付帳款彙總/,use:['各廠商應付、已沖、未付（時點值）','Payable / paid / unpaid by supplier (snapshot)'],file:'N18.XLS',sop:'—'});
- Object.assign(PARSERS,{parseCODK75,parseCPU320,parseCBL140,parseARA40,parseAR700});
- Object.assign(REP_DS,{codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum'});
- Object.assign(REP_SHEET,{codk75:'PROD_ORDER',cpu320:'RECEIVING',cbl140:'INVOICE',ar700:'AP',ara40:'AP_SUM'});
+ Object.assign(PARSERS,{parseCODK75,parseCPU320,parseCBL140,parseARA40,parseAR700,parseCCS450});
+ REPORTS.push({k:'ccs450',fn:'W_CCS450',zh:'製造費用（費用資料維護）',en:'Factory overhead',ds:'factorycost',parser:'parseCCS450',hdr:['ym','indirect_labor','nssf'],use:['每月 20 項製造費用','Monthly overhead, 20 categories'],file:'W_CCS450_overhead.csv',sop:'—'});
+ Object.assign(REP_DS,{ccs450:'factorycost',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum'});
+ Object.assign(REP_SHEET,{ccs450:'FACTORY_COST',codk75:'PROD_ORDER',cpu320:'RECEIVING',cbl140:'INVOICE',ar700:'AP',ara40:'AP_SUM'});
  SNAPREP.ara40=['apsum','apsnaps']; SNAPK.apsum=['apsum','apsnaps'];
  COVER.splice(COVER.findIndex(c=>c[1]==='cpu795')+1,0,['receiving','cpu320','W_CPU320 進貨驗收']);
  COVER.splice(COVER.findIndex(c=>c[1]==='cod690')+1,0,['prodorders','codk75','W_CODK75 製單']);
@@ -2744,7 +2746,7 @@ function parseARA40(aoa,file,rep){
   sub_apsum:['W_ARA40 各廠商應付、已沖、未付（時點值）','W_ARA40 payable / paid / unpaid by supplier (snapshot)'],
   sub_receiving:['W_CPU320 採購進貨（驗收）：驗收日、實際進貨量、單價、付款年月','W_CPU320 material receipts: date, qty, price, pay month'],
   sub_pprice:['W_CPU795 每次採購單價（料價、廠商、幣別）','W_CPU795 purchase price per order line']});
- Object.assign(NEED,{prodorders:['codk75'],receiving:['cpu320'],invoices:['cbl140'],payables:['ar700'],apsum:['ara40']});
+ Object.assign(NEED,{'factory-cost':['ccs450'],prodorders:['codk75'],receiving:['cpu320'],invoices:['cbl140'],payables:['ar700'],apsum:['ara40']});
  CFG.prodorders={data:()=>DB.prodorders,date:'order_date',title:'my_no',cust:true,cols:[COL('my_no','my_no',{lead:1,mono:1}),COL('od_no','od_no',{mono:1}),COL('type','類別'),COL('order_date','order_date',{tp:'date'}),COL('cust','customer'),COL('style','style',{mono:1}),COL('style_name','style',{wrap:1}),
   COL('qty','order_qty',{tp:'num'}),COL('prod_qty','生產件數',{tp:'num'}),COL('fg_qty','累計入庫',{tp:'num'}),COL('adj_qty','累計調整',{tp:'num'}),COL('closed_date','結案日'),COL('closed_by','結案人員'),COL('source_system','source',{tp:'src'})]};
  CFG.receiving.cols=[COL('recv_no','驗收單號',{lead:1,mono:1}),COL('seq','序',{tp:'num'}),COL('recv_date','驗收日',{tp:'date'}),COL('type','type',{tp:'bt'}),COL('pay_month','付款年月'),COL('supplier','supplier'),COL('purchase_no','purchase_no',{mono:1}),COL('material_no','material_no',{mono:1}),COL('material','material',{wrap:1}),
@@ -2762,6 +2764,32 @@ function parseARA40(aoa,file,rep){
   M({l:()=>tt('進貨金額(USD)','Received USD'),src:'recv',g:r=>sum(r.filter(x=>!x.currency||x.currency==='USD'),'amount'),ty:'money',add:1}),
   M({l:()=>tt('廠商數','Suppliers'),src:'recv',g:r=>uniq(r,x=>x.supplier)})])};
 })();
+/* ---------- v0.7.2：W_CCS450 製造費用（費用資料維護，每月一筆，Claude 從畫面逐月讀出，合計已逐月核對） ---------- */
+const OH_CATS=[['indirect_labor','間接人工','Indirect labour'],['rent','租金','Rent'],['mfg_overhead','製造雜費','Mfg overhead'],['freight','運費','Freight & trucking'],['postage','郵寄快遞','Postage & courier'],['repairs','修繕','Repairs'],['security','保全','Security'],['utilities','水電','Utilities'],['insurance','保險','Insurance & bond'],['taxi','交通車','Taxi-owned'],['taxes_licences','稅捐規費','Taxes & licences'],['depreciation','折舊','Depreciation'],['meal','伙食津貼','Meal allowance'],['employee_benefit','員工福利','Employee benefit'],['gasoline','油料','Gasoline & oil'],['printing_markers','馬克紙','Printing markers'],['misc_purchase','雜項採購','Misc purchase'],['supplies','物料','Supplies & material'],['medical','醫療','Medical'],['nssf','社保 NSSF','NSSF']];
+function parseCCS450(aoa,file,rep){
+ const hi=aoa.findIndex(r=>r.map(cellS).includes('indirect_labor')); const H=aoa[hi].map(cellS); const ix=n=>H.indexOf(n);
+ const rows=[]; let bad=0;
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const ym=cellS(r[ix('ym')]); if(!/^\d{4}-\d{2}$/.test(ym))continue;
+  const o={month:ym,erp:1,total:numV(r[ix('total')])}; OH_CATS.forEach(c=>o[c[0]]=numV(r[ix(c[0])])||0);
+  const s=OH_CATS.reduce((a,c)=>a+o[c[0]],0); if(Math.abs(s-o.total)>0.02)bad++; o._row=i+1; rows.push(o)}
+ const ms=rows.map(r=>r.month).sort(); const tot=sum(rows,'total');
+ return {rep,rows,meta:{key:rep+'|'+ms[0]+'|'+ms[ms.length-1],label:`製造費用 ${ms[0]} ～ ${ms[ms.length-1]}（${rows.length} 個月）`,range:[ms[0]+'-01',ms[ms.length-1]+'-28'],totals:{n:rows.length,amount:tot}},
+  checks:[{ok:rows.length>0,msg:`${rows.length} 個月 · USD ${fmt(tot,0)}`},{ok:bad===0,msg:bad?`${bad} 個月 20 項加總 ≠ 總合計`:'每個月 20 項加總 = ERP 總合計'}]};
+}
+function ohIn(R,f){let t=0;live(DB.factorycost).forEach(r=>{if(!r.erp)return;const [y,m]=r.month.split('-').map(Number);const ms=new Date(y,m-1,1),me=new Date(y,m,0);
+ const a=R.all?ms:new Date(Math.max(ms,R.from)),b=R.all?me:new Date(Math.min(me,R.to));if(a>b)return;t+=(r[f]||0)*((Math.round((b-a)/864e5)+1)/me.getDate())});return t}
+SRCS.oh={rows:()=>live(DB.factorycost).filter(r=>r.erp),date:r=>r.month+'-01'};
+PM['factory-cost']={metrics:mk([
+  M({l:()=>tt('製造費用','Factory overhead'),src:'oh',g:r=>sum(r,'total'),ty:'money',p:1,add:1}),
+  M({l:()=>tt('間接人工','Indirect labour'),src:'oh',g:r=>sum(r,'indirect_labor'),ty:'money',add:1}),
+  M({l:()=>tt('租金','Rent'),src:'oh',g:r=>sum(r,'rent'),ty:'money',add:1}),
+  M({l:()=>tt('伙食','Meals'),src:'oh',g:r=>sum(r,'meal'),ty:'money',add:1}),
+  M({l:()=>tt('運費','Freight'),src:'oh',g:r=>sum(r,'freight'),ty:'money',add:1}),
+  M({l:()=>tt('折舊','Depreciation'),src:'oh',g:r=>sum(r,'depreciation'),ty:'money',add:1}),
+  M({l:()=>tt('社保','NSSF'),src:'oh',g:r=>sum(r,'nssf'),ty:'money',add:1}),
+  M({l:()=>tt('成品入庫(件)','FG pcs'),src:'oh',g:r=>{FGM=null;return sum(r,fcPcs)},add:1}),
+  M({l:()=>tt('製費/件','Overhead / pc'),src:'oh',g:r=>{FGM=null;const q=sum(r,fcPcs);return q?sum(r,'total')/q:null},ty:'money3'})])};
+const FG_BY_MONTH=()=>{const m={};live(DB.fg).forEach(g=>{const k=String(g.fg_date||'').slice(0,7);if(k)m[k]=(m[k]||0)+(g.erp_qty||0)});return m};
 /* ---------- v0.7.2：製單 / INVOICE / 應付明細 的月、年報表（跟 Sewing 一樣：橫列＝期間，直欄＝數字） ---------- */
 const apDate=r=>{if(r.ap_date)return r.ap_date;const m=String(r.voucher||'').match(/^[A-Z]{1,3}(\d{2})(0[1-9]|1[0-2])\d/i);const d=m?'20'+m[1]+'-'+m[2]+'-01':(okD(r.recv_date)||null);r.ap_date=d;return d};
 (function(){
@@ -2880,7 +2908,7 @@ function erpQueueHTML(){
  <p class="small muted" style="margin:8px 0 0">${tt('只寫入 PSJERP 雲端資料；不寫回 clothes.exe。','Writes to PSJERP cloud data only; never back to clothes.exe.')}</p></div>`;
  return h;
 }
-function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum'}[rep]||'dashboard'}
+function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum',ccs450:'factory-cost'}[rep]||'dashboard'}
 function confirmERPAll(){
  const done=[]; IMPQ.filter(q=>q.P&&!q.done&&!q.skip).forEach(q=>{const r=applyERP(q.P,q.file);q.done=r;done.push(q)});
  COSTC.clear(); GC.clear(); toast(tt('已匯入 ','Imported ')+done.length+tt(' 個檔','files'));

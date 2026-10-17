@@ -465,7 +465,7 @@ function erpSS_() {
   if (!ss) { ss = SpreadsheetApp.create('PSJERP_ERPDATA'); p.setProperty('ERP_SHEET_ID', ss.getId()); }
   return ss;
 }
-const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY','PROD_ORDER','RECEIVING','INVOICE','AP','AP_SUM'];
+const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY','PROD_ORDER','RECEIVING','INVOICE','AP','AP_SUM','FACTORY_COST'];
 const FILE_COLS = ['key','rep','sheet','fn','file','rows','label','range','asof','year','totals','checks','at','batch','version','cols','types','user','sheet_id','tab'];
 const CELL_LIMIT = 9000000;   // Google 試算表上限 1,000 萬格，留 10% 空間
 function sheetOf_(ss, name, header) {
