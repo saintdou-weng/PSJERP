@@ -17,11 +17,12 @@
 const BOT_TOKEN_DIRECT = '';   // ← 貼現有 Bot Token（只貼在 Apps Script，不上傳 GitHub）
 const CHAT_ID_DIRECT   = '';   // ← 貼 Account Flow 群組 Chat ID
 const SYNC_KEY_DIRECT  = '';   // ← 雲端同步密碼（網頁「設定 → 雲端同步」輸入同一組）
+const READ_KEY_DIRECT  = '';   // ← 唯讀密碼（給生產平台讀資料用，只能 erp_manifest / erp_get / erp_updates；只貼在 Apps Script）
 
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.7.2',
+  VERSION: '0.7.3',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -521,8 +522,10 @@ function dropTab_(meta) {
 function erpApi_(b) {
   const key0 = syncKey_();
   if (!key0) return {ok:false, error:'NO_SYNC_KEY', msg:'Apps Script 尚未設定同步密碼（SYNC_KEY_DIRECT）'};
-  if (String(b.k || '') !== key0) return {ok:false, error:'BAD_KEY', msg:'同步密碼不對'};
   const a = String(b.action || '');
+  const rk = String(cfg_('READ_KEY', '') || READ_KEY_DIRECT || '').trim();
+  const isRead = /^erp_(manifest|get|updates)$/.test(a);
+  if (String(b.k || '') !== key0 && !(isRead && rk && String(b.k || '') === rk)) return {ok:false, error:'BAD_KEY', msg:'同步密碼不對'};
   const ss = erpSS_();
   if (a === 'erp_manifest') {
     return {ok:true, files:readTable_(ss.getSheetByName('ERP_FILES')), notes:readTable_(ss.getSheetByName('NOTES')), tpls:readTable_(ss.getSheetByName('TEMPLATES')), url:ss.getUrl(), time:now_()};
