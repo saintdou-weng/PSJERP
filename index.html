@@ -473,7 +473,7 @@ const T={
  sub_fg:['Legacy ERP（W_CST580 / W_COD690）、Account Flow smart_fg、VRT Prod 三方比對。','Legacy ERP (W_CST580 / W_COD690) vs Account Flow smart_fg vs VRT Prod.','ប្រៀបធៀប ៣ ប្រភព។'],
  sub_fc:['Account Flow 製造費用為主來源；不執行 W_CCS650 分攤、不按 W_CCS510 重新計算。','Account Flow factory cost is the primary source. W_CCS650 allocation and W_CCS510 recalculation are never run.','ប្រភពចម្បងគឺ Account Flow។'],
  sub_costing:['料 + 工 + 費 + 運 + 其他 = 預估成本，對比售價算毛利。預估與實際分開顯示。','Material + labour + overhead + freight + other = estimated cost, against selling price. Estimated and actual are never mixed.','ថ្លៃដើមប៉ាន់ធៀបតម្លៃលក់។'],
- sub_sync:['Legacy ERP → PSJERP Bridge（唯讀）→ Google Cloud。正式排程每日 15:30；週日與 VRT 廠休日跳過。','Legacy ERP → PSJERP Bridge (read-only) → Google cloud. Scheduled once daily at 15:30; Sundays and VRT factory holidays are skipped.','Legacy ERP → PSJERP Bridge។'],
+ sub_sync:['Legacy ERP → PSJERP Bridge（唯讀）→ Google Cloud。排程每週一、四 09:00 更新，完成後在 Telegram 發更新摘要；廠休日跳過。','Legacy ERP → PSJERP Bridge (read-only) → Google cloud. Updated every Monday and Thursday at 09:00, then an update summary goes to Telegram; factory holidays are skipped.','Legacy ERP → PSJERP Bridge។'],
  sub_compare:['任一資料集、任兩個以上來源，依 Order / 自編單號 / PO / 款式 / 料品比對。','Any dataset, two or more sources, matched by order / self key / PO / style / material.','ប្រៀបធៀបប្រភពច្រើន។'],
  sub_exc:['只標記、比對、回報，不自動修正 Legacy ERP；保留原始值。','Flag, compare and report only — never auto-fix the legacy ERP; original values are preserved.','សម្គាល់ និងរាយការណ៍ប៉ុណ្ណោះ។'],
  sub_import:['不用先選種類：丟 Excel / CSV，系統自己判斷資料集、預覽差異，確認後才存進雲端。永遠不寫回 clothes.exe。','No need to pick a type: drop an Excel/CSV file, the system detects the dataset and previews changes. Saved to the cloud only after you confirm. Never written back to clothes.exe.','ទម្លាក់ឯកសារ ប្រព័ន្ធស្គាល់ដោយខ្លួនឯង។'],
@@ -873,6 +873,7 @@ async function cloudSync(manual,only){
   if(!only)await syncTpl(man);
   for(const n of NOTEQ.splice(0)){await cpost({action:'erp_note',id:n.id,ds:n.ds,notes:n.notes,tags:n.tags,user:'paul.weng'})}
   (man.notes||[]).forEach(n=>{const arr=DB[n.ds]||[];const r=arr.find(x=>x.id===n.id);if(!r)return;if(r._nat&&r._nat>String(n.at))return;r.notes=String(n.notes||'');r.tags=String(n.tags||'').split(',').map(x=>x.trim()).filter(Boolean);r._nat=String(n.at)});
+  if((DB.digest||[]).length&&!(DB.erpfiles||[]).some(f=>f.dirty||!f.version)){try{await sendDigest(false)}catch(e){console.error(e)}}
   CLOUD.last=nowStamp(); LS.set('psjerp_cloud_last',CLOUD.last); cloudSetState('ok'); persist();
   if(pulled||pushed||manual){toast(tt('雲端同步完成','Cloud sync done')+(pushed?` · ${tt('上傳','up')} ${pushed}`:'')+(pulled?` · ${tt('下載','down')} ${pulled}`:''));rerender()}
  }catch(e){console.error(e);cloudSetState('err',String(e.message||e));if(manual||/密碼|KEY/.test(String(e.message)))toast(tt('雲端同步失敗：','Cloud sync failed: ')+(e.message||e))}
@@ -1933,16 +1934,40 @@ function renderCosting(){
 }
 
 /* ================= Sync center ================= */
-function syncCfg(){DB.sync=DB.sync||{time:'15:30',days:'MON-SAT',gas:''};if(!DB.sync.gas)DB.sync.gas='https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec';return DB.sync}
-function nextSyncText(){const c=syncCfg();const [hh,mm]=c.time.split(':').map(Number);let d=new Date();for(let i=0;i<15;i++){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+i,hh,mm);if(x<=new Date())continue;if(!isWorkDay(new Date(x.getFullYear(),x.getMonth(),x.getDate())))continue;return ymd(x)+' '+c.time+' ('+WD()[(x.getDay()+6)%7]+')'}return '—'}
+function syncCfg(){DB.sync=DB.sync||{time:'09:00',days:'MON,THU',gas:''};if(DB.sync.days!=='MON,THU'){DB.sync.time='09:00';DB.sync.days='MON,THU'}if(!DB.sync.gas)DB.sync.gas='https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec';return DB.sync}
+/* ===== v0.7.2 更新摘要（每次匯入後發到 Telegram，並記在雲端 UPDATE_LOG） ===== */
+function digestAdd(done){DB.digest=DB.digest||[];done.forEach(q=>{if(!q.P||!q.done)return;const P=q.P,T2=P.meta.totals||{};DB.digest.push({at:nowStamp(),fn:q.R.fn,zh:q.R.zh,file:q.file,label:P.meta.label||'',rows:P.rows.length,added:q.done.added||0,removed:q.done.removed||0,amount:T2.amount!=null?T2.amount:null,qty:T2.qty!=null?T2.qty:null,bad:P.checks.filter(c=>c.ok===false).length})});persist()}
+function digestText(L){
+ const g={};L.forEach(x=>{(g[x.fn+' '+x.zh]=g[x.fn+' '+x.zh]||[]).push(x)});
+ const lines=Object.keys(g).map(k=>{const a=g[k];const d=a.reduce((s,x)=>s+x.added-x.removed,0);const rows=a.reduce((s,x)=>s+x.rows,0);
+  const det=a.map(x=>`   ${x.file}（${x.label}）${fmt(x.rows)} 列`+(x.removed?`，取代舊 ${fmt(x.removed)} 列`:'，新資料')+(x.amount!=null?` · $${fmt(x.amount,0)}`:'')+(x.bad?` · ❌ ${x.bad} 項核對不符`:'')).join('\n');
+  return `• ${k}：${a.length} 個檔，${fmt(rows)} 列（${d>=0?'+':''}${fmt(d)}）\n${det}`});
+ const bad=L.reduce((s,x)=>s+x.bad,0);
+ return `時間：${nowStamp().slice(0,16)}\n共 ${L.length} 個檔、${Object.keys(g).length} 種報表${bad?`，⚠️ ${bad} 項核對不符`:'，核對全部 ✅'}\n\n${lines.join('\n')}\n\n（括號＝比上次多／少的列數）\n📊 https://${PAGE_BASE}#sync`}
+async function sendDigest(manual){
+ const L=(DB.digest||[]).slice(); if(!L.length){if(manual)toast(tt('沒有新的匯入','No new imports'));return}
+ if(!cloudReady()){if(manual)toast(tt('請先在「設定 → 雲端同步」輸入同步密碼','Enter the sync password first'));return}
+ if((DB.erpfiles||[]).some(f=>f.dirty||!f.version)){if(manual)toast(tt('還有資料沒上傳雲端，先按「全部同步」','Some data is not uploaded yet — sync first'));return}
+ const text=digestText(L); await cpost({action:'erp_digest',text,files:L.map(x=>({fn:x.fn,file:x.file,rows:x.rows,delta:x.added-x.removed,bad:x.bad}))});
+ DB.digest=[]; (DB.syncruns=DB.syncruns||[]).unshift({time:nowStamp().slice(0,16),ds:'ALL',st:'ok',msg:tt('更新摘要已發到 Telegram · ','Update summary sent to Telegram · ')+L.length+tt(' 個檔',' files')});
+ DIGLOG=null; persist(); toast(tt('更新摘要已發到 Telegram','Update summary sent to Telegram')); rerender()}
+let DIGLOG=null;
+async function loadDigLog(){if(!cloudReady())return;try{const j=await cget({action:'erp_updates'});DIGLOG=j.rows||[];if(location.hash==='#sync')rerender()}catch(e){DIGLOG=[]}}
+function digestPanel(){
+ if(DIGLOG===null){DIGLOG=[];setTimeout(loadDigLog,50)}
+ const pend=(DB.digest||[]).length;
+ return `<div class="panel mt"><h2>📣 ${tt('更新摘要','Update summaries')}</h2><p class="hint">${tt('每次匯入新的 ERP 檔、上傳雲端後，自動在 PSJERP Telegram 群組發一則摘要：更新了哪些報表、幾列、和上次差多少、核對結果。','After each import is uploaded, a summary is posted to the PSJERP Telegram group: which reports, how many rows, change vs last time, check results.')}</p>
+ <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">${pend?stChip('warn',tt('待發送 ','Pending ')+pend+tt(' 個檔',' files')):stChip('good',tt('沒有待發送','Nothing pending'))}<button class="btn sm" ${pend?'':'disabled'} onclick="sendDigest(true)">${tt('立即發送','Send now')}</button></div>
+ ${DIGLOG&&DIGLOG.length?DIGLOG.slice(0,8).map(r=>`<details style="border-top:1px solid var(--line-2);padding:6px 0"><summary><b class="mono">${esc(String(r.time).slice(0,16))}</b> · ${esc(String(r.summary||''))}</summary><div class="small" style="white-space:pre-line;margin-top:6px">${esc(String(r.text||''))}</div></details>`).join(''):`<div class="small muted">${cloudReady()?tt('還沒有摘要紀錄','No summaries yet'):tt('連上雲端後顯示紀錄','Shown after connecting to the cloud')}</div>`}</div>`}
+function nextSyncText(){const c=syncCfg();const [hh,mm]=c.time.split(':').map(Number);let d=new Date();for(let i=0;i<15;i++){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+i,hh,mm);if(x<=new Date())continue;if(x.getDay()!==1&&x.getDay()!==4)continue;if(!isWorkDay(new Date(x.getFullYear(),x.getMonth(),x.getDate())))continue;return ymd(x)+' '+c.time+' ('+WD()[(x.getDay()+6)%7]+')'}return '—'}
 function renderSync(){
  const k='sync', st=S(k), R=rangeOf(st); const c=syncCfg();
  const flow=['Legacy ERP','READ ONLY','PSJERP Bridge','Staging','Validate','Normalize','Deduplicate','Map Keys','Compare','Google Sheets','Sync Log','Refresh VRT ERP'];
  let h=pageHead(k,`<button class="btn sm pri" onclick="syncAll()">${tt('立即同步（唯讀）','Sync now (read-only)')}</button>`);
  h+=`<div class="steps">${flow.map((f,i)=>`<span class="${i<2?'on':''}">${esc(f)}</span>`).join('<span style="border:0;background:none">→</span>')}</div>`;
- h+=`<div class="kpis">${kpi(tt('排程','Schedule'),esc(c.time),'',tt('週一至週六；週日與廠休日跳過','Mon–Sat; Sundays & factory holidays skipped'))}${kpi(tt('下一次','Next run'),'<span style="font-size:17px">'+esc(nextSyncText())+'</span>','',tt('可在設定修改時間 / 行事曆','change time / calendar in Settings'))}${kpi(tt('Legacy 寫入','Legacy writes'),'0','',tt('只允許 SELECT','SELECT only'),'good')}${kpi(tt('後端','Backend'),c.gas?'GAS':'—','',c.gas?tt('已設定 Web App','Web App set'):tt('尚未設定（設定頁）','not set (Settings)'),c.gas?'good':'warn')}</div>`;
- h+=`<div class="note crit" style="margin:12px 0">${tt('單向：Legacy ERP → PSJERP Cloud。不做反向同步。Bridge 帳號只允許 SELECT。休假日不進 Legacy ERP、不發每日摘要；手動「立即同步」仍只讀。','One-way: Legacy ERP → PSJERP Cloud. No reverse sync; the Bridge account may only SELECT. On holidays nothing touches the legacy ERP and no daily summary is sent; manual Sync now is still read-only.')}</div>`;
- if(!isDemo())h+=cloudQuick()+coverageMatrixHTML()+coverageHTML(true); else{h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>Dataset</th><th>ERP</th><th class="r">Legacy</th><th class="r">Cloud</th><th>Last sync</th><th class="r">Added</th><th class="r">Updated</th><th class="r">Errors</th><th>${esc(t('status'))}</th><th>${tt('說明','Note')}</th><th></th></tr></thead><tbody>
+ h+=`<div class="kpis">${kpi(tt('排程','Schedule'),esc(c.time),'',tt('每週一、四；廠休日跳過','Mon & Thu; factory holidays skipped'))}${kpi(tt('下一次','Next run'),'<span style="font-size:17px">'+esc(nextSyncText())+'</span>','',tt('可在設定修改時間 / 行事曆','change time / calendar in Settings'))}${kpi(tt('Legacy 寫入','Legacy writes'),'0','',tt('只允許 SELECT','SELECT only'),'good')}${kpi(tt('後端','Backend'),c.gas?'GAS':'—','',c.gas?tt('已設定 Web App','Web App set'):tt('尚未設定（設定頁）','not set (Settings)'),c.gas?'good':'warn')}</div>`;
+ h+=`<div class="note crit" style="margin:12px 0">${tt('單向：Legacy ERP → PSJERP Cloud。不做反向同步。Bridge 帳號只允許 SELECT。每週一、四 09:00 抓最新資料並匯入，匯完在 Telegram 發「更新摘要」；11:00 若還沒收到更新會發提醒。休假日不進 Legacy ERP。','One-way: Legacy ERP → PSJERP Cloud. Every Mon & Thu 09:00 the latest data is exported and imported, then an update summary goes to Telegram; if nothing arrives by 11:00 a reminder is sent. Holidays are skipped.')}</div>`;
+ if(!isDemo())h+=cloudQuick()+digestPanel()+coverageMatrixHTML()+coverageHTML(true); else{h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>Dataset</th><th>ERP</th><th class="r">Legacy</th><th class="r">Cloud</th><th>Last sync</th><th class="r">Added</th><th class="r">Updated</th><th class="r">Errors</th><th>${esc(t('status'))}</th><th>${tt('說明','Note')}</th><th></th></tr></thead><tbody>
  ${SYNCSETS.map((x,i)=>`<tr><td class="lead" data-l="Dataset">${modIcon(x.k)} ${esc(x.k==='smv'?'SMV':t(x.k))}</td><td class="mono small" data-l="ERP">${esc(x.fn)}</td><td class="r" data-l="Legacy">${x.legacy==null?'—':fmt(x.legacy)}</td><td class="r" data-l="Cloud">${fmt(x.cloud)}</td><td data-l="Last sync">${esc(x.last)}</td><td class="r" data-l="Added">${fmt(x.add)}</td><td class="r" data-l="Updated">${fmt(x.upd)}</td><td class="r" data-l="Errors">${x.err?`<b class="diff-neg">${fmt(x.err)}</b>`:'0'}</td><td data-l="${esc(t('status'))}">${syncChip(x.st)}</td><td class="wrap small" data-l="Note">${esc(x.note[LANG===0?0:1])}</td>
  <td data-l=""><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn sm" onclick="syncNow(${i})">Sync Now</button>${x.err||x.st==='error'?`<button class="btn sm dng" onclick="syncErr(${i})">View Error</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;}
  const runs=(DB.syncruns||[]).filter(r=>inR(r.time.slice(0,10),R));
@@ -2250,7 +2275,7 @@ function renderSettings(){
  h+=`<div class="grid2 mt"><div class="panel"><h2>${tt('角色（PSJERP Cloud 權限，非 Legacy ERP）','Roles (PSJERP Cloud, not legacy ERP)')}</h2><div class="tbl-wrap"><table class="t"><tbody>${roles.map(r=>`<tr><td><b>${r[0]}</b></td><td class="wrap">${esc(LANG===0?r[1]:r[2])}</td></tr>`).join('')}</tbody></table></div><p class="small muted" style="margin-top:8px">${tt('正式版由 Google Apps Script 後端再次檢查 session / user / role，不只靠前端隱藏按鈕。','Production enforces permissions again in the Google Apps Script backend, not just hidden buttons.')}</p></div>
   <div class="panel"><h2>${tt('資料來源模式','Source mode per module')}</h2><div class="tbl-wrap"><table class="t"><tbody>${['orders','bom','purchase','receiving','fabric','accessories','wip','finished-goods','factory-cost','shipping'].map(m=>`<tr><td>${modIcon(m)} ${esc(t(m))}</td><td><select class="inp" style="width:auto" id="md_${m}" onchange="DB.modes['${m}']=this.value;persist();toast(t('saved'))">${[['import','📤 Import'],['linked','🔗 Linked'],['erp','🔄 ERP Sync']].map(([v,l])=>`<option value="${v}" ${(DB.modes[m]||(m==='factory-cost'||m==='wip'?'linked':'erp'))===v?'selected':''}>${l}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>`;
  h+=`<div class="grid2 mt"><div class="panel"><h2>${tt('每日 ERP 同步','Daily ERP sync')}</h2><p class="hint">${tt('週一至週六；週日與下列廠休日自動跳過（記錄 SKIPPED — FACTORY HOLIDAY）','Mon–Sat; Sundays and the holidays below are skipped (logged as SKIPPED — FACTORY HOLIDAY)')}</p>
-  <div class="form"><div class="field"><label for="syncTime">${tt('同步時間（柬埔寨時間）','Sync time (Cambodia time)')}</label><input class="inp" type="time" id="syncTime" value="${esc(sc.time)}" onchange="syncCfg().time=this.value||'15:30';audit('settings','SYNC_TIME','EDIT',null,{time:syncCfg().time});persist();toast(t('saved'));rerender()"></div>
+  <div class="form"><div class="field"><label for="syncTime">${tt('同步時間（柬埔寨時間）','Sync time (Cambodia time)')}</label><input class="inp" type="time" id="syncTime" value="${esc(sc.time)}" onchange="syncCfg().time=this.value||'09:00';audit('settings','SYNC_TIME','EDIT',null,{time:syncCfg().time});persist();toast(t('saved'));rerender()"></div>
   <div class="field"><label>${tt('下一次','Next run')}</label><div style="padding:7px 0"><b>${esc(nextSyncText())}</b></div></div></div>
   <h3 style="margin-top:14px">${tt('VRT 工廠行事曆（廠休日）','VRT factory calendar (closed days)')}</h3>
   ${holidayRows().map(x=>`<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line-2)"><span class="mono">${esc(x.date)}</span><span style="flex:1">${esc(x.name)}</span><button class="btn sm dng" onclick="delHoliday('${esc(x.date)}')">${esc(t('del'))}</button></div>`).join('')||`<div class="small muted">—</div>`}
@@ -2335,7 +2360,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.7.1';
+const APP_VER='0.7.2';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -2725,6 +2750,35 @@ function parseARA40(aoa,file,rep){
   M({l:()=>tt('進貨金額(USD)','Received USD'),src:'recv',g:r=>sum(r.filter(x=>!x.currency||x.currency==='USD'),'amount'),ty:'money',add:1}),
   M({l:()=>tt('廠商數','Suppliers'),src:'recv',g:r=>uniq(r,x=>x.supplier)})])};
 })();
+/* ---------- v0.7.2：製單 / INVOICE / 應付明細 的月、年報表（跟 Sewing 一樣：橫列＝期間，直欄＝數字） ---------- */
+const apDate=r=>{if(r.ap_date)return r.ap_date;const m=String(r.voucher||'').match(/^[A-Z]{1,3}(\d{2})(0[1-9]|1[0-2])\d/i);const d=m?'20'+m[1]+'-'+m[2]+'-01':(okD(r.recv_date)||null);r.ap_date=d;return d};
+(function(){
+ SRCS.mo={rows:()=>live(DB.prodorders||[]),date:r=>r.order_date,year:r=>r.order_year};
+ SRCS.inv={rows:()=>live(DB.invoices||[]),date:r=>r.inv_date};
+ SRCS.ap={rows:()=>live(DB.payables||[]),date:apDate,year:r=>r.year};
+ const usd=r=>r.filter(x=>!x.currency||x.currency==='USD');
+ PM.prodorders={metrics:mk([
+  M({l:()=>tt('製單數','Orders'),src:'mo',g:r=>r.length,add:1}),
+  M({l:()=>tt('客戶數','Customers'),src:'mo',g:r=>uniq(r,x=>x.cust)}),
+  M({l:()=>t('order_qty'),src:'mo',g:r=>sum(r,'qty'),p:1,add:1}),
+  M({l:()=>tt('生產件數','Produced'),src:'mo',g:r=>sum(r,'prod_qty'),add:1}),
+  M({l:()=>tt('累計入庫','FG in'),src:'mo',g:r=>sum(r,'fg_qty'),add:1}),
+  M({l:()=>tt('在製（生產−入庫）','WIP (produced − FG)'),src:'mo',g:r=>sum(r.filter(x=>!x.closed),x=>Math.max(0,(x.prod_qty||0)-(x.fg_qty||0))),add:1}),
+  M({l:()=>tt('未結案','Open'),src:'mo',g:r=>r.filter(x=>!x.closed).length,add:1})])};
+ PM.invoices={metrics:mk([
+  M({l:()=>'INVOICE',src:'inv',g:r=>uniq(r,x=>x.invoice),add:1}),
+  M({l:()=>tt('客戶數','Customers'),src:'inv',g:r=>uniq(r,x=>x.cust)}),
+  M({l:()=>tt('件數','Pieces'),src:'inv',g:r=>sum(r,'qty'),add:1}),
+  M({l:()=>tt('金額(USD)','Amount (USD)'),src:'inv',g:r=>sum(usd(r),'amount'),ty:'money',p:1,add:1}),
+  M({l:()=>tt('平均單價','Avg price'),src:'inv',g:r=>{const u=usd(r),q=sum(u,'qty');return q?sum(u,'amount')/q:null},ty:'money3'})])};
+ PM.payables={metrics:mk([
+  M({l:()=>tt('應付憑單','Vouchers'),src:'ap',g:r=>uniq(r,x=>x.voucher),add:1}),
+  M({l:()=>tt('明細列','Lines'),src:'ap',g:r=>r.length,add:1}),
+  M({l:()=>tt('廠商數','Suppliers'),src:'ap',g:r=>uniq(r,x=>x.supplier)}),
+  M({l:()=>tt('應付金額(USD)','Payable (USD)'),src:'ap',g:r=>sum(usd(r),'amount'),ty:'money',p:1,add:1}),
+  M({l:()=>tt('已付款憑單','Paid vouchers'),src:'ap',g:r=>uniq(r.filter(x=>x.pay_no),x=>x.voucher),add:1})])};
+ if(CFG.payables){CFG.payables.date='ap_date'}
+})();
 /* ---------- W_AR700 廠商結帳明細表（AR2014.XLS…；Excel 只有第一頁有廠商，所以用驗收單／採購單補廠商） ---------- */
 function parseAR700(aoa,file,rep){
  const hi=hdrIdx(aoa,['應付憑單號','驗收單號','金額']); if(hi<0)throw new Error('找不到表頭（應付憑單號 / 驗收單號 / 金額）');
@@ -2744,7 +2798,7 @@ function parseAR700(aoa,file,rep){
   if(cur.length&&cur[0].voucher!==v)cur=[];
   const rec={voucher:v,invoice_no:cellS(g(r,'發票號碼')),invoice_amt:numV(g(r,'發票金額')),invoice_tax:numV(g(r,'發票稅額')),recv_no:rv,recv_date:dayOf(g(r,'進貨日期')),my_no:cellS(g(r,'自編單號')),purchase_no:pu,
    material_no:cellS(g(r,'料品代號')),material:cellS(g(r,'料品名稱說明')),color:cellS(g(r,'顏色')),currency:cellS(g(r,'幣別'))||'USD',qty:numV(g(r,'數量')),price:numV(g(r,'單價')),amount:numV(amtS),
-   supplier_id:sp[0],supplier:sp[1],year:y,ap_from:ym?ym[1]+'-'+ym[2]:'',ap_to:ym?ym[3]+'-'+ym[4]:'',pay_no:'',pay_date:'',paid_total:null,_row:i+1};
+   supplier_id:sp[0],supplier:sp[1],year:y,ap_date:null,ap_from:ym?ym[1]+'-'+ym[2]:'',ap_to:ym?ym[3]+'-'+ym[4]:'',pay_no:'',pay_date:'',paid_total:null,_row:i+1};
   rows.push(rec); cur.push(rec);
  }
  const tot=sum(rows,'amount'); const nos=rows.filter(r=>!r.supplier).length;
@@ -2819,7 +2873,7 @@ function confirmERPAll(){
  const done=[]; IMPQ.filter(q=>q.P&&!q.done&&!q.skip).forEach(q=>{const r=applyERP(q.P,q.file);q.done=r;done.push(q)});
  COSTC.clear(); GC.clear(); toast(tt('已匯入 ','Imported ')+done.length+tt(' 個檔','files'));
  GC.clear(); [...new Set(done.map(q=>pageOfRep(q.R.k)))].forEach(pg=>{if(SNAPK[pg])return;const lk=latestKey(pg);if(!lk)return;const st=S(pg);if(lk.length===7){st.pt='M';st.anchor=lk+'-01';if(st.view==='detail'||st.view==='trend')st.view='list'}else{st.pt='Y';st.anchor=lk+'-01-01'}saveNav(pg)});
- rerender(); if(cloudReady())setTimeout(()=>cloudSync(false),300);
+ digestAdd(done); rerender(); if(cloudReady())setTimeout(()=>cloudSync(false),300);
 }
 
 /* ---------- export: Excel with 說明 + 資料 sheets (current period + filters) ---------- */

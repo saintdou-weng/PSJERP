@@ -21,7 +21,7 @@ const SYNC_KEY_DIRECT  = '';   // ← 雲端同步密碼（網頁「設定 → �
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.7.0',
+  VERSION: '0.7.2',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -253,6 +253,7 @@ function doPost(e) {
  */
 function doGet(e) {
   const action = String((e && e.parameter && e.parameter.action) || 'ping').toLowerCase();
+  try { if (props_().getProperty('TRIGGER_VER') !== '0.7.2') installDailyTrigger_(); } catch (err) {}   // v0.7.2 自動換成週一四檢查
   let out;
   try {
     if (/^erp_/.test(action)) out = erpApi_(Object.assign({}, e.parameter, {action: action}));
@@ -332,16 +333,31 @@ function setTelegramCommands_() {
 }
 
 function installDailyTrigger_() {
+  // v0.7.2：不再每天 15:30 發「NOT_CONNECTED」。改成每天 11:00 檢查：週一、週四若還沒收到更新摘要就提醒。
   ScriptApp.getProjectTriggers().forEach(t => {
-    if (t.getHandlerFunction() === 'daily1530') ScriptApp.deleteTrigger(t);
+    const f = t.getHandlerFunction(); if (f === 'daily1530' || f === 'checkUpdate11') ScriptApp.deleteTrigger(t);
   });
+  ScriptApp.newTrigger('checkUpdate11').timeBased().atHour(11).nearMinute(0).everyDays(1).create();
+  props_().setProperty('TRIGGER_VER', '0.7.2');
+  return;
   // Time comes from SETTINGS → DAILY_SYNC_TIME (default 15:30). Google runs it within about ±15 min.
   const tm = String(getSetting_('DAILY_SYNC_TIME', '15:30')).split(':');
   const hh = Math.min(23, Math.max(0, Number(tm[0]) || 15)), mm = Math.min(59, Math.max(0, Number(tm[1]) || 30));
   ScriptApp.newTrigger('daily1530').timeBased().atHour(hh).nearMinute(mm).everyDays(1).create();
 }
 /** Run once after changing DAILY_SYNC_TIME in the SETTINGS sheet. */
-function REINSTALL_TRIGGER() { installDailyTrigger_(); return 'Daily trigger set to ' + getSetting_('DAILY_SYNC_TIME', '15:30'); }
+function REINSTALL_TRIGGER() { installDailyTrigger_(); return 'Check trigger set: every day 11:00 (acts on Mon/Thu only)'; }
+/** 週一、四 11:00：若今天還沒收到 ERP 更新摘要，就在 Telegram 提醒。 */
+function checkUpdate11() {
+  const d = new Date(), z = tz_(); const dow = Number(Utilities.formatDate(d, z, 'u'));
+  if (dow !== 1 && dow !== 4) return;
+  if (!isWorkingDay_(d)) { log_('UPDATE_CHECK','SKIPPED','FACTORY HOLIDAY'); return; }
+  const today = Utilities.formatDate(d, z, 'yyyy-MM-dd'); const sh = erpSS_().getSheetByName('UPDATE_LOG');
+  const got = sh ? readTable_(sh).some(r => String(r.time).slice(0, 10) === today) : false;
+  if (got) { log_('UPDATE_CHECK','OK','updated today'); return; }
+  sendTelegram_(defaultChat_(), '⚠️ <b>VRT ERP：今天 09:00 的 ERP 更新還沒完成</b>\n請確認公司電腦有開機、成衣管理系統已登入、沒有鎖螢幕。\n📊 ' + webBase_() + '#sync', null);
+  log_('UPDATE_CHECK','WARN','no update today');
+}
 function getSetting_(key, fallback) {
   const sh = dataSS_().getSheetByName('SETTINGS');
   if (!sh || sh.getLastRow() < 2) return fallback;
@@ -528,8 +544,21 @@ function erpApi_(b) {
     block.forEach((r, i) => { if (want[first + i]) rows.push(r.slice(1).map(x => x instanceof Date ? Utilities.formatDate(x, tz_(), 'yyyy-MM-dd') : x)); });
     return {ok:true, cols:h.slice(1), rows:rows, total:idx.length};
   }
+  if (a === 'erp_updates') {   // 最近的更新摘要
+    const sh = ss.getSheetByName('UPDATE_LOG'); return {ok:true, rows: sh ? readTable_(sh).slice(-30).reverse() : []};
+  }
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
+    if (a === 'erp_digest') {   // v0.7.2：每次匯入上傳後，網頁送來的更新摘要 → Telegram + UPDATE_LOG
+      const text = String(b.text || '').slice(0, 3600); const files = b.files || [];
+      const sumLine = files.length + ' 個檔，' + files.reduce((s, f) => s + (Number(f.rows) || 0), 0) + ' 列';
+      const sh = sheetOf_(ss, 'UPDATE_LOG', ['time','summary','files','text']);
+      sh.getRange(sh.getLastRow() + 1, 1, 1, 4).setNumberFormat('@').setValues([[now_(), sumLine, JSON.stringify(files).slice(0, 45000), text]]);
+      let tg = null;
+      try { tg = sendTelegram_(defaultChat_(), '📣 <b>VRT ERP 資料已更新</b>\n' + escapeHtml_(text), null).getResponseCode(); } catch (err) { log_('DIGEST','ERROR',String(err)); }
+      log_('DIGEST','OK',sumLine);
+      return {ok:true, telegram:tg};
+    }
     if (a === 'erp_put') {
       const name = String(b.sheet); if (ERP_SHEETS.indexOf(name) < 0) return {ok:false, error:'BAD_SHEET', msg:'不認得的資料集：' + name};
       const key = String(b.key), cols = b.cols || [], types = b.types || [], rows = b.rows || [];
