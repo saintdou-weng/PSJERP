@@ -22,7 +22,7 @@ const READ_KEY_DIRECT  = '';   // ← 唯讀密碼（給生產平台讀資料用
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.7.3',
+  VERSION: '0.7.4',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -466,7 +466,7 @@ function erpSS_() {
   if (!ss) { ss = SpreadsheetApp.create('PSJERP_ERPDATA'); p.setProperty('ERP_SHEET_ID', ss.getId()); }
   return ss;
 }
-const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY','PROD_ORDER','RECEIVING','INVOICE','AP','AP_SUM','FACTORY_COST'];
+const ERP_SHEETS = ['ORDERS','ORDERS_PROGRESS','BOM','PURCHASE','PURCHASE_PRICE','STOCK_MOVE','FABRIC','ACCESS','FG_STOCK','FG','SHIP','SMV','STYLE','LABOR_SUMMARY','PROD_ORDER','RECEIVING','INVOICE','AP','AP_SUM','FACTORY_COST','ISSUE','MATERIAL'];
 const FILE_COLS = ['key','rep','sheet','fn','file','rows','label','range','asof','year','totals','checks','at','batch','version','cols','types','user','sheet_id','tab'];
 const CELL_LIMIT = 9000000;   // Google 試算表上限 1,000 萬格，留 10% 空間
 function sheetOf_(ss, name, header) {

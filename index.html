@@ -653,7 +653,7 @@ const IDB={_db:null,
  set(k,v){return new Promise(res=>{if(!this._db)return res(false);try{const tx=this._db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);tx.onabort=()=>res(false)}catch(e){console.error(e);res(false)}})}};
 let MODE=LS.get('psjerp_mode','real'); if(MODE!=='demo')MODE='real';
 function emptyDB(){return {_v:5,_mode:'real',orders:[],bom:[],purchase:[],receiving:[],fabric:[],accessories:[],shipping:[],production:[],fg:[],factorycost:[],accwip:[],
- importlog:[],audit:[],trash:[],cmpres:[],syncruns:[],tglog:[],holidays:[],erpfiles:[],fabsnaps:{},accsnaps:{},asof:{},ordidx:{},smv:[],price:[],stockmove:[],fgstock:[],fgsnaps:{},labor:[],tpl:[],prodorders:[],invoices:[],payables:[],apsum:[],apsnaps:{}}}
+ importlog:[],audit:[],trash:[],cmpres:[],syncruns:[],tglog:[],holidays:[],erpfiles:[],fabsnaps:{},accsnaps:{},asof:{},ordidx:{},smv:[],price:[],stockmove:[],fgstock:[],fgsnaps:{},labor:[],tpl:[],prodorders:[],invoices:[],payables:[],apsum:[],apsnaps:{},issues:[],materials:[]}}
 let DB=emptyDB();
 const dbKey=()=>MODE==='demo'?'db_demo_v5':'db_real_v5';
 let SAVE_OK=true;
@@ -796,15 +796,15 @@ function buildRecords(P,fileName){
  if(P.rep==='cod550')return P.rows.map(r=>({id:nid('b'),...r,...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cod700')return P.rows.map(r=>({id:nid('o'),...r,cut_qty:0,fg_qty:0,status:r.closed_date?'closed':'open',...erpMeta(fileName,P,r._row)}));
  if(P.rep==='cst302')return P.rows.map(r=>({id:nid('k'),...r,...erpMeta(fileName,P,r._row)}));
- if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190','codk75','cpu320','cbl140','ar700','ara40','ccs450'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v',codk75:'mo',cpu320:'rv',cbl140:'iv',ar700:'ap',ara40:'as',ccs450:'oh'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
+ if(['cpu350','cpu340','cpu795','cst541','cst551','cbl300','cba190','codk75','cpu320','cbl140','ar700','ara40','ccs450','cst78x','cba22x'].includes(P.rep))return P.rows.map(r=>({id:nid({cpu350:'pm',cpu340:'pf',cpu795:'pp',cst541:'mm',cst551:'mf',cbl300:'s',cba190:'v',codk75:'mo',cpu320:'rv',cbl140:'iv',ar700:'ap',ara40:'as',ccs450:'oh',cst78x:'is',cba22x:'mt'}[P.rep]),...r,...erpMeta(fileName,P,r._row)}));
  return [];
 }
 /* put one batch of finished records into the store (used by import and by cloud download) */
 /* v0.7.2：每週重抓「今年」時，新檔範圍包住舊檔 → 舊批次作廢（本機刪掉，雲端也刪），避免同一段資料算兩次 */
-const SUPERSEDE=new Set(['cod700','codk75','cpu320','cbl140','cst541','cst551','cst580','cbl300','cod690']);
+const SUPERSEDE=new Set(['cst78x','cod700','codk75','cpu320','cbl140','cst541','cst551','cst580','cbl300','cod690']);
 function rngOf(m){const r=m&&m.range;if(!r||!r[0]||!r[1])return null;return [String(r[0]).slice(0,10),String(r[1]).slice(0,10)]}
 function supersede(rep,key,meta){
- if(!SUPERSEDE.has(rep)||SNAPREP[rep])return 0; const nr=rngOf(meta); if(!nr)return 0; const sub=k=>rep==='cpu320'?String(k).split('|')[1]:'';
+ if(!SUPERSEDE.has(rep)||SNAPREP[rep])return 0; const nr=rngOf(meta); if(!nr)return 0; const sub=k=>(rep==='cpu320'||rep==='cst78x')?String(k).split('|')[1]:'';
  const old=(DB.erpfiles||[]).filter(f=>f.key!==key&&f.rep===rep&&sub(f.key)===sub(key)&&(()=>{const r=rngOf(f);return r&&r[0].slice(0,7)>=nr[0].slice(0,7)&&r[1]<=nr[1]})());
  let n=0; old.forEach(f=>{n+=dropLocalBatch(f);if(f.version)(DB.dropq=DB.dropq||[]).push(f.key)}); return n}
 function dropLocalBatch(f){const ds=REP_DS[f.rep];let n=0;if(ds&&!SNAPREP[f.rep]&&DB[ds]){const b=DB[ds].length;DB[ds]=DB[ds].filter(x=>x.import_key!==f.key);n=b-DB[ds].length}
@@ -1443,7 +1443,7 @@ function pageHead(k,acts=''){
 }
 const subKey=k=>({dashboard:'sub_dashboard',orders:'sub_orders',bom:'sub_bom',purchase:'sub_purchase',receiving:'sub_receiving',fabric:'sub_fabric',accessories:'sub_accessories',
  production:'sub_production',shipping:'sub_shipping',wip:'sub_wip','finished-goods':'sub_fg','factory-cost':'sub_fc',costing:'sub_costing',sync:'sub_sync',compare:'sub_compare',
- exceptions:'sub_exc',prodorders:'sub_prodorders',invoices:'sub_invoices',payables:'sub_payables',apsum:'sub_apsum',pprice:'sub_pprice',stockmove:'sub_stockmove',fgstock:'sub_fgstock',labor:'sub_labor','smart-import':'sub_import',reports:'sub_reports',telegram:'sub_tg',audit:'sub_audit',settings:'sub_settings'}[k]);
+ exceptions:'sub_exc',prodorders:'sub_prodorders',issues:'sub_issues',materials:'sub_materials',invoices:'sub_invoices',payables:'sub_payables',apsum:'sub_apsum',pprice:'sub_pprice',stockmove:'sub_stockmove',fgstock:'sub_fgstock',labor:'sub_labor','smart-import':'sub_import',reports:'sub_reports',telegram:'sub_tg',audit:'sub_audit',settings:'sub_settings'}[k]);
 let toastT; function toast(m){const el=$('#toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
 function live(arr){return arr.filter(r=>!r.deleted_at)}
 function sum(a,f){return a.reduce((s,r)=>s+(+(typeof f==='function'?f(r):r[f])||0),0)}
@@ -2373,7 +2373,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.7.2';
+const APP_VER='0.7.4';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -2764,6 +2764,58 @@ function parseARA40(aoa,file,rep){
   M({l:()=>tt('進貨金額(USD)','Received USD'),src:'recv',g:r=>sum(r.filter(x=>!x.currency||x.currency==='USD'),'amount'),ty:'money',add:1}),
   M({l:()=>tt('廠商數','Suppliers'),src:'recv',g:r=>uniq(r,x=>x.supplier)})])};
 })();
+/* ---------- v0.7.4：W_CST780／785 主副料領料（N19–N24.txt）、W_CBA220／230 主副料基本資料（N26／N27.txt） ---------- */
+function parseCST78X(aoa,file,rep){
+ const hi=hdrIdx(aoa,['ma_date','ma_no','mas_id','qty'],5); if(hi<0)throw new Error('找不到表頭（ma_date / ma_no / mas_id / qty）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[]; let skip=0;
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const no=cellS(g(r,'ma_no')); if(!no||!/^D[A-Z]\d/i.test(no)){if(r.some(x=>cellS(x)))skip++;continue}
+  rows.push({issue_no:no,type:/^DM/i.test(no)?'main':'trim',issue_date:dayOf(g(r,'ma_date')),od_no:cellS(g(r,'od_no')),my_no:cellS(g(r,'my_no')),style:cellS(g(r,'style_id')),
+   material_no:cellS(g(r,'mas_id')),material:cellS(g(r,'t_name')),color:cellS(g(r,'color_no')),size:cellS(g(r,'size')),width:numV(g(r,'width')),weight:numV(g(r,'weight')),
+   qty:numV(g(r,'qty')),lot_qty:numV(g(r,'lot_qty')),unit:cellS(g(r,'unit_id_u')),whs:cellS(g(r,'whs_id')),loc:cellS(g(r,'loc_id')),prod_qty:numV(g(r,'ps_qty')),cost_in:cellS(g(r,'ps_cost_yn')),person:cellS(g(r,'per_id')),_row:i+1});
+ }
+ const dr=minmax(rows.map(r=>r.issue_date)); const nm=rows.filter(r=>r.type==='main').length; const tp=nm*2>=rows.length?'main':'trim'; const nd=rows.filter(r=>!r.issue_date).length;
+ const checks=[{ok:rows.length>0,msg:`${fmt(rows.length)} 列 · ${fmt(uniq(rows,r=>r.issue_no))} 張領料單 · ${tp==='main'?'主料':'副料'}`},{ok:null,msg:'txt 沒有合計列，以逐筆加總為準'}];
+ if(skip)checks.push({ok:null,msg:`${skip} 列格式不完整（品名內有換行）已略過`}); if(nd)checks.push({ok:false,msg:`${nd} 列沒有領料日期`});
+ const y0=dr[0].slice(0,4), y1=dr[1].slice(0,4);
+ return {rep,rows,meta:{key:rep+'|'+tp+'|'+dr[0]+'|'+dr[1],label:`${tp==='main'?'主料':'副料'}領料 ${y0}${y1!==y0?'–'+y1:''}`,range:dr,totals:{n:rows.length,qty:sum(rows,'qty')},dataRange:dr},checks};
+}
+function parseCBA22X(aoa,file,rep){
+ const hi=hdrIdx(aoa,['mas_id','mas_type','mas_name','vend_id'],5); if(hi<0)throw new Error('找不到表頭（mas_id / mas_type / mas_name / vend_id）');
+ const H=headerMap(aoa[hi]); const g=(r,n)=>H[n]!=null?r[H[n]]:''; const rows=[];
+ for(let i=hi+1;i<aoa.length;i++){const r=aoa[i]; const id=cellS(g(r,'mas_id')); if(!id)continue; const mt=cellS(g(r,'mas_type'));
+  rows.push({material_no:id,type:mt==='1'?'main':mt==='2'?'trim':mt,material:cellS(g(r,'mas_name')),material2:cellS(g(r,'mas_name2')),unit:cellS(g(r,'unit_id_u'))||cellS(g(r,'unit_id')),buy_unit:cellS(g(r,'unit_id_p')),
+   supplier_id:cellS(g(r,'vend_id')),price:numV(g(r,'price')),currency:cellS(g(r,'curr_id')),width:numV(g(r,'width')),weight:numV(g(r,'weight')),composition:cellS(g(r,'comp_name')),
+   moq:numV(g(r,'lowest_qty')),is_old:cellS(g(r,'is_old'))==='Y'?'停用':'',created:dayOf(g(r,'in_date')),edited:dayOf(g(r,'edit_date')),created_by:cellS(g(r,'user_name')),_row:i+1});
+ }
+ const nm=rows.filter(r=>r.type==='main').length; const tp=nm*2>=rows.length?'main':'trim';
+ return {rep,rows,meta:{key:rep+'|'+tp,label:(tp==='main'?'主料':'副料')+'基本資料（全部）',range:null,totals:{n:rows.length}},
+  checks:[{ok:rows.length>0,msg:`${fmt(rows.length)} 個料號 · ${tp==='main'?'主料':'副料'}`},{ok:null,msg:'主檔：同一種（主料／副料）重匯會整批取代'}]};
+}
+(function(){
+ Object.assign(PARSERS,{parseCST78X,parseCBA22X});
+ REPORTS.push({k:'cst78x',fn:'W_CST780/785',zh:'主副料領料',en:'Material issues',ds:'issues',parser:'parseCST78X',hdr:['ma_date','ma_no','mas_id','qty'],use:['每次領料：日期、製單、料號、數量','Every material issue: date, order, item, qty'],file:'N19（主料）、N20–N24（副料）',sop:'—'},
+  {k:'cba22x',fn:'W_CBA220/230',zh:'主副料基本資料',en:'Material master',ds:'materials',parser:'parseCBA22X',hdr:['mas_id','mas_type','mas_name','vend_id'],use:['料號、品名、單位、廠商、幅寬克重、成分','Item, name, unit, supplier, width/weight, composition'],file:'N26（主料）、N27（副料）',sop:'—'});
+ Object.assign(REP_DS,{cst78x:'issues',cba22x:'materials'}); Object.assign(REP_SHEET,{cst78x:'ISSUE',cba22x:'MATERIAL'});
+ COVER.splice(COVER.findIndex(c=>c[1]==='cpu320')+1,0,['issues','cst78x','W_CST780/785 領料'],['materials','cba22x','W_CBA220/230 料品主檔']);
+ const at=(after,row)=>{const i=MODS.findIndex(m=>m[0]===after);MODS.splice(i+1,0,row)};
+ at('receiving',['issues','📤','g_mat']); at('issues',['materials','🗂️','g_mat']);
+ Object.assign(T,{issues:['領料','Material issues','ការបញ្ចេញវត្ថុធាតុ'],materials:['料品主檔','Material master','បញ្ជីវត្ថុធាតុ'],
+  sub_issues:['W_CST780／785 主副料領料：每次領料的日期、製單、料號、數量','W_CST780/785 material issues: date, order, item, qty'],
+  sub_materials:['W_CBA220／230 主副料基本資料：料號、品名、單位、廠商、幅寬、克重、成分','W_CBA220/230 material master']});
+ Object.assign(NEED,{issues:['cst78x'],materials:['cba22x']});
+ CFG.issues={data:()=>DB.issues,date:'issue_date',title:'issue_no',cols:[COL('issue_no','領料單',{lead:1,mono:1}),COL('issue_date','領料日',{tp:'date'}),COL('type','type',{tp:'bt'}),COL('my_no','my_no',{mono:1}),COL('od_no','od_no',{mono:1}),COL('style','style',{mono:1}),
+  COL('material_no','material_no',{mono:1}),COL('material','material',{wrap:1}),COL('color','color'),COL('qty','qty',{tp:'num'}),COL('unit','unit'),COL('prod_qty','生產件數',{tp:'num'}),COL('whs','倉別'),COL('source_system','source',{tp:'src'})]};
+ CFG.materials={data:()=>DB.materials,title:'material_no',nodate:1,cols:[COL('material_no','material_no',{lead:1,mono:1}),COL('type','type',{tp:'bt'}),COL('material','material',{wrap:1}),COL('unit','unit'),COL('supplier_id','supplier'),
+  COL('width','幅寬',{tp:'num'}),COL('weight','克重',{tp:'num'}),COL('composition','成分',{wrap:1}),COL('price','price',{tp:'money3'}),COL('is_old','停用'),COL('edited','最後修改',{tp:'date'}),COL('source_system','source',{tp:'src'})]};
+ SRCS.iss={rows:()=>live(DB.issues||[]),date:r=>r.issue_date};
+ PM.issues={metrics:mk([
+  M({l:()=>tt('領料單','Issue slips'),src:'iss',g:r=>uniq(r,x=>x.issue_no),add:1}),
+  M({l:()=>tt('領料列','Lines'),src:'iss',g:r=>r.length,add:1}),
+  M({l:()=>tt('主料領用(碼)','Fabric issued (yd)'),src:'iss',g:r=>sum(r.filter(x=>x.type==='main'&&/^Y/i.test(x.unit||'')),'qty'),p:1,add:1}),
+  M({l:()=>tt('副料領用(件)','Trims issued (pcs)'),src:'iss',g:r=>sum(r.filter(x=>x.type!=='main'&&/^PC/i.test(x.unit||'')),'qty'),add:1}),
+  M({l:()=>tt('製單數','Orders'),src:'iss',g:r=>uniq(r,x=>x.my_no)}),
+  M({l:()=>tt('料號數','Items'),src:'iss',g:r=>uniq(r,x=>x.material_no)})])};
+})();
 /* ---------- v0.7.2：W_CCS450 製造費用（費用資料維護，每月一筆，Claude 從畫面逐月讀出，合計已逐月核對） ---------- */
 const OH_CATS=[['indirect_labor','間接人工','Indirect labour'],['rent','租金','Rent'],['mfg_overhead','製造雜費','Mfg overhead'],['freight','運費','Freight & trucking'],['postage','郵寄快遞','Postage & courier'],['repairs','修繕','Repairs'],['security','保全','Security'],['utilities','水電','Utilities'],['insurance','保險','Insurance & bond'],['taxi','交通車','Taxi-owned'],['taxes_licences','稅捐規費','Taxes & licences'],['depreciation','折舊','Depreciation'],['meal','伙食津貼','Meal allowance'],['employee_benefit','員工福利','Employee benefit'],['gasoline','油料','Gasoline & oil'],['printing_markers','馬克紙','Printing markers'],['misc_purchase','雜項採購','Misc purchase'],['supplies','物料','Supplies & material'],['medical','醫療','Medical'],['nssf','社保 NSSF','NSSF']];
 function parseCCS450(aoa,file,rep){
@@ -2908,7 +2960,7 @@ function erpQueueHTML(){
  <p class="small muted" style="margin:8px 0 0">${tt('只寫入 PSJERP 雲端資料；不寫回 clothes.exe。','Writes to PSJERP cloud data only; never back to clothes.exe.')}</p></div>`;
  return h;
 }
-function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum',ccs450:'factory-cost'}[rep]||'dashboard'}
+function pageOfRep(rep){return {cod700:'orders',cod690:'orders',cod550:'bom',cst580:'finished-goods',stkmain:'fabric',stktrim:'accessories',cpu795:'pprice',cbl300:'shipping',cba190:'costing',cst302:'fgstock',cpu350:'purchase',cpu340:'purchase',cst541:'stockmove',cst551:'stockmove',codk75:'prodorders',cpu320:'receiving',cbl140:'invoices',ar700:'payables',ara40:'apsum',ccs450:'factory-cost',cst78x:'issues',cba22x:'materials'}[rep]||'dashboard'}
 function confirmERPAll(){
  const done=[]; IMPQ.filter(q=>q.P&&!q.done&&!q.skip).forEach(q=>{const r=applyERP(q.P,q.file);q.done=r;done.push(q)});
  COSTC.clear(); GC.clear(); toast(tt('已匯入 ','Imported ')+done.length+tt(' 個檔','files'));
