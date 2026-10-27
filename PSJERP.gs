@@ -22,7 +22,7 @@ const READ_KEY_DIRECT  = '';   // ← 唯讀密碼（給生產平台讀資料用
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.7.4',
+  VERSION: '0.7.5',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -254,7 +254,7 @@ function doPost(e) {
  */
 function doGet(e) {
   const action = String((e && e.parameter && e.parameter.action) || 'ping').toLowerCase();
-  try { if (props_().getProperty('TRIGGER_VER') !== '0.7.2') installDailyTrigger_(); } catch (err) {}   // v0.7.2 自動換成週一四檢查
+  try { if (props_().getProperty('TRIGGER_VER') !== '0.7.5') installDailyTrigger_(); } catch (err) {}   // v0.7.5 自動換成週三 16:30 檢查
   let out;
   try {
     if (/^erp_/.test(action)) out = erpApi_(Object.assign({}, e.parameter, {action: action}));
@@ -334,12 +334,12 @@ function setTelegramCommands_() {
 }
 
 function installDailyTrigger_() {
-  // v0.7.2：不再每天 15:30 發「NOT_CONNECTED」。改成每天 11:00 檢查：週一、週四若還沒收到更新摘要就提醒。
+  // v0.7.5：ERP 更新改為每週三 08:00–16:00（10/27 起）。每天 16:30 檢查：週三若還沒收到更新摘要就提醒。（v0.7.2 原為週一、四 11:00）
   ScriptApp.getProjectTriggers().forEach(t => {
     const f = t.getHandlerFunction(); if (f === 'daily1530' || f === 'checkUpdate11') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('checkUpdate11').timeBased().atHour(11).nearMinute(0).everyDays(1).create();
-  props_().setProperty('TRIGGER_VER', '0.7.2');
+  ScriptApp.newTrigger('checkUpdate11').timeBased().atHour(16).nearMinute(30).everyDays(1).create();
+  props_().setProperty('TRIGGER_VER', '0.7.5');
   return;
   // Time comes from SETTINGS → DAILY_SYNC_TIME (default 15:30). Google runs it within about ±15 min.
   const tm = String(getSetting_('DAILY_SYNC_TIME', '15:30')).split(':');
@@ -347,16 +347,16 @@ function installDailyTrigger_() {
   ScriptApp.newTrigger('daily1530').timeBased().atHour(hh).nearMinute(mm).everyDays(1).create();
 }
 /** Run once after changing DAILY_SYNC_TIME in the SETTINGS sheet. */
-function REINSTALL_TRIGGER() { installDailyTrigger_(); return 'Check trigger set: every day 11:00 (acts on Mon/Thu only)'; }
-/** 週一、四 11:00：若今天還沒收到 ERP 更新摘要，就在 Telegram 提醒。 */
+function REINSTALL_TRIGGER() { installDailyTrigger_(); return 'Check trigger set: every day 16:30 (acts on Wednesday only)'; }
+/** 週三 16:30：若今天還沒收到 ERP 更新摘要，就在 Telegram 提醒。（更新排程：每週三 08:00–16:00） */
 function checkUpdate11() {
   const d = new Date(), z = tz_(); const dow = Number(Utilities.formatDate(d, z, 'u'));
-  if (dow !== 1 && dow !== 4) return;
+  if (dow !== 3) return;
   if (!isWorkingDay_(d)) { log_('UPDATE_CHECK','SKIPPED','FACTORY HOLIDAY'); return; }
   const today = Utilities.formatDate(d, z, 'yyyy-MM-dd'); const sh = erpSS_().getSheetByName('UPDATE_LOG');
   const got = sh ? readTable_(sh).some(r => String(r.time).slice(0, 10) === today) : false;
   if (got) { log_('UPDATE_CHECK','OK','updated today'); return; }
-  sendTelegram_(defaultChat_(), '⚠️ <b>VRT ERP：今天 09:00 的 ERP 更新還沒完成</b>\n請確認公司電腦有開機、成衣管理系統已登入、沒有鎖螢幕。\n📊 ' + webBase_() + '#sync', null);
+  sendTelegram_(defaultChat_(), '⚠️ <b>VRT ERP：今天（週三）的 ERP 更新還沒完成</b>\n排程是 08:00–16:00。請確認公司電腦有開機、成衣管理系統已登入、沒有鎖螢幕。\n📊 ' + webBase_() + '#sync', null);
   log_('UPDATE_CHECK','WARN','no update today');
 }
 function getSetting_(key, fallback) {
