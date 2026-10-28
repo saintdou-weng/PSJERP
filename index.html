@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.7';
+const APP_VER='0.9.8';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3729,8 +3729,9 @@ async function syncTpl(man){
   rowsOf('qc').forEach(r=>{ const [d,po,line,ins,rej,out,cust,stys]=r; const k=keyN(po); if(!k)return; let e=qc.get(k); if(!e){e={ins:0,rej:0,out:0,n:0,first:'',last:'',lines:new Set()};qc.set(k,e)} e.ins+=ins; e.rej+=rej; e.out+=out; e.n++; if(line)e.lines.add(line); if(d&&(!e.first||d<e.first))e.first=d; if(d>e.last)e.last=d });
   rowsOf('smv').forEach(r=>{ if(r[0]==='ie'){ const [,kind,sty,v,d,appr]=r; if(kind==='upd'&&appr&&!/approved/i.test(appr))return; putSmv(sty,v,kind==='upd'?'ie_upd':'ie_obd',d,kind==='upd'?1:2) } else if(r[0]==='day'){ const [,d,items]=r; items.forEach(([sty,v])=>putSmv(sty,v,'day',d,4)) } });
   const smvCore=new Map(); smv.forEach((v,k)=>{const c=core(k); if(c.length>=4){ if(smvCore.has(c)&&smvCore.get(c)!==v)smvCore.set(c,null); else smvCore.set(c,v)} });
+  const smvPre=new Map(); smv.forEach((v,k)=>{ for(let n=5;n<k.length;n++){ const p=k.slice(0,n); const o=smvPre.get(p); if(o===undefined)smvPre.set(p,v); else if(o&&Math.abs(o.v-v.v)>0.01)smvPre.set(p,null) } });   /* DI876 → DI876WH（只有一種 SMV 才用）*/
   const maxD=t=>{let m='';rowsOf(t).forEach(r=>{const d=r[0]==='day'?r[1]:r[0];if(typeof d==='string'&&d>m&&d<='2099')m=d});return m};
-  IX={sew,cut,qc,smv,smvCore,to:{sewing:maxD('sewing'),cutting:maxD('cutting'),qc:maxD('qc')},n:{sewing:rowsOf('sewing').length,cutting:rowsOf('cutting').length,qc:rowsOf('qc').length,smv:smv.size}};
+  IX={sew,cut,qc,smv,smvCore,smvPre,to:{sewing:maxD('sewing'),cutting:maxD('cutting'),qc:maxD('qc')},n:{sewing:rowsOf('sewing').length,cutting:rowsOf('cutting').length,qc:rowsOf('qc').length,smv:smv.size}};
  }
  const SMV_SRC={ie_upd:['IE 週報（核准）','IE weekly (approved)'],ie_obd:['IE OBD','IE OBD'],sew:['車縫日報','Sewing report'],day:['日報 SMV 表','Daily SMV list'],erp:['ERP','ERP']};
  window.smvSrcName=s=>{const x=SMV_SRC[s]||[s,s];return LANG===0?x[0]:x[1]};
@@ -3738,6 +3739,7 @@ async function syncTpl(man){
   for(const c of cands){ const k=ks(c); if(!k)continue; if(IX.smv.has(k))return IX.smv.get(k); }
   for(const c of cands){ const k=ks(c); const cc=core(k); if(cc.length>=4&&IX.smvCore.get(cc))return IX.smvCore.get(cc); }
   for(const c of cands){ const k=ks(c); for(let n=k.length-1;n>=4;n--){ if(IX.smv.has(k.slice(0,n)))return IX.smv.get(k.slice(0,n)) } }   /* A318-W-SP-CHP → A318 */
+  for(const c of cands){ const k=ks(c); if(k.length>=5&&IX.smvPre.get(k))return IX.smvPre.get(k) }
   return null };
  /* 一張訂單（款＋PO）在日報裡的量：先用 PO 號（客戶 PO／訂單編號／自編單號）找，再用款號篩 */
  const GENERIC_PO=/^(SAMPLES?|STOCK|TBA|TBC|NA|N\/A|-|0|NONE)$/;
