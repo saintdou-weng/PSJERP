@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.2';
+const APP_VER='0.9.3';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3349,7 +3349,7 @@ async function syncTpl(man){
   sub_ordercenter:['一列一款／PO。ERP 訂單（W_COD700／690）是正式數字；客戶 PO（PDF，生產平台解析）只做核對；出貨、INVOICE、成品入庫往同一列掛。對不上的在最下面「待對照」。','One row per style / PO. ERP orders are the official numbers; customer POs (PDF, parsed by the production platform) are cross-checks; shipping, invoices and FG receipts hang on the same row. Unmatched items are listed under “To reconcile”.'],
  });
  const OCI=MODS.findIndex(m=>m[0]==='orders'); MODS.splice(OCI<0?0:OCI,0,['ordercenter','🧭','g_order','prod']);
- const OC_DEF={q:'',cust:'',st:'',yr:'',chk:'',sort:'delivery',page:0,per:100};
+ const OC_DEF={q:'',cust:'',st:'',yr:'',chk:'',sort:'order_date',page:0,per:100};
  const OC=Object.assign({},OC_DEF,LS.get('psjerp_oc',{})); window.OC=OC;
  window.ocSet=function(k,v){OC[k]=v;if(k!=='page')OC.page=0;LS.set('psjerp_oc',OC);rerender()};
  const PO_ST={ok:['good',['相符','matches']],diff:['warn',['有差異','differs']],nostyle:['warn',['PO 有、款對不上','PO found, style not matched']],missing:['neu',['缺客戶 PO 檔','no customer PO file']],none:['neu',['— ','—']],loading:['neu',['讀取中','loading']]};
@@ -3358,13 +3358,14 @@ async function syncTpl(man){
  const OST={open:['info',['未結','open']],late:['crit',['逾期','late']],closed:['good',['已結','closed']]};
  const ostChip=s=>{const x=OST[s]||OST.open;return stChip2(x[0],LANG===0?x[1][0]:x[1][1])};
  const d10=v=>String(v||'').slice(0,10);
+ const OC_MAXD=(()=>{const d=new Date();d.setFullYear(d.getFullYear()+3);return ymd(d)})();
  function ocRows(){
   if(GC.has('ocrows'))return GC.get('ocrows');
   const ov=ordersView(); const G=new Map();
   ov.forEach(o=>{ const k=keyN(o.my_no)+'|'+keyN(o.po_no)+'|'+keyN(o.style); let g=G.get(k);
    if(!g){g={k,id:o.id,my_no:o.my_no,od_no:o.od_no,po_no:o.po_no,cust:o.cust,style:o.style,style_name:o.style_name||'',order_date:o.order_date||'',delivery:o.delivery||'',closed_date:o.closed_date||'',qty:0,ship_qty:0,open_qty:0,amount:0,fg_qty:0,cut_qty:0,price:0,colors:new Set(),lines:0,status:'closed',ids:[]};G.set(k,g)}
    g.lines++; g.ids.push(o.id); g.qty+=+o.qty||0; g.ship_qty+=+o.ship_qty||0; g.open_qty+=+o.open_qty||0; g.amount+=+o.amount||0; g.fg_qty+=+o.fg_qty||0; g.cut_qty+=+o.cut_qty||0; if(o.clr)g.colors.add(o.clr); if(!g.price&&o.price)g.price=o.price;
-   if(o.order_date&&(!g.order_date||o.order_date<g.order_date))g.order_date=o.order_date; if(o.delivery&&(!g.delivery||o.delivery>g.delivery))g.delivery=o.delivery;
+   if(o.order_date&&(!g.order_date||o.order_date<g.order_date))g.order_date=o.order_date; const dl=String(o.delivery||'').slice(0,10); if(dl&&dl<=OC_MAXD&&(!g.delivery||dl>g.delivery))g.delivery=dl; else if(dl&&dl>OC_MAXD)g.bad_delivery=dl;   /* 6014-04-02 這種是 ERP 打錯，不當交期、排最後 */
    const st=o.status||'open'; if(st==='late')g.status='late'; else if(st==='open'&&g.status!=='late')g.status='open';
    if(!o.closed_date)g.closed_date='' });
   /* 出貨 W_CBL300 */
@@ -3394,7 +3395,7 @@ async function syncTpl(man){
   const all=ocRows();
   if(!all.length){h+=needHTML('orders');return h}
   /* 資料時間 */
-  const fr=(reps)=>{const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep));let u='';F.forEach(f=>{const x=(f.range&&f.range[1])||f.asof||(f.year?f.year+'-12-31':'');if(x>u)u=String(x).slice(0,10)});return u};
+  const fr=(reps)=>{const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep));let u='';F.forEach(f=>{let x=String((f.range&&f.range[1])||f.asof||(f.year?f.year+'-12-31':'')).slice(0,10);const imp=f.at?String(f.at).slice(0,10):'';if(imp&&x>imp)x=imp;if(x>u)u=x});return u};
   h+=`<div class="fresh"><div class="fc">${srcChip('erp')}<span>${tt('訂單到 ','orders to ')}<b>${esc(fr(['cod700','cod690'])||'—')}</b> · ${tt('出貨到 ','shipping to ')}<b>${esc(fr(['cbl300'])||'—')}</b> · INVOICE <b>${esc(fr(['cbl140'])||'—')}</b> · ${tt('入庫到 ','FG to ')}<b>${esc(fr(['cst580'])||'—')}</b></span></div>
    <div class="fc">${srcChip('email',tt('客戶 PO','customer PO'))}<span>${!PRODORD?tt('讀取生產平台… ','loading production cloud… ')+`<span id="poProg">${window.PRODORD_PROG?PRODORD_PROG.done+'/'+PRODORD_PROG.total:''}</span>`:PRODORD.err&&!PRODORD.headers.length?tt('生產平台雲端沒回應','production cloud not responding'):`${fmt(PRODORD.hdrByPo.size)} ${tt('張 PO','POs')} · ${fmt(PRODORD.lines.length)} ${tt('行','lines')} · ${tt('同步 ','synced ')}${esc(String(PRODORD.updatedAt).replace('T',' ').slice(0,16))}`}</span></div></div>`;
   /* 過濾 */
@@ -3415,7 +3416,7 @@ async function syncTpl(man){
   const L=(z,e)=>LANG===0?z:e; const dot=s=>`<span class="ocdot ${s}" title="${esc(srcName_(s))}"></span>`;
   h+=`<div class="tbl-wrap"><table class="t cards oc"><thead><tr><th>${L('客戶','Customer')}</th><th>${L('款號','Style')}</th><th>PO</th><th>${L('訂單日','Order')}</th><th>${L('交期','Delivery')}</th><th class="r">${dot('erp')}${L('訂單量','Order qty')}</th><th class="r">${dot('email')}${L('客戶 PO','Cust. PO')}</th><th class="r">${dot('erp')}${L('已裁','Cut')}</th><th class="r">${dot('manual')}${L('已縫','Sewn')}</th><th class="r">${dot('erp')}${L('入庫','FG')}</th><th class="r">${dot('erp')}${L('出貨','Shipped')}</th><th class="r">${dot('erp')}INVOICE</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
   pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-po.erp)}${po.erp!==r.qty?` · ${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}`:''}</div>`:po.state==='ok'&&po.erp!==r.qty?`<div class="small muted">${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
-   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cut_qty?fmt(r.cut_qty):'—'}</td><td class="r num muted" data-l="${L('已縫','Sewn')}">—</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
+   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}${r.bad_delivery?`<div class="small warn-t" title="${L('ERP 交期打錯','ERP delivery date looks wrong')}">⚠ ${esc(r.bad_delivery)}</div>`:''}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cut_qty?fmt(r.cut_qty):'—'}</td><td class="r num muted" data-l="${L('已縫','Sewn')}">—</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
   h+=`</tbody></table></div>`;
   if(pages>1)h+=`<div class="oc-pages"><button class="btn sm" ${OC.page?'':'disabled'} onclick="ocSet('page',${OC.page-1})">◀</button><span class="small">${OC.page+1} / ${pages} · ${fmt(rows.length)} ${L('列','rows')}</span><button class="btn sm" ${OC.page<pages-1?'':'disabled'} onclick="ocSet('page',${OC.page+1})">▶</button></div>`;
   /* 待對照 */
