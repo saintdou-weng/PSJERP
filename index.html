@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.8';
+const APP_VER='0.9.9';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3781,7 +3781,7 @@ async function syncTpl(man){
   if(!IX)h+=`<p class="small muted">${CHAIN.busy?L('讀取生產日報中… ','Loading production reports… ')+`<span id="chainProg">${CHAIN.prog.done}/${CHAIN.prog.total}</span>`:L('生產日報尚未載入','Production reports not loaded')} <button class="btn sm" onclick="loadChain(true)">↻</button></p>`;
   /* 1 客戶 PO */
   const po=g&&g.po;
-  h+=line('📄',L('客戶 PO','Customer PO'),srcChip('email'),po&&po.state&&po.state!=='missing'&&po.state!=='loading'?`<span><b>${fmt(po.qty)}</b> ${L('件','pcs')} · ${esc(po.state==='ok'?L('與 ERP 相符','matches ERP'):po.state==='diff'?L('與 ERP 差 ','differs by ')+fmt(po.qty-(po.erp||q)):L('PO 有、款號對不上','PO found, style not matched'))}</span>`:`<span class="muted">${L('沒有客戶 PO 檔','no customer PO file')}</span>`,0,po&&po.file?`${esc(po.file)}${po.email_date?' · '+L('郵件 ','email ')+esc(String(po.email_date).slice(0,10)):''}${po.revs>1?' · '+L('改過 '+po.revs+' 次，以 ERP 為準','revised '+po.revs+'×, ERP rules'):''}${po.required?' · '+L('客戶交期 ','required ')+esc(po.required):''}`:'');
+  h+=line('📄',L('客戶 PO','Customer PO'),srcChip('email'),po&&po.state&&po.state!=='missing'&&po.state!=='loading'?`<span><b>${fmt(po.qty)}</b> ${L('件','pcs')} · ${esc(po.state==='ok'?L('與 ERP 相符','matches ERP'):po.state==='diff'?L('與 ERP 差 ','differs by ')+fmt(po.qty-(po.erp||q)):L('PO 有、款號對不上','PO found, style not matched'))}${po.erp&&po.erp!==q&&po.state!=='nostyle'?`<span class="small muted">（${L('這是整款合計：ERP 這張 PO 這款共 ','whole style: ERP total for this PO/style ')}${fmt(po.erp)}${L('，本單 ',', this order ')}${fmt(q)}）</span>`:''}</span>`:`<span class="muted">${L('沒有客戶 PO 檔','no customer PO file')}</span>`,0,po&&po.file?`${esc(po.file)}${po.email_date?' · '+L('郵件 ','email ')+esc(String(po.email_date).slice(0,10)):''}${po.revs>1?' · '+L('改過 '+po.revs+' 次，以 ERP 為準','revised '+po.revs+'×, ERP rules'):''}${po.required?' · '+L('客戶交期 ','required ')+esc(po.required):''}`:'');
   /* 2 ERP 訂單 */
   h+=line('🧾',L('ERP 訂單','ERP order'),srcChip('erp'),`<span><b>${fmt(q)}</b> ${L('件','pcs')} · ${L('接單 ','ordered ')}${esc(o.order_date||'—')} · ${L('交期 ','delivery ')}${esc(o.delivery||'—')}</span>`,0,`${esc(o.my_no)}${o.od_no?' · '+esc(o.od_no):''}${o.price?' · @'+fmt(o.price,2):''}`);
   /* 3 SMV */
