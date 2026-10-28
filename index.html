@@ -2373,7 +2373,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.7.5';
+const APP_VER='0.8.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3006,6 +3006,226 @@ async function syncTpl(man){
  for(const t2 of DB.tpl.filter(x=>x.dirty)){await cpost({action:'erp_tpl',tpl:{name:t2.name,sig:t2.sig,ds:t2.ds,map:JSON.stringify(t2.map),at:t2.at}});t2.dirty=false}
  cloud.forEach(c=>{if(!DB.tpl.some(x=>x.sig===c.sig))DB.tpl.push({name:c.name,sig:c.sig,ds:c.ds,map:PJ(c.map)||{},at:c.at,dirty:false})});
 }
+
+
+/* ---------- v0.8.0 (2026-10-28)：統一外殼 ----------
+   兩個入口：🏭 生產營運（?s=prod）與 💰 財務（?s=fin），同一份資料、各自的選單；
+   生產平台（vrt-prod）的頁面嵌進同一個外殼（同網域 iframe），選單照「接單 → 備料 → 生產 → 成品與出貨」排；
+   每頁標示資料來源（🔵 ERP／🟠 Email／🟢 Telegram／⚪ 手動）與資料時間；
+   新頁：📥 收件匣（Email／Telegram／ERP 進來的檔案，判到哪、匯入了沒）、📰 生產報告（日報／排單週報／效率週報＋ERP 更新摘要）。
+   第 3 步會把平台頁面逐一搬進來；這一步不動任何資料與既有頁面的算法。 */
+(function(){
+ const PROD_SITE='https://saintdou-weng.github.io/vrt-prod/';
+ const PROD_GAS='https://script.google.com/macros/s/AKfycbxKAEMe1Y2bYH2qQkCQclJQljA8-nxgmE-lbbpqbmByzconjC5IjcJJwS8INVytEtvv/exec';
+ window.PROD_SITE=PROD_SITE; window.PROD_GAS=PROD_GAS;
+
+ /* ── 來源 ── */
+ const SRC={erp:['🔵','ERP','erp'],email:['🟠','Email','email'],tg:['🟢','Telegram','tg'],manual:['⚪',['手動／上傳','Manual / upload','ដោយដៃ'],'manual'],mixed:['🟠🟢',['Email＋Telegram','Email + Telegram','Email + Telegram'],'mixed']};
+ const srcName=s=>{const x=SRC[s]||SRC.manual;return Array.isArray(x[1])?(x[1][LANG]||x[1][1]):x[1]};
+ const srcDot=s=>(SRC[s]||SRC.manual)[0];
+ window.srcChip=function(s,extra){const x=SRC[s]||SRC.manual;return `<span class="src ${x[2]}">${x[0]} ${esc(srcName(s))}${extra?' · '+extra:''}</span>`};
+
+ /* ── 兩個入口 ── */
+ window.SEC={prod:{ic:'🏭',k:'sec_prod'},fin:{ic:'💰',k:'sec_fin'}};
+ window.SECTION=(()=>{try{const q=new URLSearchParams(location.search).get('s');if(q==='fin'||q==='prod'){LS.set('psjerp_section',q);return q}}catch(e){}const s=LS.get('psjerp_section','prod');return s==='fin'?'fin':'prod'})();
+ window.setSection=function(s){ if(s!=='fin'&&s!=='prod')return; SECTION=s; LS.set('psjerp_section',s);
+  const m=MODS.find(x=>x[0]===CUR); if(m&&m[3]!=='both'&&m[3]!==s){go('dashboard')}else{renderNav();document.title='VRT ERP · '+t(SEC[SECTION].k)} };
+
+ /* ── 生產平台頁面（嵌入） ── [檔名, 來源, [中, EN, ខ្មែរ]] */
+ const FRAMES={
+  'p-orders':['orders_v3.html','email',['客戶訂單表','Customer order sheet','តារាងបញ្ជាទិញ']],
+  'p-bom':['VRT_BOM_Management_v2_AI.html','email',['BOM 管理','BOM management','គ្រប់គ្រង BOM']],
+  'p-fabstock':['vrt_fabric_stock_control_v1.html','tg',['布料庫存','Fabric stock','ស្តុកក្រណាត់']],
+  'p-greige':['vrt_fabric_delivery_greige_center_v1.html','email',['布料進倉','Greige delivery','ក្រណាត់ចូលឃ្លាំង']],
+  'p-prodplan':['production_plan_capacity_v1.html','manual',['排單與產能','Planning & capacity','ផែនការ និងសមត្ថភាព']],
+  'p-cutplan':['cutting_plan_v2.html','manual',['裁剪計劃','Cutting plan','ផែនការកាត់']],
+  'p-cutting':['cutting_v3.html','email',['裁剪','Cutting','កាត់']],
+  'p-sewing':['sewing_v5.html','email',['車縫','Sewing','ដេរ']],
+  'p-qc':['vrt_final_qc_v1.html','tg',['Final QC','Final QC','Final QC']],
+  'p-ie':['ie_smv_report_v2_1.html','tg',['IE / SMV','IE / SMV','IE / SMV']],
+  'p-spare':['vrt_spare_parts_v2.html','tg',['機修零件','Spare parts','គ្រឿងបន្លាស់']],
+  'p-overview':['production_v4.html','mixed',['生產總覽','Production overview','ទិដ្ឋភាពផលិតកម្ម']],
+  'p-fg':['VRT_FG_Inventory_Management_v1.html','manual',['成品庫存表','FG inventory sheet','តារាងស្តុកផលិតផល']],
+  'p-shipping':['shipping_v2.html','email',['出貨管制','Shipping control','ត្រួតពិនិត្យដឹកជញ្ជូន']],
+  'p-podelivery':['VRT_PO_Delivery_Control_Center.html','email',['PO 交期','PO delivery','កាលបរិច្ឆេទ PO']],
+  'p-monthship':['vrt_monthly_shipping_control_center_v1.html','manual',['月出貨','Monthly shipping','ដឹកជញ្ជូនប្រចាំខែ']],
+  'p-weekly':['vrt_production_weekly_report_generator_v3.html','mixed',['週報產生器','Weekly report generator','បង្កើតរបាយការណ៍សប្តាហ៍']],
+  'p-portal':['portal_v2.html','mixed',['生產平台入口','Production portal','ផតថលផលិតកម្ម']],
+ };
+ window.FRAMES=FRAMES;
+ Object.keys(FRAMES).forEach(k=>{T[k]=FRAMES[k][2];RENDER[k]=()=>renderFrame(k)});
+ Object.assign(T,{
+  sec_prod:['生產營運','Production','ផលិតកម្ម'], sec_fin:['財務','Finance','ហិរញ្ញវត្ថុ'],
+  g_order:['接單','Orders','ការបញ្ជាទិញ'], g_matl:['備料','Materials','សម្ភារៈ'], g_make:['生產','Production','ផលិតកម្ម'], g_ship:['成品與出貨','FG & shipping','ផលិតផល និងដឹកជញ្ជូន'],
+  g_ap:['應付與收入','Payables & revenue','ត្រូវបង់ និងចំណូល'], g_cost:['成本','Cost','ថ្លៃដើម'],
+  inbox:['收件匣','Inbox','ប្រអប់ទទួល'], prodreports:['生產報告','Production reports','របាយការណ៍ផលិតកម្ម'],
+  sub_inbox:['Email、Telegram 群組、ERP 進來的檔案：判到哪個模組、匯入了沒、上雲了沒。有問題的在這裡看得到，不用等人回報。','Files arriving from Email, Telegram groups and the ERP: which module, imported or not, in the cloud or not.'],
+  sub_prodreports:['生產日報、排單週報、效率週報（生產平台產生，Telegram 同一份）＋ ERP 更新摘要。','Daily report, planning weekly, efficiency weekly (generated by the production platform; same text as Telegram) + ERP update summaries.'],
+  platform_tag:['平台','platform','វេទិកា'],
+ });
+
+ /* ── 選單：每項 [頁, 圖示, 群組, 入口 prod／fin／both] ── */
+ const M=[
+  ['dashboard','📊','g_over','both'],['inbox','📥','g_over','prod'],['smart-import','🧠','g_over','both'],['prodreports','📰','g_over','prod'],
+  ['orders','🧾','g_order','prod'],['prodorders','📋','g_order','prod'],['bom','🧵','g_order','prod'],['p-orders','📦','g_order','prod'],['p-bom','📐','g_order','prod'],
+  ['purchase','🛒','g_matl','prod'],['pprice','🏷️','g_matl','prod'],['receiving','📥','g_matl','prod'],['issues','📤','g_matl','prod'],['materials','🗂️','g_matl','prod'],['fabric','🧶','g_matl','prod'],['accessories','🧷','g_matl','prod'],['stockmove','🔁','g_matl','prod'],['p-fabstock','🧵','g_matl','prod'],['p-greige','🚛','g_matl','prod'],
+  ['p-prodplan','📅','g_make','prod'],['p-cutplan','🗓️','g_make','prod'],['p-cutting','✂️','g_make','prod'],['p-sewing','🪡','g_make','prod'],['production','🏭','g_make','prod'],['wip','⏳','g_make','prod'],['p-qc','✅','g_make','prod'],['p-ie','⏱️','g_make','prod'],['p-spare','🔧','g_make','prod'],['p-overview','📈','g_make','prod'],
+  ['finished-goods','📦','g_ship','prod'],['fgstock','🗃️','g_ship','prod'],['p-fg','🏬','g_ship','prod'],['shipping','🚢','g_ship','prod'],['p-shipping','🛳️','g_ship','prod'],['p-podelivery','📬','g_ship','prod'],['p-monthship','🗓','g_ship','prod'],
+  ['invoices','🧾','g_ap','fin'],['payables','💳','g_ap','fin'],['apsum','📒','g_ap','fin'],
+  ['factory-cost','💰','g_cost','fin'],['labor','👷','g_cost','fin'],['costing','🧮','g_cost','fin'],['reports','📑','g_cost','fin'],
+  ['sync','🔄','g_hub','both'],['compare','🔍','g_hub','prod'],['exceptions','⚠️','g_hub','prod'],['p-weekly','📝','g_hub','prod'],['p-portal','🏭','g_hub','prod'],
+  ['telegram','✈️','g_sys','both'],['audit','🗂️','g_sys','both'],['settings','⚙️','g_sys','both'],
+ ];
+ MODS.length=0; M.forEach(r=>MODS.push(r));
+ const secOf=k=>{const m=MODS.find(x=>x[0]===k);return m?m[3]:'both'};
+
+ renderNav=function(){
+  let g='',h=`<div class="sec-sw">${['prod','fin'].map(s=>`<button type="button" class="${s===SECTION?'on':''}" onclick="setSection('${s}')">${SEC[s].ic} ${esc(t(SEC[s].k))}</button>`).join('')}</div>`;
+  MODS.forEach(([k,ic,grp,sec])=>{ if(sec!=='both'&&sec!==SECTION)return;
+   if(grp!==g){h+=`<div class="nav-g">${esc(t(grp))}</div>`;g=grp}
+   const F=FRAMES[k];
+   h+=`<a href="#${k}" class="${k===CUR?'on':''}${F?' pf':''}" data-k="${k}"><span class="ic">${ic}</span><span>${esc(t(k))}</span>${F?`<span class="ct" title="${esc(srcName(F[1]))}"><i class="ptag">${esc(t('platform_tag'))}</i> ${srcDot(F[1])}</span>`:navCount(k)}</a>`;
+  });
+  $('#nav').innerHTML=h;
+ };
+
+ route=function(){
+  let h=decodeURIComponent((location.hash||'#dashboard').slice(1)); SOLO=h.startsWith('solo-'); if(SOLO)h=h.slice(5);
+  CUR=(RENDER[h]||CFG[h])?h:'dashboard';
+  const s=secOf(CUR); if(s!=='both'&&s!==SECTION){SECTION=s;LS.set('psjerp_section',s)}
+  document.body.classList.toggle('solo',SOLO); document.body.classList.toggle('framed',!!FRAMES[CUR]);
+  $('#rail').classList.remove('open'); closeDrawer(); rerender(); window.scrollTo(0,0);
+  document.title=(SOLO?t(CUR)+' · ':'')+'VRT ERP · '+t(SEC[SECTION].k);
+ };
+
+ /* ── 嵌入的平台頁 ── */
+ function renderFrame(k){
+  const F=FRAMES[k]; const url=PROD_SITE+F[0];
+  return `<div class="ph"><div style="min-width:0"><h1>${modIcon(k)} ${esc(t(k))}</h1><div class="src-line">${srcChip(F[1])}<span class="small muted">${tt('生產平台的頁面，嵌在 VRT ERP 裡；資料存在生產平台的雲端，匯入、編輯都在這一頁做即可。','A production-platform page shown inside VRT ERP; its data lives in the production cloud — import and edit right here.')}</span></div></div>
+   <div class="acts"><a class="btn sm" href="${url}" target="_blank" rel="noopener">${tt('在新分頁開啟','Open in new tab')} ↗</a></div></div>
+   <iframe class="pframe" src="${url}" title="${esc(t(k))}" loading="eager"></iframe>`;
+ }
+
+ /* ── ERP 資料時間（哪個 ERP 報表進到哪一天） ── */
+ function fileUpto(f){ if(f.range&&f.range[1])return String(f.range[1]).slice(0,10); if(f.asof)return String(f.asof).slice(0,10); if(f.year)return f.year+'-12-31'; return '' }
+ function erpFresh(reps){ const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep)); if(!F.length)return null;
+  let upto='',at=''; F.forEach(f=>{const u=fileUpto(f);if(u>upto)upto=u;if(f.at&&f.at>at)at=f.at}); return {upto,at,n:F.length} }
+ window.erpFreshAll=function(){ return erpFresh((DB.erpfiles||[]).map(f=>f.rep)) };
+ const repsOfPage=k=>{const a=(typeof COVER!=='undefined'?COVER:[]).filter(c=>c[0]===k).map(c=>c[1]);const b=(typeof NEED!=='undefined'&&NEED[k])||[];return [...new Set(a.concat(b))]};
+ function srcLineFor(k){ const reps=repsOfPage(k); if(!reps.length)return '';
+  const fr=erpFresh(reps);
+  if(!fr)return `<div class="src-line">${srcChip('erp')}<span class="small muted">${tt('這頁的 ERP 報表還沒匯入','ERP reports for this page not imported yet')}</span></div>`;
+  return `<div class="src-line">${srcChip('erp',tt('資料到 ','data to ')+fr.upto)}<span class="small muted">${tt('上次匯入 ','last import ')+String(fr.at).slice(0,16)} · ${tt('每週三更新','updated every Wednesday')}</span></div>`;
+ }
+ const _pageHead=pageHead;
+ pageHead=function(k,acts){ let h=_pageHead(k,acts);
+  if(T['sub_'+k]&&!subKey(k))h=h.replace('<div class="sub"></div>',`<div class="sub">${esc(t('sub_'+k))}</div>`);   /* 新頁的副標 */
+  const line=k==='dashboard'?'':srcLineFor(k); if(line)h=h.replace('<div class="url-chip"',line+'<div class="url-chip"'); if(k==='dashboard'&&SECTION==='prod')h+=freshStrip(); return h };
+
+ /* ── 現場資料（生產平台雲端）最後同步時間 ── */
+ window.PRODST=null; let prodStAt=0, prodStBusy=false;
+ window.loadProdStatus=async function(force){ if(prodStBusy)return; if(!force&&PRODST&&Date.now()-prodStAt<5*60e3)return; prodStBusy=true;
+  try{const r=await fetch(PROD_GAS+'?action=status',{redirect:'follow'}); const j=await r.json(); PRODST=j.data||j; prodStAt=Date.now()}catch(e){PRODST={_err:String(e&&e.message||e)}}
+  finally{prodStBusy=false; if(CUR==='dashboard'||CUR==='inbox')rerender()} };
+ const TOOL_ZH={sewing:['車縫','Sewing'],cutting:['裁剪','Cutting'],qc:['Final QC','Final QC'],prodplan:['排單','Planning'],orders:['訂單','Orders'],shipping:['出貨','Shipping'],podelivery:['PO 交期','PO delivery'],fabricstock:['布料庫存','Fabric stock'],fabricdelivery:['布料進倉','Greige'],bom:['BOM','BOM'],fg:['成品庫存','FG'],spareparts:['機修零件','Spare parts'],smv:['SMV','SMV'],ie_smv:['IE/SMV','IE/SMV'],cuttingplan:['裁剪計劃','Cutting plan'],monthship:['月出貨','Monthly shipping'],custstats:['客戶統計','Customer stats'],unrouted:['未判定','Unrouted'],fabric:['布料','Fabric']};
+ const toolZh=k=>{const x=TOOL_ZH[k];return x?(LANG===0?x[0]:x[1]):k};
+ const dShort=iso=>{if(!iso)return '—';const d=new Date(iso);if(isNaN(d))return String(iso).slice(0,10);return pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+ const ageCls=iso=>{if(!iso)return 'crit';const h=(Date.now()-new Date(iso))/36e5;return h<=36?'good':h<=24*7?'warn':'crit'};
+ function freshStrip(){
+  const fr=erpFreshAll();
+  let h=`<div class="fresh"><div class="fc">${srcChip('erp')}<span>${fr?tt('資料到 ','data to ')+'<b>'+fr.upto+'</b>':tt('還沒匯入','nothing imported')}</span><span class="small muted">${tt('下次更新 ','next ')+esc(nextSyncText())}</span></div>`;
+  h+=`<div class="fc">${srcChip('mixed')}`;
+  if(!PRODST){h+=`<span class="small muted">${tt('讀取生產平台狀態…','loading production status…')}</span>`;setTimeout(()=>loadProdStatus(false),30)}
+  else if(PRODST._err){h+=`<span class="small muted">${tt('生產平台雲端沒回應','production cloud not responding')}</span>`}
+  else ['sewing','cutting','qc','prodplan','shipping','spareparts'].forEach(tk=>{const s=PRODST[tk];h+=`<span class="fitem"><b>${esc(toolZh(tk))}</b> <span class="st ${s?ageCls(s.timestamp):'neu'}">${s?dShort(s.timestamp):'—'}</span></span>`});
+  h+=`<span class="small muted">${tt('＝最後同步到雲端的時間','= last cloud sync')}</span></div>`;
+  const pend=INBOX&&INBOX.counts?Object.values(INBOX.counts).reduce((a,b)=>a+b,0):null;
+  h+=`<a class="fc" href="#inbox" style="text-decoration:none;color:inherit">📥 <b>${esc(t('inbox'))}</b> ${pend==null?'':`<span class="st ${pend?'warn':'good'}">${pend?tt('待匯入 ','pending ')+pend:tt('沒有待處理','nothing pending')}</span>`}</a></div>`;
+  return h;
+ }
+
+ /* ── 📥 收件匣 ── */
+ window.INBOX=null; let inboxAt=0, inboxBusy=false;
+ window.loadInbox=async function(force){ if(inboxBusy)return; if(!force&&INBOX&&Date.now()-inboxAt<3*60e3)return; inboxBusy=true;
+  try{const r=await fetch(PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'inboxList',status:'all',includeUnrouted:true,limit:150}),redirect:'follow'});const j=await r.json();const d=j.data||j;INBOX=d.ok?d:{_err:d.error||'error'};inboxAt=Date.now()}catch(e){INBOX={_err:String(e&&e.message||e)}}
+  finally{inboxBusy=false; if(CUR==='inbox'||CUR==='dashboard')rerender()} };
+ const IB_ST={pending:['warn',['待匯入','pending']],done:['good',['已匯入','imported']],skipped:['neu',['略過／重複','skipped']],error:['crit',['錯誤','error']]};
+ const ibSt=s=>{const x=IB_ST[s]||['neu',[s,s]];return stChip(x[0],LANG===0?x[1][0]:x[1][1])};
+ const ibSrc=g=>{g=String(g||'');return g==='Email'?srcChip('email'):/^Web/i.test(g)?srcChip('manual'):srcChip('tg',g)};
+ const mono=s=>`<span class="mono">${esc(s)}</span>`;
+ function renderInbox(){
+  const k='inbox';
+  let h=pageHead(k,`<button class="btn sm" onclick="loadInbox(true);loadDigLog&&loadDigLog();toast('${tt('重新整理','Refreshing')}')">↻ ${tt('重新整理','Refresh')}</button><a class="btn sm" href="#smart-import">🧠 ${esc(t('smart-import'))}</a>`);
+  if(INBOX===null){h+=`<div class="note">${tt('讀取收件匣…','Loading inbox…')}</div>`;setTimeout(()=>loadInbox(false),30)}
+  else if(INBOX._err){h+=`<div class="note crit">${tt('讀不到生產平台的收件匣：','Cannot read the production inbox: ')}${esc(INBOX._err)}</div>`}
+  else{
+   const rows=INBOX.rows||[]; const counts=INBOX.counts||{}; const pend=Object.values(counts).reduce((a,b)=>a+b,0);
+   h+=`<div class="kpis" style="margin-bottom:14px">${kpi(tt('待匯入','Pending'),fmt(pend),'',Object.keys(counts).map(m=>toolZh(m)+' '+counts[m]).join(' · ')||tt('沒有','none'),pend?'warn':'good')}${kpi(tt('最近 150 筆','Last 150'),fmt(rows.length),'',tt('Email、Telegram、網頁上傳','Email, Telegram, web upload'))}${kpi(tt('總收件','Total received'),fmt(INBOX.total||0))}</div>`;
+   h+=`<div class="panel"><h2>${srcChip('mixed')} ${tt('現場檔案','Field files')}</h2><p class="hint">${tt('機器人每 30 分鐘收一次群組檔案（週一～六 08–18），Email 附件由 Outlook 分類後匯入；同一個檔再傳一次只記一筆「重複」。','The bot collects group files every 30 min (Mon–Sat 08–18); email attachments are classified by Outlook then imported; a re-sent file is logged once as a duplicate.')}</p>
+    <div class="tbl-wrap"><table class="t cards"><thead><tr><th>${tt('收到','Received')}</th><th>${tt('來源','Source')}</th><th>${tt('檔名','File')}</th><th>${tt('判到模組','Module')}</th><th>${esc(t('status'))}</th><th>${tt('備註','Note')}</th></tr></thead><tbody>`;
+   if(!rows.length)h+=`<tr><td colspan="6" class="muted small">${tt('還沒有收到檔案','No files yet')}</td></tr>`;
+   rows.forEach(e=>{h+=`<tr><td class="mono small" data-l="${tt('收到','Received')}">${esc(String(e.receivedAt||'').replace('T',' ').slice(0,16))}</td><td data-l="${tt('來源','Source')}">${ibSrc(e.group)}${e.sender?`<div class="small muted">${esc(e.sender)}</div>`:''}</td><td class="wrap" data-l="${tt('檔名','File')}">${mono(e.fileName||'')}${e.size?`<div class="small muted">${fmt(Math.round(e.size/1024))} KB</div>`:''}</td><td data-l="${tt('模組','Module')}">${esc(toolZh(e.module||'unrouted'))}${e.page?`<div class="small muted mono">${esc(e.page)}</div>`:''}</td><td data-l="${esc(t('status'))}">${ibSt(e.status)}${e.doneAt?`<div class="small muted">${esc(String(e.doneAt).replace('T',' ').slice(0,16))}</div>`:''}</td><td class="wrap small" data-l="${tt('備註','Note')}">${esc(e.note||'')}</td></tr>`});
+   h+=`</tbody></table></div></div>`;
+  }
+  /* ERP 這邊 */
+  if(DIGLOG===null){DIGLOG=[];setTimeout(loadDigLog,50)}
+  const fr=erpFreshAll(); const F=(DB.erpfiles||[]).slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,12);
+  h+=`<div class="panel mt"><h2>${srcChip('erp')} ${tt('ERP 匯入','ERP imports')}</h2><p class="hint">${tt('每週三 08:00–16:00 從公司電腦的成衣管理系統抓資料、匯入、上雲端，完成後在 Telegram 發更新摘要。','Every Wednesday 08:00–16:00 the legacy ERP on the office PC is exported, imported and uploaded; a summary goes to Telegram.')} ${fr?tt('目前資料到 ','Data to ')+'<b>'+fr.upto+'</b>':''} · ${tt('下次 ','next ')+esc(nextSyncText())}</p>
+   <div class="tbl-wrap"><table class="t cards"><thead><tr><th>${tt('匯入時間','Imported')}</th><th>${tt('報表','Report')}</th><th>${tt('檔案','File')}</th><th>${tt('範圍','Scope')}</th><th class="r">${tt('筆數','Rows')}</th><th>${tt('雲端','Cloud')}</th></tr></thead><tbody>`;
+  if(!F.length)h+=`<tr><td colspan="6" class="muted small">${tt('還沒有匯入','Nothing imported yet')}</td></tr>`;
+  F.forEach(f=>{h+=`<tr><td class="mono small" data-l="${tt('匯入','Imported')}">${esc(String(f.at||'').slice(0,16))}</td><td data-l="${tt('報表','Report')}" class="mono">${esc(f.fn||f.rep)}</td><td class="mono small wrap" data-l="${tt('檔案','File')}">${esc(f.file||'')}</td><td class="small wrap" data-l="${tt('範圍','Scope')}">${esc(f.label||'')}</td><td class="r" data-l="${tt('筆數','Rows')}">${fmt(f.rows||0)}</td><td data-l="${tt('雲端','Cloud')}">${f.dirty||!f.version?stChip('warn',tt('待上傳','to upload')):stChip('good',tt('已上雲','in cloud'))}</td></tr>`});
+  h+=`</tbody></table></div>`;
+  if(DIGLOG&&DIGLOG.length)h+=`<h3 style="margin-top:14px">📣 ${tt('最近的更新摘要','Recent update summaries')}</h3>`+DIGLOG.slice(0,5).map(r=>`<details style="border-top:1px solid var(--line-2);padding:6px 0"><summary><b class="mono">${esc(String(r.time).slice(0,16))}</b> · ${esc(String(r.summary||''))}</summary><div class="small" style="white-space:pre-line;margin-top:6px">${esc(String(r.text||''))}</div></details>`).join('');
+  h+=`</div>`;
+  return h;
+ }
+ RENDER.inbox=renderInbox;
+
+ /* ── 📰 生產報告 ── */
+ const PR_MODES=[['day','📰',['生產日報','Daily report']],['plan','📋',['排單週報','Planning weekly']],['eff','📅',['效率週報','Efficiency weekly']]];
+ window.PRREP={}; let prBusy={};
+ window.loadProdReport=async function(mode,force){ if(prBusy[mode])return; if(!force&&PRREP[mode]&&Date.now()-PRREP[mode]._at<5*60e3)return; prBusy[mode]=true;
+  try{const r=await fetch(PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'dailyReportText',mode}),redirect:'follow'});const j=await r.json();const d=j.data||j;PRREP[mode]=Object.assign({_at:Date.now()},d)}catch(e){PRREP[mode]={_at:Date.now(),ok:false,error:String(e&&e.message||e)}}
+  finally{prBusy[mode]=false;if(CUR==='prodreports')rerender()} };
+ window.prMode=function(m){LS.set('psjerp_prmode',m);rerender()};
+ function renderProdReports(){
+  const k='prodreports'; const mode=LS.get('psjerp_prmode','day');
+  let h=pageHead(k,`<button class="btn sm" onclick="loadProdReport('${mode}',true);toast('${tt('重新整理','Refreshing')}')">↻ ${tt('重新整理','Refresh')}</button><a class="btn sm" href="#p-overview">📈 ${esc(t('p-overview'))}</a>`);
+  h+=`<div class="tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${PR_MODES.map(([m,ic,l])=>`<button class="btn sm ${m===mode?'pri':''}" onclick="prMode('${m}')">${ic} ${esc(LANG===0?l[0]:l[1])}</button>`).join('')}</div>`;
+  const R=PRREP[mode];
+  if(!R){h+=`<div class="note">${tt('讀取報告…','Loading report…')}</div>`;setTimeout(()=>loadProdReport(mode,false),30)}
+  else if(!R.ok){h+=`<div class="note crit">${tt('讀不到報告：','Cannot load the report: ')}${esc(R.error||'')}</div>`}
+  else{
+   const link=mode==='plan'?'#p-prodplan':mode==='eff'?'#p-sewing':'#p-overview';
+   h+=`<div class="panel"><div class="src-line" style="margin-bottom:8px">${srcChip('mixed')}<span class="small muted">${tt('報告期間 ','period ')}<b class="mono">${esc(R.date||'')}</b> · ${tt('產生 ','generated ')}${esc(dShort(R.generatedAt))} · ${R.sentAt?tt('Telegram 已送 ','sent to Telegram ')+esc(dShort(R.sentAt)):tt('Telegram 未送','not sent to Telegram')}</span></div>
+    <div class="rep-text">${esc(R.text||'')}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="${link}">${tt('看相關頁面','Open related page')}</a><a class="btn sm" href="${PROD_SITE}portal_v2.html" target="_blank" rel="noopener">🏭 ${esc(t('p-portal'))} ↗</a></div></div>`;
+  }
+  h+=digestPanel();
+  return h;
+ }
+ RENDER.prodreports=renderProdReports;
+
+ /* ── 樣式 ── */
+ const st=document.createElement('style'); st.textContent=`
+ .sec-sw{display:flex;gap:6px;padding:0 12px 10px}.sec-sw button{flex:1;padding:7px 4px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);font:600 12.5px/1.2 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+ .sec-sw button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+ .nav a .ptag{font-style:normal;font-size:9.5px;color:var(--muted);border:1px solid var(--line-2);border-radius:4px;padding:0 4px;vertical-align:1px}
+ .nav a>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav a .ct{white-space:nowrap}
+ .src-line{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--ink-2);margin:4px 0 6px}
+ .src{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap}
+ .src.erp{background:#DBEAFE;color:#1E40AF}.src.email{background:#FFEDD5;color:#9A3412}.src.tg{background:#DCFCE7;color:#166534}.src.manual{background:#F1F5F9;color:#334155}.src.mixed{background:linear-gradient(90deg,#FFEDD5,#DCFCE7);color:#334155}
+ .fresh{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.fresh .fc{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-size:12.5px}
+ .fresh .fitem{display:inline-flex;gap:4px;align-items:center}.fresh .st{padding:1px 7px;font-size:11px}
+ .pframe{width:100%;height:calc(100vh - 170px);min-height:520px;border:1px solid var(--line);border-radius:var(--r);background:#fff;display:block}
+ body.framed .page{padding-bottom:12px}body.framed .back-bar{display:none}
+ .rep-text{white-space:pre-wrap;font-size:14px;line-height:1.65;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:12px 14px;max-width:80ch}
+ @media (max-width:860px){.pframe{height:calc(100vh - 140px)}}`;
+ document.head.appendChild(st);
+
+ /* 側欄底部的「生產平台 ↗」改成入口頁（嵌入版） */
+ const pl=document.getElementById('prodLinks'); if(pl){const a=pl.querySelector('a[href*="portal_v2"]'); if(a){a.href='#p-portal';a.removeAttribute('target')}}
+})();
 
 init();
 </script></body></html>
