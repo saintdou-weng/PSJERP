@@ -22,7 +22,7 @@ const READ_KEY_DIRECT  = '';   // ← 唯讀密碼（給生產平台讀資料用
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.7.5',
+  VERSION: '0.8.0',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -297,7 +297,26 @@ function handleTelegramUpdate_(u) {
   }
 }
 
+/* v0.8.0 (2026-10-28)：群組訊息改送 AI Production（VRT Production）群組——經由生產平台 GAS 的 Telegram 代理（那個機器人已在群組裡），
+   原本的 VRT ERP 群組不再發（SETTINGS → TG_ROUTE = direct 可切回）。私訊（/start 的回覆）仍由本機器人直接回。
+   代理只收網址按鈕，所以群組訊息一律配「VRT ERP 總覽／收件匣／同步中心」三顆按鈕。代理失敗才退回舊群組並註明。 */
+const PROD_GAS_URL = 'https://script.google.com/macros/s/AKfycbxKAEMe1Y2bYH2qQkCQclJQljA8-nxgmE-lbbpqbmByzconjC5IjcJJwS8INVytEtvv/exec';
+function erpButtons_() { const w = webBase_().replace(/\/?$/, '/'); return { inline_keyboard: [[ {text:'📊 VRT ERP 總覽', url:w + '?s=prod#dashboard'}, {text:'📥 收件匣', url:w + '?s=prod#inbox'}, {text:'🔄 同步中心', url:w + '?s=prod#sync'} ]] }; }
+function prodRelay_(text, keyboard) {
+  const body = { action:'sendMessage', text:String(text).slice(0, 4000), parse_mode:'HTML', disable_web_page_preview:true, auditTool:'erp', auditType:'digest' };
+  if (keyboard) body.reply_markup = keyboard;
+  const res = UrlFetchApp.fetch(PROD_GAS_URL, { method:'post', contentType:'text/plain;charset=utf-8', payload:JSON.stringify(body), muteHttpExceptions:true, followRedirects:true });
+  const code = res.getResponseCode(); const txt = res.getContentText(); let j = null; try { j = JSON.parse(txt); } catch (e) {}
+  const ok = code === 200 && j && j.ok !== false && !(j.data && j.data.ok === false);
+  logTelegram_('relay:sendMessage', 'VRT Production', code, txt.slice(0, 500));
+  if (!ok) throw new Error('relay failed: HTTP ' + code + ' ' + txt.slice(0, 200));
+  return res;
+}
 function sendTelegram_(chatId, text, keyboard) {
+  if (String(chatId) === String(defaultChat_()) && String(cfg_('TG_ROUTE', 'prod') || 'prod').toLowerCase() !== 'direct') {
+    try { return prodRelay_(text, erpButtons_()); }
+    catch (err) { log_('TG_RELAY', 'ERROR', String(err)); text = '（生產群組發送失敗，暫發這裡）\n' + text; }
+  }
   const payload = {
     chat_id: String(chatId),
     text: text,

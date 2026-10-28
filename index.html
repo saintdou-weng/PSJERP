@@ -372,6 +372,7 @@ table.t.list tr.sel td{background:#FFF7ED}
   <div class="main">
     <header class="top">
       <button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <button class="icon-btn search-btn" id="searchBtn" aria-label="Search" onclick="document.body.classList.toggle('search-open');if(document.body.classList.contains('search-open'))document.getElementById('gsearch').focus()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
       <div class="solo-bar"><a href="#dashboard" id="soloBack" class="btn sm">← <span data-i="back_portal"></span></a></div>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -1969,7 +1970,7 @@ async function loadDigLog(){if(!cloudReady())return;try{const j=await cget({acti
 function digestPanel(){
  if(DIGLOG===null){DIGLOG=[];setTimeout(loadDigLog,50)}
  const pend=(DB.digest||[]).length;
- return `<div class="panel mt"><h2>📣 ${tt('更新摘要','Update summaries')}</h2><p class="hint">${tt('每次匯入新的 ERP 檔、上傳雲端後，自動在 PSJERP Telegram 群組發一則摘要：更新了哪些報表、幾列、和上次差多少、核對結果。','After each import is uploaded, a summary is posted to the PSJERP Telegram group: which reports, how many rows, change vs last time, check results.')}</p>
+ return `<div class="panel mt"><h2>📣 ${tt('更新摘要','Update summaries')}</h2><p class="hint">${tt('每次匯入新的 ERP 檔、上傳雲端後，自動在 AI Production（VRT Production）Telegram 群組發一則摘要：更新了哪些報表、幾列、和上次差多少、核對結果。','After each import is uploaded, a summary is posted to the AI Production (VRT Production) Telegram group: which reports, how many rows, change vs last time, check results.')}</p>
  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">${pend?stChip('warn',tt('待發送 ','Pending ')+pend+tt(' 個檔',' files')):stChip('good',tt('沒有待發送','Nothing pending'))}<button class="btn sm" ${pend?'':'disabled'} onclick="sendDigest(true)">${tt('立即發送','Send now')}</button></div>
  ${DIGLOG&&DIGLOG.length?DIGLOG.slice(0,8).map(r=>`<details style="border-top:1px solid var(--line-2);padding:6px 0"><summary><b class="mono">${esc(String(r.time).slice(0,16))}</b> · ${esc(String(r.summary||''))}</summary><div class="small" style="white-space:pre-line;margin-top:6px">${esc(String(r.text||''))}</div></details>`).join(''):`<div class="small muted">${cloudReady()?tt('還沒有摘要紀錄','No summaries yet'):tt('連上雲端後顯示紀錄','Shown after connecting to the cloud')}</div>`}</div>`}
 function nextSyncText(){const c=syncCfg();const [hh,mm]=c.time.split(':').map(Number);let d=new Date();for(let i=0;i<15;i++){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+i,hh,mm);if(x<=new Date())continue;if(x.getDay()!==3)continue;if(!isWorkDay(new Date(x.getFullYear(),x.getMonth(),x.getDate())))continue;return ymd(x)+' '+c.time+' ('+WD()[(x.getDay()+6)%7]+')'}return '—'}
@@ -3220,7 +3221,22 @@ async function syncTpl(man){
  .pframe{width:100%;height:calc(100vh - 170px);min-height:520px;border:1px solid var(--line);border-radius:var(--r);background:#fff;display:block}
  body.framed .page{padding-bottom:12px}body.framed .back-bar{display:none}
  .rep-text{white-space:pre-wrap;font-size:14px;line-height:1.65;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:12px 14px;max-width:80ch}
- @media (max-width:860px){.pframe{height:calc(100vh - 140px)}}`;
+ @media (max-width:860px){
+  /* v0.8.0 手機：上方只留一列（☰ 🔍 雲端 語言），搜尋框按 🔍 才展開；嵌入的平台頁全螢幕 */
+  .top{padding:6px 10px;gap:6px;flex-wrap:nowrap}
+  .top .search{display:none;order:9;flex-basis:100%}
+  body.search-open .top{flex-wrap:wrap}body.search-open .top .search{display:block}
+  .top .user-chip,.top #themeBtn,.top .mode-badge{display:none}
+  .top .cloud-badge{order:0;max-width:34vw;font-size:11px;padding:3px 8px}
+  .top .lang{margin-left:auto}.top .lang button{padding:5px 7px;font-size:12px}
+  .top .search-btn{display:grid}
+  .ph h1{font-size:20px}.url-chip{display:none}
+  .page{padding:10px 10px 32px}
+  body.framed .page{padding:0}body.framed .ph{display:none}body.framed .back-bar{display:none}
+  .pframe{height:calc(100vh - 54px);min-height:0;border:0;border-radius:0}
+  .fresh .fc{padding:6px 10px;font-size:12px}
+ }
+ .search-btn{display:none}`;
  document.head.appendChild(st);
 
  /* 側欄底部的「生產平台 ↗」改成入口頁（嵌入版） */
