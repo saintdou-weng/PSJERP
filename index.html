@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.9';
+const APP_VER='1.0.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3409,14 +3409,14 @@ async function syncTpl(man){
   const q=keyN(OC.q);
   let rows=all.filter(r=>(!OC.cust||r.cust===OC.cust)&&(!OC.st||r.status===OC.st)&&(!OC.yr||String(r.order_date).startsWith(OC.yr))&&(!OC.chk||(r.po&&r.po.state===OC.chk))&&(!q||[r.po_no,r.style,r.my_no,r.od_no,r.cust,r.style_name].some(v=>keyN(v).includes(q))));
   const sorters={delivery:(a,b)=>String(b.delivery).localeCompare(String(a.delivery))||String(b.order_date).localeCompare(String(a.order_date)),order_date:(a,b)=>String(b.order_date).localeCompare(String(a.order_date)),cust:(a,b)=>String(a.cust).localeCompare(String(b.cust))||String(b.delivery).localeCompare(String(a.delivery)),style:(a,b)=>String(a.style).localeCompare(String(b.style)),open:(a,b)=>(b.open_qty-a.open_qty)};
-  rows.sort(sorters[OC.sort]||sorters.delivery);
+  rows.sort(sorters[OC.sort]||sorters.delivery); window.OC_LAST=rows.map(r=>r.ids[0]);
   const tq=sum(rows,'qty'),ts=sum(rows,r=>r.ship.qty),tf=sum(rows,'fg_qty'),to=sum(rows,'open_qty'); const late=rows.filter(r=>r.status==='late').length; const pod=rows.filter(r=>r.po&&r.po.state==='diff').length, pom=rows.filter(r=>r.po&&r.po.state==='missing').length;
   h+=`<div class="kpis" style="margin:12px 0">${kpi(tt('款／PO','Style / PO'),fmt(rows.length),'',late?tt('逾期 ','late ')+late:'',late?'warn':'')}${kpi(tt('訂單量','Order qty'),fmt(tq),'',srcChip('erp'))}${kpi(tt('已入庫','FG received'),fmt(tf),'',tq?Math.round(tf/tq*100)+'%':'')}${kpi(tt('已出貨','Shipped'),fmt(ts),'',tq?Math.round(ts/tq*100)+'%':'')}${kpi(tt('未交','Open'),fmt(to),'',to?'':tt('全部出完','all shipped'),to?'warn':'good')}${kpi(tt('客戶 PO 核對','PO check'),PRODORD?fmt(pod+pom):'…','',PRODORD?(pod?tt('有差異 ','differs ')+pod+' · ':'')+(pom?tt('缺檔 ','missing ')+pom:''):tt('讀取中','loading'),(pod||pom)?'warn':'good')}</div>`;
   const per=OC.per||100, pages=Math.max(1,Math.ceil(rows.length/per)); if(OC.page>=pages)OC.page=pages-1; const pg=rows.slice(OC.page*per,(OC.page+1)*per);
   const L=(z,e)=>LANG===0?z:e; const dot=s=>`<span class="ocdot ${s}" title="${esc(srcName_(s))}"></span>`;
   h+=`<div class="tbl-wrap"><table class="t cards oc"><thead><tr><th>${L('客戶','Customer')}</th><th>${L('款號','Style')}</th><th>PO</th><th>${L('訂單日','Order')}</th><th>${L('交期','Delivery')}</th><th class="r">${dot('erp')}${L('訂單量','Order qty')}</th><th class="r">${dot('email')}${L('客戶 PO','Cust. PO')}</th><th class="r">${dot('email')}${L('已裁','Cut')}</th><th class="r">${dot('email')}${L('已縫','Sewn')}</th><th class="r">${dot('erp')}${L('入庫','FG')}</th><th class="r">${dot('erp')}${L('出貨','Shipped')}</th><th class="r">${dot('erp')}INVOICE</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
   pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-po.erp)}${po.erp!==r.qty?` · ${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}`:''}</div>`:po.state==='ok'&&po.erp!==r.qty?`<div class="small muted">${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
-   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}${r.smv?`<div class="small muted">SMV ${fmt(r.smv,2)} · ${esc(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src)}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}${r.bad_delivery?`<div class="small warn-t" title="${L('ERP 交期打錯','ERP delivery date looks wrong')}">⚠ ${esc(r.bad_delivery)}</div>`:''}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cutr&&!r.cutr.none?`<b>${fmt(r.cutr.pcs)}</b><span class="oc-sub">${esc(r.cutr.last)}${r.cutr.alloc?' ≈':''}</span>`:r.cut_qty?`${fmt(r.cut_qty)}<span class="oc-sub">ERP</span>`:'—'}</td><td class="r num" data-l="${L('已縫','Sewn')}">${r.sewr&&!r.sewr.none?`<b>${fmt(r.sewr.pcs)}</b><span class="oc-sub">${esc(r.sewr.last)}${r.sewr.alloc?' ≈':''}</span>`:'—'}${r.qcr&&r.qcr.ins?`<span class="oc-sub">QC ${fmt(r.qcr.ins)}${r.qcr.rej?' · '+L('退 ','rej ')+fmt(r.qcr.rej):''}</span>`:''}</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
+   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}${r.smv?`<div class="small muted">SMV ${fmt(r.smv,2)} · ${esc(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src)}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}${r.bad_delivery?`<div class="small warn-t" title="${L('ERP 交期打錯','ERP delivery date looks wrong')}">⚠ ${esc(r.bad_delivery)}</div>`:''}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cutr&&!r.cutr.none?`<b>${fmt(r.cutr.pcs)}</b><span class="oc-sub">${esc(r.cutr.last)}${r.cutr.alloc?' ≈':''}</span>`:r.cut_qty?`${fmt(r.cut_qty)}<span class="oc-sub">ERP</span>`:'—'}</td><td class="r num" data-l="${L('已縫','Sewn')}">${r.sewr&&!r.sewr.none?`<b>${fmt(r.sewr.pcs)}</b><span class="oc-sub">${esc(r.sewr.last)}${r.sewr.alloc?' ≈':''}</span>`:r.prodq?`${fmt(r.prodq)}<span class="oc-sub">ERP ${L('生產','prod.')}</span>`:'—'}${r.qcr&&r.qcr.ins?`<span class="oc-sub">QC ${fmt(r.qcr.ins)}${r.qcr.rej?' · '+L('退 ','rej ')+fmt(r.qcr.rej):''}</span>`:''}</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
   h+=`</tbody></table></div>`;
   if(pages>1)h+=`<div class="oc-pages"><button class="btn sm" ${OC.page?'':'disabled'} onclick="ocSet('page',${OC.page-1})">◀</button><span class="small">${OC.page+1} / ${pages} · ${fmt(rows.length)} ${L('列','rows')}</span><button class="btn sm" ${OC.page<pages-1?'':'disabled'} onclick="ocSet('page',${OC.page+1})">▶</button></div>`;
   /* 待對照 */
@@ -3733,9 +3733,12 @@ async function syncTpl(man){
   const maxD=t=>{let m='';rowsOf(t).forEach(r=>{const d=r[0]==='day'?r[1]:r[0];if(typeof d==='string'&&d>m&&d<='2099')m=d});return m};
   IX={sew,cut,qc,smv,smvCore,smvPre,to:{sewing:maxD('sewing'),cutting:maxD('cutting'),qc:maxD('qc')},n:{sewing:rowsOf('sewing').length,cutting:rowsOf('cutting').length,qc:rowsOf('qc').length,smv:smv.size}};
  }
- const SMV_SRC={ie_upd:['IE 週報（核准）','IE weekly (approved)'],ie_obd:['IE OBD','IE OBD'],sew:['車縫日報','Sewing report'],day:['日報 SMV 表','Daily SMV list'],erp:['ERP','ERP']};
+ const SMV_SRC={erp:['ERP 款式 SMV（W_CBA190）','ERP style SMV (W_CBA190)'],ie_upd:['IE 週報（核准）','IE weekly (approved)'],ie_obd:['IE OBD','IE OBD'],sew:['車縫日報','Sewing report'],day:['日報 SMV 表','Daily SMV list'],erpo:['ERP 訂單','ERP order']};
  window.smvSrcName=s=>{const x=SMV_SRC[s]||[s,s];return LANG===0?x[0]:x[1]};
- window.smvFor=function(style,styleName){ if(!IX)return null; const cands=[style].concat(String(styleName||'').split(/[\s,/=()]+/).filter(t=>/\d/.test(t)&&t.length>=4));
+ window.erpSmvMap=function(){ if(GC.has('erpsmv'))return GC.get('erpsmv'); const m=new Map(); live(DB.smv||[]).forEach(r=>{const k=ks(r.style); const v=+r.smv||+r.smv_prod||0; if(k&&v>0.01)m.set(k,{v,src:'erp',d:'',rank:0,style:r.style})}); GC.set('erpsmv',m); return m };
+ window.smvFor=function(style,styleName){ const cands=[style].concat(String(styleName||'').split(/[\s,/=()]+/).filter(t=>/\d/.test(t)&&t.length>=4));
+  const EM=erpSmvMap(); if(EM.size){ for(const c of cands){ const k=ks(c); if(k&&EM.has(k))return EM.get(k) } }   /* ERP W_CBA190 款式 SMV 優先 */
+  if(!IX)return null;
   for(const c of cands){ const k=ks(c); if(!k)continue; if(IX.smv.has(k))return IX.smv.get(k); }
   for(const c of cands){ const k=ks(c); const cc=core(k); if(cc.length>=4&&IX.smvCore.get(cc))return IX.smvCore.get(cc); }
   for(const c of cands){ const k=ks(c); for(let n=k.length-1;n>=4;n--){ if(IX.smv.has(k.slice(0,n)))return IX.smv.get(k.slice(0,n)) } }   /* A318-W-SP-CHP → A318 */
@@ -3759,8 +3762,8 @@ async function syncTpl(man){
 
  /* ── 1) ordersView：ERP 沒有 SMV（或 0.01 佔位）就用 IE／日報的 SMV，並記下來源 ── */
  const _ov=ordersView;
- ordersView=function(){ if(GC.has('ordv'))return GC.get('ordv'); const out=_ov(); if(!IX)return out;
-  const res=out.map(o=>{ if(o.smv>0.01)return o.smv_src?o:Object.assign({},o,{smv_src:'erp'}); const s=smvFor(o.style,o.style_name); return s?Object.assign({},o,{smv:s.v,smv_src:s.src,smv_date:s.d}):o });
+ ordersView=function(){ if(GC.has('ordv'))return GC.get('ordv'); const out=_ov(); if(!IX&&!erpSmvMap().size)return out;
+  const res=out.map(o=>{ if(o.smv>0.01)return o.smv_src?o:Object.assign({},o,{smv_src:'erpo'}); const s=smvFor(o.style,o.style_name); return s?Object.assign({},o,{smv:s.v,smv_src:s.src,smv_date:s.d}):o });
   GC.set('ordv',res); return res };
 
  /* ── 2) 訂單中心每列加上 已裁／已縫／QC／SMV ── */
@@ -3768,7 +3771,7 @@ async function syncTpl(man){
  GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._chain&&IX){ try{
    const ov=new Map(ordersView().map(o=>[o.id,o]));
    v.forEach(g=>{ const o0=ov.get(g.ids[0])||{}; const sm=g.ids.map(id=>ov.get(id)).find(o=>o&&o.smv>0.01); g.smv=sm?sm.smv:null; g.smv_src=sm?sm.smv_src:''; g.smv_date=sm?sm.smv_date||'':'';
-    const share=g.erp_ps&&g.erp_ps>g.qty?g.qty/g.erp_ps:1; const C=chainFor({po_no:g.po_no,od_no:g.od_no,my_no:g.my_no,style:g.style,style_name:g.style_name},share)||{}; g.cutr=C.cut||null; g.sewr=C.sew||null; g.qcr=C.qc||null });
+    const share=g.erp_ps&&g.erp_ps>g.qty?g.qty/g.erp_ps:1; const C=chainFor({po_no:g.po_no,od_no:g.od_no,my_no:g.my_no,style:g.style,style_name:g.style_name},share)||{}; g.cutr=C.cut||null; g.sewr=C.sew||null; g.qcr=C.qc||null; });
    Object.defineProperty(v,'_chain',{value:1,enumerable:false}) }catch(e){console.error('chain',e)} } return _gset(k,v) };
 
  /* ── 3) 訂單抽屜：「從頭追到尾」取代原本只看 ERP 的進度 ── */
@@ -3786,16 +3789,21 @@ async function syncTpl(man){
   h+=line('🧾',L('ERP 訂單','ERP order'),srcChip('erp'),`<span><b>${fmt(q)}</b> ${L('件','pcs')} · ${L('接單 ','ordered ')}${esc(o.order_date||'—')} · ${L('交期 ','delivery ')}${esc(o.delivery||'—')}</span>`,0,`${esc(o.my_no)}${o.od_no?' · '+esc(o.od_no):''}${o.price?' · @'+fmt(o.price,2):''}`);
   /* 3 SMV */
   const sv=o.smv>0.01?o:null;
-  h+=line('⏱️','SMV',sv?srcChip(o.smv_src==='erp'||!o.smv_src?'erp':o.smv_src==='day'||o.smv_src==='sew'?'email':'tg',smvSrcName(o.smv_src||'erp')):'',sv?`<span><b>${fmt(o.smv,2)}</b> ${L('分鐘','min')}${q?` · ${L('總分鐘 ','total ')}${fmt(o.smv*q)}`:''}</span>`:`<span class="st warn">${L('ERP、IE、日報都沒有這款的 SMV','No SMV in ERP, IE or daily reports')}</span>`,0,sv&&o.smv_date?L('日期 ','date ')+esc(o.smv_date):'');
+  h+=line('⏱️','SMV',sv?srcChip(o.smv_src==='erp'||o.smv_src==='erpo'||!o.smv_src?'erp':o.smv_src==='day'||o.smv_src==='sew'?'email':'tg',smvSrcName(o.smv_src||'erpo')):'',sv?`<span><b>${fmt(o.smv,2)}</b> ${L('分鐘','min')}${q?` · ${L('總分鐘 ','total ')}${fmt(o.smv*q)}`:''}</span>`:`<span class="st warn">${L('ERP、IE、日報都沒有這款的 SMV','No SMV in ERP, IE or daily reports')}</span>`,0,sv&&o.smv_date?L('日期 ','date ')+esc(o.smv_date):'');
+  /* 日報找不到時：用 ERP 的生產件數／入庫／出貨推定（雲端日報從 2020-06 開始） */
+  const pq=g?g.prodq:0, fgq=g?g.fg_qty:o.fg_qty, shq=g?g.ship.qty:o.ship_qty, ec=g?g.cut_qty:o.cut_qty;
+  const nf=t=>{ const best=Math.max(t==='cut'?ec||0:0,pq||0,fgq||0,shq||0); const old=String(o.order_date||'')<'2020-06';
+   const why=old?L('2020 年 6 月以前的日報不在雲端','daily reports before Jun 2020 are not in the cloud'):L((t==='cut'?'裁剪':'車縫')+'日報沒有這張 PO',(t==='cut'?'cutting':'sewing')+' reports do not have this PO');
+   return best?`${bar(best,q)}<div class="small muted">${why}；${L('以 ERP 推定','estimated from ERP')}：${[t==='cut'&&ec?L('裁剪 ','cut ')+fmt(ec):'',pq?L('生產件數 ','produced ')+fmt(pq):'',fgq?L('入庫 ','FG ')+fmt(fgq):'',shq?L('出貨 ','shipped ')+fmt(shq):''].filter(Boolean).join('、')}</div>`:`<span class="muted">${why}</span>` };
   /* 4 裁剪 */
   const cr=g&&g.cutr; const erpCut=g?g.cut_qty:o.cut_qty;
-  h+=line('✂️',L('裁剪','Cutting'),srcChip('email','Cutting report'),cr&&!cr.none?bar(cr.pcs,q):cr&&cr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(cr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:`<span class="muted">${L('裁剪日報沒有這張 PO','not in cutting reports')}</span>`,q,[cr&&!cr.none?`${esc(cr.first)} → ${esc(cr.last)}${cr.yds?` · ${fmt(cr.yds,0)} ${L('碼','yds')}`:''}${cr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${cr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}`:'',erpCut?`ERP ${L('裁剪 ','cut ')}${fmt(erpCut)}`:''].filter(Boolean).join(' · '));
+  h+=line('✂️',L('裁剪','Cutting'),srcChip('email','Cutting report'),cr&&!cr.none?bar(cr.pcs,q):cr&&cr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(cr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:nf('cut'),q,[cr&&!cr.none?`${esc(cr.first)} → ${esc(cr.last)}${cr.yds?` · ${fmt(cr.yds,0)} ${L('碼','yds')}`:''}${cr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${cr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}`:'',erpCut?`ERP ${L('裁剪 ','cut ')}${fmt(erpCut)}`:''].filter(Boolean).join(' · '));
   /* 5 車縫 */
   const sr=g&&g.sewr;
-  h+=line('🪡',L('車縫','Sewing'),srcChip('email','Sewing report'),sr&&!sr.none?bar(sr.pcs,q):sr&&sr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(sr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:`<span class="muted">${L('車縫日報沒有這張 PO','not in sewing reports')}</span>`,q,sr&&!sr.none?`${esc(sr.first)} → ${esc(sr.last)} · ${esc(sr.lines.slice(0,6).join('、'))}${sr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${sr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}${sr.how==='digits'?' · '+L('款號數字段相同','matched by style number'):''}`:'');
+  h+=line('🪡',L('車縫','Sewing'),srcChip('email','Sewing report'),sr&&!sr.none?bar(sr.pcs,q):sr&&sr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(sr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:nf('sew'),q,sr&&!sr.none?`${esc(sr.first)} → ${esc(sr.last)} · ${esc(sr.lines.slice(0,6).join('、'))}${sr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${sr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}${sr.how==='digits'?' · '+L('款號數字段相同','matched by style number'):''}`:'');
   /* 6 QC */
   const qr=g&&g.qcr;
-  h+=line('✅','Final QC',srcChip('tg'),qr?`<span>${L('檢驗 ','inspected ')}<b>${fmt(qr.ins)}</b> · ${L('退修 ','rejected ')}<b>${fmt(qr.rej)}</b>${qr.ins?` · ${L('不良率 ','defect ')}${fmt(qr.rej/qr.ins*100,1)}%`:''}</span>`:`<span class="muted">${L('QC 報告沒有這張 PO','no QC record')}</span>`,0,qr?`${esc(qr.first)} → ${esc(qr.last)} · ${qr.n} ${L('份報告','reports')}`:'');
+  if(qr)h+=line('✅','Final QC',srcChip('tg'),qr?`<span>${L('檢驗 ','inspected ')}<b>${fmt(qr.ins)}</b> · ${L('退修 ','rejected ')}<b>${fmt(qr.rej)}</b>${qr.ins?` · ${L('不良率 ','defect ')}${fmt(qr.rej/qr.ins*100,1)}%`:''}</span>`:`<span class="muted">${L('QC 報告沒有這張 PO','no QC record')}</span>`,0,qr?`${esc(qr.first)} → ${esc(qr.last)} · ${qr.n} ${L('份報告','reports')}`:'');
   /* 7 入庫 8 出貨 9 INVOICE（ERP）*/
   const fg=g?g.fg_qty:o.fg_qty, sh=g?g.ship:{qty:o.ship_qty}, iv=g&&g.inv;
   h+=line('📦',L('成品入庫','FG received'),srcChip('erp'),bar(fg||0,q),q,'');
@@ -3833,6 +3841,137 @@ async function syncTpl(man){
  .chain .tl-det{margin-top:8px}.chain .tl-det summary{cursor:pointer}
  .oc-sub{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap}
  @media (max-width:860px){#drawer .kv{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}#drawer .kv dd{font-size:14px}}`;
+ document.head.appendChild(st);
+})();
+
+
+/* ══════════ v1.0.0：訂單資料卡（學員工資料：◀ ▶ 前後翻、分頁、每頁可匯出／列印）、深色主題、ERP 生產件數 ══════════ */
+(function(){
+ const L=(z,e)=>LANG===0?z:e;
+ const ks=s=>keyN(s).replace(/[^A-Z0-9]+/g,'');
+ /* ── ERP 製單（W_CODK75）生產件數，依自編單號 ── */
+ function prodIdx(){ if(GC.has('prodidx'))return GC.get('prodidx'); const m=new Map(); live(DB.prodorders||[]).forEach(p=>{const k=keyN(p.my_no);if(!k)return;const x=m.get(k)||{prod:0,fg:0,type:'',close:''};x.prod+=+p.prod_qty||0;x.fg+=+p.fg_qty||0;if(!x.type)x.type=p.type||'';if(p.close_date||p.mclose_date)x.close=p.close_date||p.mclose_date;m.set(k,x)}); GC.set('prodidx',m); return m }
+ window.prodFor=my=>prodIdx().get(keyN(my))||null;
+ const _gs=GC.set.bind(GC);
+ GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._prodq){ try{ const P=prodIdx(); const ov=new Map(ordersView().map(o=>[o.id,o])); v.forEach(g=>{ const myn=new Set(); g.ids.forEach(id=>{const o=ov.get(id); if(o&&o.my_no)myn.add(keyN(o.my_no))}); if(!myn.size)myn.add(keyN(g.my_no)); let pq=0; myn.forEach(m=>{const x=P.get(m);if(x)pq+=x.prod}); g.prodq=pq; g.myset=[...myn] }); Object.defineProperty(v,'_prodq',{value:1,enumerable:false}) }catch(e){console.error('prodq',e)} } return _gs(k,v) };
+
+ /* ── 深色主題（加在淡色後面）── */
+ const DARK=[['navy','#16263D','海軍藍','Navy','ខៀវចាស់'],['dkgreen','#14302A','墨綠','Dark green','បៃតងចាស់'],['black','#17191C','黑色','Black','ខ្មៅ'],['wine','#3A1820','酒紅','Wine red','ក្រហមស្រា'],['purple','#2A1F3D','紫色','Purple','ស្វាយ']];
+ DARK.forEach(d=>{ if(!TINTS.some(t=>t[0]===d[0]))TINTS.push(d) });
+ const DK=new Set(DARK.map(d=>d[0]));
+ const _st=window.setTint;
+ const applyDark=k=>{ const d=document.documentElement; if(DK.has(k))d.dataset.dark='1'; else delete d.dataset.dark; d.dataset.tint=k&&k!=='white'?k:''; if(!k||k==='white')delete d.dataset.tint };
+ window.setTint=function(k){ _st(k); applyDark(k) };
+ applyDark(LS.get('psjerp_tint','white'));
+ const pal={ navy:['#0F1B2D','#16263D','#1C2F4A','#0B1524','#2B3F5C','#22344F','#6EA8FF','#1E3557'],
+  dkgreen:['#0E201B','#14302A','#1A3A33','#0A1814','#2A4A41','#20403A','#5FD3A4','#1A3F35'],
+  black:['#0E0F11','#17191C','#1F2226','#0A0B0C','#30343A','#262A2F','#7FA3F2','#1D2533'],
+  wine:['#250F14','#3A1820','#46202A','#1C0B0F','#5A2C36','#4A242D','#F49AB0','#4A1F2B'],
+  purple:['#1A1427','#2A1F3D','#34274A','#130E1E','#45375E','#3A2E52','#B79BFF','#33264F'] };
+ let css=Object.entries(pal).map(([k,c])=>`:root[data-tint="${k}"]{--bg:${c[0]}!important;--surface:${c[1]}!important;--surface-2:${c[2]}!important;--sunk:${c[3]}!important;--line:${c[4]}!important;--line-2:${c[5]}!important;--accent:${c[6]}!important;--accent-2:${c[6]}!important;--accent-soft:${c[7]}!important;--on-accent:${c[0]}!important;--bar:${c[6]}!important;--grid:${c[5]}!important}`).join('\n');
+ css+=`
+ :root[data-dark]{--ink:#E8EDF3!important;--ink-2:#BAC5D1!important;--muted:#8E9BAA!important;--good:#5CC48F!important;--good-soft:#173528!important;--warn:#E8B15C!important;--warn-soft:#3B2E14!important;--crit:#F28B80!important;--crit-soft:#3E1D1A!important;--shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.4)!important;color-scheme:dark}
+ :root[data-dark] .top{background:var(--surface)!important;border-bottom-color:var(--line)!important;color:var(--ink)!important}
+ :root[data-dark] .top-title,:root[data-dark] .top .user-chip{color:var(--ink)!important}
+ :root[data-dark] .rail,:root[data-dark] #drawer,:root[data-dark] .frame-bar{background:var(--surface)!important;color:var(--ink)!important}
+ :root[data-dark] .src.erp{background:#1E3557;color:#BFD4FF}:root[data-dark] .src.email{background:#4A2E12;color:#FFD3A6}:root[data-dark] .src.tg{background:#173A26;color:#B7F0CC}:root[data-dark] .src.manual{background:#2B323B;color:#D5DCE4}:root[data-dark] .src.mixed{background:linear-gradient(90deg,#4A2E12,#173A26);color:#EEE}
+ :root[data-dark] .pframe{background:#fff}
+ :root[data-dark] .tint-pop{border-color:var(--accent)!important;box-shadow:0 10px 30px rgba(0,0,0,.6)!important}
+ .tint-row{display:flex;flex-wrap:wrap;gap:10px}
+ .tint-sep{width:100%;font-size:11.5px;color:var(--muted);margin-top:4px}`;
+ const st0=document.createElement('style'); st0.textContent=css; document.head.appendChild(st0);
+ const _sw=window.tintSwHTML;
+ window.tintSwHTML=function(){ const h=_sw(); const i=h.indexOf(`<div style="text-align:center"><div class="tint-sw ${LS.get('psjerp_tint','white')==='navy'?'on':''}" style="background:#16263D"`); return i>0?h.slice(0,i)+`<div class="tint-sep">${L('深色','Dark')}</div>`+h.slice(i):h };
+
+ /* ══════════ 訂單資料卡 ══════════ */
+ const TABS=[['info','📋',['基本資料','Details']],['chain','🧭',['從頭追到尾','End-to-end']],['bom','🧵',['主副料明細','Materials']],['cut','✂️',['裁剪','Cutting']],['sew','🪡',['車縫','Sewing']],['ship','🚢',['出貨／INVOICE','Shipping / invoice']],['cost','💰',['成本','Cost']],['hist','📎',['附件・歷程','Files & history']]];
+ let OCUR={id:null,tab:LS.get('psjerp_otab','info')};
+ const kv=(l,v)=>`<div><dt>${esc(l)}</dt><dd>${v==null||v===''?'<span class="muted">—</span>':v}</dd></div>`;
+ const tbl=(id,head,rows,foot)=>rows.length?`<div class="tbl-wrap"><table class="t" id="${id}"><thead><tr>${head.map(h=>`<th${h[1]?' class="r"':''}>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot?`<tfoot><tr>${foot.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}><b>${c}</b></td>`).join('')}</tr></tfoot>`:''}</table></div>`:`<p class="muted small">${L('沒有資料','No data')}</p>`;
+ const ctx=id=>{ const ov=ordersView(); const o=ov.find(x=>x.id===id)||findRec('orders',id); const rows=window.ocRows?ocRows():[]; const g=rows.find(r=>r.ids&&r.ids.includes(id))||null;
+  const ids=g?g.ids:[id]; const os=ids.map(i=>ov.find(x=>x.id===i)).filter(Boolean); const my=new Set(os.map(x=>keyN(x.my_no)).filter(Boolean)); const od=new Set(os.map(x=>x.od_no).filter(Boolean));
+  const same=x=>(x.od_no&&od.has(x.od_no))||(x.my_no&&my.has(keyN(x.my_no))); return {o,g,os,same,my} };
+ function tabBody(tab,C){
+  const {o,g,os,same}=C; const q=g?g.qty:o.qty;
+  if(tab==='info'){ const P=prodFor(o.my_no); const po=g&&g.po;
+   let h=`<div class="kv">${kv(L('自編單號','Order no.'),`<span class="mono">${esc([...new Set(os.map(x=>x.my_no))].join('、'))}</span>`)}${kv(L('訂單編號','ERP order'),`<span class="mono">${esc([...new Set(os.map(x=>x.od_no).filter(Boolean))].join('、'))}</span>`)}${kv(L('客戶 PO','Customer PO'),`<span class="mono">${esc(o.po_no)}</span>`)}${kv(L('客戶','Customer'),esc(o.cust))}
+    ${kv(L('款號','Style'),`<span class="mono">${esc(o.style)}</span>`)}${kv(L('款名','Style name'),esc(o.style_name||''))}${kv(L('顏色','Colour'),esc([...new Set(os.map(x=>x.clr).filter(Boolean))].join('、')))}${kv(L('訂單量','Order qty'),fmt(q)+' '+L('件','pcs'))}
+    ${kv(L('單價','Price'),o.price?money(o.price,3)+' '+esc(o.currency||''):'')}${kv(L('金額','Amount'),o.price?money(sum(os,x=>(+x.qty||0)*(+x.price||0))):'')}${kv(L('接單日','Order date'),esc(o.order_date))}${kv(L('交期','Delivery'),esc(o.delivery))}
+    ${kv(L('結案日','Closed'),esc(o.closed_date||''))}${kv(L('狀態','Status'),g?stChip(g.status==='late'?'crit':g.status==='closed'?'good':'info',g.status==='late'?L('逾期','late'):g.status==='closed'?L('已結','closed'):L('未結','open')):'')}
+    ${kv('SMV',o.smv>0.01?`<b>${fmt(o.smv,2)}</b> <span class="small muted">${esc(smvSrcName(o.smv_src||'erpo'))}</span>`:`<span class="st warn">${L('缺 SMV','no SMV')}</span>`)}${kv(L('製單類別','Order type'),esc(P&&P.type||''))}
+    ${kv(L('生產件數（ERP 製單）','Produced (ERP)'),P&&P.prod?fmt(P.prod):'')}${kv(L('入庫','FG'),fmt(g?g.fg_qty:o.fg_qty))}${kv(L('出貨','Shipped'),fmt(g?g.ship.qty:o.ship_qty))}${kv(L('未交','Open'),g&&g.open_qty?fmt(g.open_qty):'0')}</div>`;
+   if(po&&po.state&&po.state!=='missing'&&po.state!=='loading')h+=`<div class="sec"><h4>📄 ${L('客戶 PO（Email PDF）','Customer PO (email PDF)')}</h4><div class="kv">${kv(L('客戶 PO 量','PO qty'),fmt(po.qty))}${kv(L('核對','Check'),esc(po.state==='ok'?L('與 ERP 相符','matches ERP'):po.state==='diff'?L('差 ','Δ ')+fmt(po.qty-(po.erp||q)):L('款號對不上','style not matched')))}${kv(L('客戶交期','Required'),esc(po.required||''))}${kv(L('單價','Price'),po.price?money(po.price,3):'')}${kv(L('檔案','File'),esc(po.file||''))}${kv(L('版本','Versions'),po.revs?po.revs+(po.revs>1?L('（以 ERP 為準）',' (ERP rules)'):''):'')}</div></div>`;
+   if(o.note||o.tags)h+=`<div class="sec"><h4>📝 ${L('備註／標籤','Notes / tags')}</h4><div class="small">${esc(o.note||'')} ${(o.tags||[]).map?((o.tags||[]).map(t=>`<span class="st info">${esc(t)}</span>`).join(' ')):''}</div></div>`;
+   return h }
+  if(tab==='chain')return chainHTML(o).replace('<div class="sec chain">','<div class="chain">');
+  if(tab==='bom'){ const bom=live(DB.bom||[]).filter(same); const main=bom.filter(b=>/main|主/i.test(b.type||'')), trim=bom.filter(b=>!/main|主/i.test(b.type||''));
+   const row=b=>[esc(b.material_no||''),`<span class="wrap">${esc(b.material||'')}</span>`,esc(b.color||''),esc(b.size||''),fmt(b.cons,4),fmt(b.total_use,1),esc(b.unit||''),esc(b.supplier||''),money(b.est_cost)];
+   const head=[[L('料號','Item no.')],[L('料品','Material')],[L('顏色','Colour')],[L('尺寸','Size')],[L('單件用量','Per pc'),1],[L('總用量','Total'),1],[L('單位','Unit')],[L('供應商','Supplier')],[L('預估成本','Est. cost'),1]];
+   let h=`<p class="small muted">${srcChip('erp','W_COD550 BOM')} ${fmt(bom.length)} ${L('項','items')}</p>`;
+   h+=`<h4>🧶 ${L('主料','Main fabric')} (${main.length})</h4>`+tbl('ot_bom_main',head,main.map(row),main.length?['','',  '','','',fmt(sum(main,'total_use'),1),'','',money(sum(main,'est_cost'))]:null);
+   h+=`<h4 style="margin-top:14px">🧷 ${L('副料','Trims')} (${trim.length})</h4>`+tbl('ot_bom_trim',head,trim.map(row),trim.length?['','','','','','','','',money(sum(trim,'est_cost'))]:null);
+   const mats=new Set(bom.map(b=>b.material_no+'|'+b.color)); const pur=live(DB.purchase||[]).filter(p=>(p.my_no&&C.my.has(keyN(p.my_no)))||mats.has(p.material_no+'|'+p.color)).slice(0,200);
+   h+=`<h4 style="margin-top:14px">🛒 ${L('採購','Purchases')} (${pur.length})</h4>`+tbl('ot_pur',[[L('採購單','PO no.')],[L('日期','Date')],[L('料品','Material')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單價','Price'),1],['ETA'],[L('未交','Outst.'),1]],pur.map(p=>[`<span class="mono">${esc(p.purchase_no)}</span>`,esc(p.purchase_date||p.date||''),esc(p.material||''),esc(p.color||''),fmt(p.qty),money(p.price,3),esc(p.eta||''),fmt(p.outstanding)]));
+   const iss=dsLoaded('issues')?live(DB.issues||[]).filter(r=>r.my_no&&C.my.has(keyN(r.my_no))):null;
+   h+=`<h4 style="margin-top:14px">📤 ${L('領料','Issues')} ${iss?'('+iss.length+')':''}</h4>`+(iss?tbl('ot_iss',[[L('領料單','Issue no.')],[L('日期','Date')],[L('類別','Type')],[L('料品','Material')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單位','Unit')]],iss.slice(0,300).map(r=>[`<span class="mono">${esc(r.issue_no)}</span>`,esc(r.issue_date),esc(r.type==='main'?L('主料','main'):L('副料','trim')),esc(r.material||''),esc(r.color||''),fmt(r.qty,2),esc(r.unit||'')])):`<button class="btn sm" onclick="ensureDS(['issues']).then(()=>ordTab('bom'))">${L('載入領料明細（資料較大）','Load issue details (large)')}</button>`);
+   return h }
+  if(tab==='cut'||tab==='sew'){ const r=g&&(tab==='cut'?g.cutr:g.sewr); const rows=r&&!r.none?r.rows.slice().sort((a,b)=>String(b.d).localeCompare(String(a.d))):[];
+   const head=tab==='cut'?[[L('日期','Date')],[L('布料','Fabric')],[L('顏色','Colour')],[L('尺寸','Size')],[L('件數','Pcs'),1]]:[[L('日期','Date')],[L('線別','Line')],[L('顏色','Colour')],[L('尺寸','Size')],[L('件數','Pcs'),1]];
+   let h=`<p class="small muted">${srcChip('email',tab==='cut'?'Cutting report':'Sewing report')} ${rows.length?`${fmt(rows.length)} ${L('筆','rows')} · ${esc(r.first)} → ${esc(r.last)}${r.alloc?' · '+L('同款多張自編單號，總數依訂單量分攤；明細為整款','qty allocated across order numbers; rows are for the whole style'):''}`:''}</p>`;
+   if(!rows.length){ const P=prodFor(o.my_no); h+=`<p class="note">${String(o.order_date||'')<'2020-06'?L('2020 年 6 月以前的日報不在雲端。','Daily reports before Jun 2020 are not in the cloud. '):L('日報裡找不到這張 PO。','This PO is not in the daily reports. ')}${P&&P.prod?L('ERP 製單生產件數 ','ERP produced ')+fmt(P.prod)+'。':''}${(g?g.ship.qty:o.ship_qty)?L('已出貨 ','Shipped ')+fmt(g?g.ship.qty:o.ship_qty)+L('，所以實際上已裁、已縫。',' — so it was cut and sewn.'):''}</p>`; return h }
+   const agg=new Map(); rows.forEach(x=>{const k=(x.clr||'')+'|'+(x.size||'');agg.set(k,(agg.get(k)||0)+x.pcs)});
+   h+=`<h4>${L('依顏色／尺寸','By colour / size')}</h4>`+tbl('ot_'+tab+'_sum',[[L('顏色','Colour')],[L('尺寸','Size')],[L('件數','Pcs'),1]],[...agg.entries()].map(([k,v])=>{const [c,s]=k.split('|');return [esc(c),esc(s),fmt(v)]}),['','',fmt(r.raw||r.pcs)]);
+   h+=`<h4 style="margin-top:14px">${L('每日明細','Daily rows')}</h4>`+tbl('ot_'+tab,head,rows.map(x=>[`<span class="mono">${esc(x.d)}</span>`,esc(tab==='cut'?(x.fab||''):(x.line||'')),esc(x.clr||''),esc(x.size||''),fmt(x.pcs)]));
+   return h }
+  if(tab==='ship'){ const sh=live(DB.shipping||[]).filter(same).sort((a,b)=>String(b.ship_date).localeCompare(String(a.ship_date)));
+   const pk=keyN(o.po_no), sk=ks(o.style); const iv=live(DB.invoices||[]).filter(v=>keyN(v.po_no)===pk&&(!sk||ks(v.style)===sk||!v.style));
+   return `<h4>🚢 ${L('出貨','Shipments')} · W_CBL300 (${sh.length})</h4>`+tbl('ot_ship',[[L('提單','B/L')],[L('出貨日','Date')],[L('顏色','Colour')],[L('件數','Pcs'),1],[L('金額','Amount'),1],['INVOICE'],[L('貨櫃','Container')]],sh.map(x=>[`<span class="mono">${esc(x.bl_no)}</span>`,esc(x.ship_date),esc(x.clr||''),fmt(x.qty),money(x.amount),esc(x.invoice||''),esc(x.container||'')]),sh.length?['','','',fmt(sum(sh,'qty')),money(sum(sh,'amount')),'','']:null)
+    +`<h4 style="margin-top:14px">💵 INVOICE · W_CBL140 (${iv.length})</h4>`+tbl('ot_inv',[['INVOICE'],[L('日期','Date')],[L('顏色','Colour')],[L('件數','Pcs'),1],[L('單價','Price'),1],[L('金額','Amount'),1]],iv.map(v=>[`<span class="mono">${esc(v.invoice)}</span>`,esc(v.inv_date),esc(v.clr||''),fmt(v.qty),money(v.price,3),money(v.amount)]),iv.length?['','','',fmt(sum(iv,'qty')),'',money(sum(iv,'amount'))]:null) }
+  if(tab==='cost'){ try{ return costBlock(costOrder(o,'latest'),o) }catch(e){ return `<p class="muted">${esc(e.message||e)}</p>` } }
+  if(tab==='hist')return `<h4>📎 ${L('附件','Attachments')}</h4><label class="btn sm" for="att_${esc(o.id)}">＋ ${L('上傳附件','Upload file')}</label><input type="file" id="att_${esc(o.id)}" hidden onchange="addAttach('${esc(o.id)}',this)"><div class="small" style="margin:6px 0 14px">${(o.att||[]).map(a=>`📎 ${esc(a)}`).join('<br>')||'<span class="muted">—</span>'}</div><h4>🕓 ${L('歷程','History')}</h4>${histFor(o.id)}`;
+  return '' }
+ function render(id){
+  const C=ctx(id); const {o,g}=C; if(!o)return;
+  const list=(window.OC_LAST&&OC_LAST.length?OC_LAST:(window.ocRows?ocRows().map(r=>r.ids[0]):[]));
+  const head=g?g.ids[0]:id; let pos=list.indexOf(head); if(pos<0)pos=list.findIndex(x=>g&&g.ids.includes(x));
+  const tab=TABS.some(t=>t[0]===OCUR.tab)?OCUR.tab:'info';
+  const stc=g?(g.status==='late'?['crit',L('逾期','late')]:g.status==='closed'?['good',L('已結','closed')]:['info',L('未結','open')]):['neu',''];
+  openDrawer(`<div class="dh od-h"><div class="od-title"><div class="small muted">🧾 ${esc(o.cust)} · <span class="mono">${esc(o.my_no)}</span> ${stChip(stc[0],stc[1])}</div><h2><span class="mono">${esc(o.po_no||o.od_no||o.my_no)}</span> · <span class="mono">${esc(o.style)}</span></h2><div class="small muted">${fmt(g?g.qty:o.qty)} ${L('件','pcs')}${o.style_name?' · '+esc(o.style_name):''}</div></div>
+   <div class="od-nav"><span class="small muted">${pos>=0?(pos+1)+'/'+fmt(list.length):''}</span><button class="icon-btn" ${pos>0?'':'disabled'} onclick="ordGo(-1)" aria-label="prev">◀</button><button class="icon-btn" ${pos>=0&&pos<list.length-1?'':'disabled'} onclick="ordGo(1)" aria-label="next">▶</button><button class="icon-btn x" onclick="closeDrawer()" aria-label="${esc(t('close'))}">✕</button></div></div>
+   <div class="od-tabs">${TABS.map(([k,ic,l])=>`<button class="${k===tab?'on':''}" onclick="ordTab('${k}')">${ic} ${esc(L(l[0],l[1]))}</button>`).join('')}</div>
+   <div class="db od-body"><div class="od-acts"><button class="btn sm" onclick="ordExport()">⬇ ${L('匯出 Excel','Export Excel')}</button><button class="btn sm" onclick="window.print()">🖨 ${L('列印','Print')}</button><a class="btn sm" href="#smart-import" onclick="closeDrawer()">📥 ${L('匯入','Import')}</a></div><div id="odTab">${tabBody(tab,C)}</div></div>
+   <div class="df" id="dfoot"><button class="btn pri" onclick="openRec('orders','${esc(id)}',true)">✏️ ${isLocked(o)?L('備註／標籤','Notes / tags'):esc(t('edit'))}</button><button class="btn" onclick="sendSummary('orders','${esc(id)}')">${esc(t('send_tg'))}</button></div>`);
+  document.getElementById('drawer').classList.add('od');
+ }
+ window.ordTab=function(k){ OCUR.tab=k; LS.set('psjerp_otab',k); if(OCUR.id)render(OCUR.id); const b=document.querySelector('.od-tabs .on'); if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest',inline:'center'}) };
+ window.ordGo=function(d){ const list=window.OC_LAST&&OC_LAST.length?OC_LAST:(window.ocRows?ocRows().map(r=>r.ids[0]):[]); const C=ctx(OCUR.id); const head=C.g?C.g.ids[0]:OCUR.id; const i=list.indexOf(head); const j=i+d; if(i<0||j<0||j>=list.length)return; openOrder(list[j]) };
+ window.ordExport=function(){ if(!window.XLSX){toast(L('Excel 元件未載入','Excel library not loaded'));return} const C=ctx(OCUR.id); const wb=XLSX.utils.book_new(); const tabs=document.querySelectorAll('#odTab table');
+  if(OCUR.tab==='info'||!tabs.length){ const rows=[...document.querySelectorAll('#odTab .kv > div')].map(d=>[d.querySelector('dt').innerText,d.querySelector('dd').innerText]); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[L('欄位','Field'),L('內容','Value')]].concat(rows.length?rows:[[L('從頭追到尾','End-to-end'),document.getElementById('odTab').innerText]])),'訂單') }
+  tabs.forEach((t,i)=>{ const name=(t.id||'表'+(i+1)).replace(/^ot_/,'').slice(0,28); XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t,{raw:true}),name) });
+  const tl=(TABS.find(x=>x[0]===OCUR.tab)||['','',['','']])[2][0]; XLSX.writeFile(wb,`VRT_訂單_${(C.o.po_no||C.o.my_no||'').replace(/[\\/:*?"<>|]/g,'_')}_${C.o.style}_${tl}.xlsx`); toast(L('已匯出','Exported')) };
+ const _oo=openOrder;
+ openOrder=async function(id){ OCUR.id=id;
+  const need=['bom','purchase'].filter(k=>!dsLoaded(k)); if(need.length){ openDrawer(`<div class="db"><p class="note">⏳ ${L('載入主副料與採購…','Loading materials…')}</p></div>`); try{await ensureDS(need)}catch(e){} }
+  try{ render(id) }catch(e){ console.error('order card',e); _oo(id) }
+  if(window.CHAIN&&!CHAIN.loaded&&!CHAIN.busy&&window.loadChain)loadChain(false).then(()=>{ if(OCUR.id===id&&!document.getElementById('drawer').hidden)render(id) });
+ };
+ const _cd=closeDrawer; closeDrawer=function(){ OCUR.id=null; const d=document.getElementById('drawer'); if(d)d.classList.remove('od'); return _cd.apply(this,arguments) };
+ document.addEventListener('keydown',e=>{ if(!OCUR.id||document.getElementById('drawer').hidden)return; if(/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return; if(e.key==='ArrowLeft')ordGo(-1); else if(e.key==='ArrowRight')ordGo(1) });
+ /* 手機左右滑動換張 */
+ let tx=null; document.addEventListener('touchstart',e=>{ if(OCUR.id&&e.target.closest&&e.target.closest('#drawer')&&!e.target.closest('.tbl-wrap,.od-tabs'))tx=e.touches[0].clientX; else tx=null },{passive:true});
+ document.addEventListener('touchend',e=>{ if(tx==null)return; const dx=e.changedTouches[0].clientX-tx; tx=null; if(Math.abs(dx)>90)ordGo(dx<0?1:-1) },{passive:true});
+
+ const st=document.createElement('style'); st.textContent=`
+ #drawer.od{width:min(1040px,100vw)}
+ .od-h{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}.od-title{min-width:0}.od-title h2{margin:2px 0;font-size:20px;line-height:1.25;overflow-wrap:anywhere}
+ .od-nav{display:flex;gap:6px;align-items:center;flex:0 0 auto}.od-nav .icon-btn{min-width:40px;height:40px;font-size:15px}.od-nav .icon-btn[disabled]{opacity:.35}
+ .od-tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 12px;background:var(--surface);position:sticky;top:0;z-index:2;scrollbar-width:none}
+ .od-tabs button{flex:0 0 auto;border:0;background:none;padding:10px 12px;font:600 13.5px/1.2 inherit;font-family:inherit;color:var(--ink-2);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+ .od-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+ .od-acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+ .od-body h4{margin:6px 0 8px}
+ @media (max-width:860px){.od-title h2{font-size:17px}.od-nav .icon-btn{min-width:38px;height:38px}}
+ @media print{body>*:not(#drawer){display:none!important}#drawer{position:static!important;width:100%!important;height:auto!important;box-shadow:none!important;overflow:visible!important}.od-nav,.od-acts,#dfoot,.od-tabs{display:none!important}}`;
  document.head.appendChild(st);
 })();
 
