@@ -3581,30 +3581,42 @@ async function syncTpl(man){
   live(DB.custpo||[]).forEach(l=>{ const k=keyN(l.po_no); if(!k)return; let g=byPo.get(k); if(!g){g={key:k,vers:new Map()};byPo.set(k,g)}
    let v=g.vers.get(l.ver); if(!v){v={ver:l.ver,email_date:l.email_date||'',file:l.file||'',hdr:l,lines:[]};g.vers.set(l.ver,v)} v.lines.push(l);
    if(l.cut_no){const ck=keyN(l.cut_no); if(ck&&!byCut.has(ck))byCut.set(ck,k)} });
-  byPo.forEach(g=>{ g.versions=[...g.vers.values()].sort((a,b)=>String(a.email_date).localeCompare(String(b.email_date))||String(a.file).localeCompare(String(b.file))); g.latest=g.versions[g.versions.length-1]; delete g.vers });
+  byPo.forEach(g=>{ g.versions=[...g.vers.values()].sort((a,b)=>String(a.email_date).localeCompare(String(b.email_date))||String(a.file).localeCompare(String(b.file))); g.latest=g.versions[g.versions.length-1]; delete g.vers;
+   /* 有效明細：同一款以最後一次出現的版本為準（改單常只重寄改到的款），沒再出現的款保留舊版 */
+   const byStyle=new Map(); g.versions.forEach(v=>{const grp=new Map(); v.lines.forEach(l=>{const k=keyS(l.style)||keyS(l.sku)||'?';(grp.get(k)||grp.set(k,[]).get(k)).push(l)}); grp.forEach((ls,k)=>byStyle.set(k,ls))});
+   g.eff=[].concat(...byStyle.values()); g.full=g.versions.filter(v=>v.lines.length>=g.eff.length*0.8).pop()||g.latest });
   const byDigits=new Map(); byPo.forEach((g,k)=>{const dk=digitsOf(k); if(dk&&dk.length>=4){ if(byDigits.has(dk))byDigits.set(dk,null); else byDigits.set(dk,k) }});
   const idx={byPo,byDigits,byCut,n:byPo.size,lines:(DB.custpo||[]).length}; GC.set('cpo',idx); return idx;
  }
  window.cpoIndex=cpoIndex;
+ /* 只比數字的備援：兩邊都有英文字首時必須相同（SORD45315 不能對到 FGCL-45315）*/
+ const letOK=(a,b)=>{const la=String(a).replace(/[^A-Z]/g,''),lb=String(b).replace(/[^A-Z]/g,'');return !la||!lb||la===lb};
+ const _ppf=window.prodPoFor; if(_ppf)window.prodPoFor=function(po){const r=_ppf(po); if(r&&r.fuzzy&&!letOK(r.key,keyN(po)))return null; return r};
  window.custPoFor=function(po){
   const I=cpoIndex(); if(!I.n)return null; const k=keyN(po); if(!k)return null;
   let key=I.byPo.has(k)?k:null, fuzzy=false, cut='';
-  if(!key){const dk=digitsOf(k); const alt=dk&&dk.length>=4?I.byDigits.get(dk):null; if(alt){key=alt;fuzzy=true}}
+  if(!key){const dk=digitsOf(k); const alt=dk&&dk.length>=4?I.byDigits.get(dk):null; if(alt&&letOK(alt,k)){key=alt;fuzzy=true}}
   if(!key&&I.byCut.has(k)){key=I.byCut.get(k);cut=k}
   if(!key)return null; const g=I.byPo.get(key); return {key,g,latest:g.latest,fuzzy,cut};
  };
- function matchLines(V,style,cut){
-  const sk=keyS(style); let L=V.lines;
-  if(cut)L=L.filter(l=>keyN(l.cut_no)===cut);
-  if(!sk)return [];
-  const hit=L.filter(l=>{const a=keyS(l.style),b=keyS(l.cust_style),c=keyS(l.sku);return a===sk||b===sk||c===sk});
-  if(hit.length)return hit;
-  return L.filter(l=>{const a=keyS(l.style),b=keyS(l.cust_style),c=keyS(l.sku);return (a&&a.startsWith(sk))||(b&&b.startsWith(sk))||(c&&c.startsWith(sk))||(a&&sk.startsWith(a)&&a.length>=4)});
+ function matchLines(V,style,cut,styleName){
+  let L=V.lines; if(cut)L=L.filter(l=>keyN(l.cut_no)===cut);
+  const sn=String(styleName||''); const toks=sn.split(/[\s,/=]+/).filter(t=>/\d/.test(t)&&t.length>=4).map(keyS);
+  const E=[...new Set([keyS(style),keyS(sn),...toks].filter(x=>x&&x.length>=3))];   /* ERP 款號、款名、款名裡的代碼（款名常放客戶 SKU）*/
+  if(!E.length)return [];
+  const P=l=>[keyS(l.style),keyS(l.cust_style),keyS(l.sku)].filter(Boolean);
+  const same=(a,b)=>a===b;
+  const pre=(a,b)=>a.length>=4&&b.length>=4&&(a.startsWith(b)||b.startsWith(a));
+  const core=x=>x.replace(/^(HA|NU|DI|A|O|K)/,'').replace(/[A-Z]$/,'');   /* A1037 ↔ 1037G ↔ HA1037 ↔ NU6137 */
+  const near=(a,b)=>{const ca=core(a),cb=core(b);return ca.length>=4&&cb.length>=4&&(ca===cb||ca.startsWith(cb)||cb.startsWith(ca))};
+  const inc=(a,b)=>a.length>=6&&b.length>=6&&(a.includes(b)||b.includes(a));
+  for(const test of [same,pre,near,inc]){ const hit=L.filter(l=>P(l).some(p=>E.some(e=>test(p,e)))); if(hit.length)return hit }
+  return [];
  }
  function applyCpo(g){
   const C=custPoFor(g.po_no); if(!C)return false;
-  const V=C.latest, h=V.hdr; const L=matchLines(V,g.style,C.cut);
-  const q=L.reduce((s,l)=>s+(+l.qty||0),0), tot=V.lines.reduce((s,l)=>s+(+l.qty||0),0);
+  const V=C.latest, h=V.hdr; const L=matchLines({lines:C.g.eff},g.style,C.cut,g.style_name);
+  const q=L.reduce((s,l)=>s+(+l.qty||0),0), tot=C.g.eff.reduce((s,l)=>s+(+l.qty||0),0);
   const price=L.find(l=>+l.unit_price>0); const sd=L.map(l=>d10(l.ship_date||l.cancel_date)).filter(Boolean).sort();
   g.po={state:L.length?(q===g.erp_ps?'ok':'diff'):'nostyle',qty:L.length?q:tot,erp:g.erp_ps,lines:L.length,total:tot,customer:h.customer||'',order_date:d10(h.order_date),required:d10(h.required_date)||sd[sd.length-1]||'',revision:h.revision||null,revs:C.g.versions.length,price:price?+price.unit_price:null,file:V.file||'',fuzzy:C.fuzzy,key:C.key,src:'email',email_date:V.email_date,total_ok:+h.total_ok===1,declared_total:h.declared_total,fmt:h.fmt,colors:[...new Set(L.map(l=>l.color).filter(Boolean))]};
   return true;
@@ -3616,7 +3628,7 @@ async function syncTpl(man){
   if(!PRODORD||!PRODORD.byPo)PRODORD=emptyProd();
   if(PRODORD._cpo===I)return; if(PRODORD.prodN==null)PRODORD.prodN=PRODORD.cpoOnly?0:PRODORD.hdrByPo.size;
   I.byPo.forEach((g,k)=>{ const V=g.latest;
-   PRODORD.byPo.set(k,V.lines.map(l=>({po_number:l.po_no,customer:l.customer,style_code:l.style,sku:l.sku,cust_style:l.cust_style,cut_no:l.cut_no,color:l.color,size:l.size,qty:l.qty,unit_price:l.unit_price,ext_price:l.ext_price,ship_date:l.ship_date,cancel_date:l.cancel_date,order_date:l.order_date,source_file:l.file,src:'email'})));
+   PRODORD.byPo.set(k,g.eff.map(l=>({po_number:l.po_no,customer:l.customer,style_code:l.style,sku:l.sku,cust_style:l.cust_style,cut_no:l.cut_no,color:l.color,size:l.size,qty:l.qty,unit_price:l.unit_price,ext_price:l.ext_price,ship_date:l.ship_date,cancel_date:l.cancel_date,order_date:l.order_date,source_file:l.file,src:'email'})));
    PRODORD.hdrByPo.set(k,g.versions.slice().reverse().map(v=>({customer:v.hdr.customer,po_number:v.hdr.po_no,order_date:v.hdr.order_date,required_date:v.hdr.required_date,revision:v.hdr.revision,source_file:v.file,email_date:v.email_date,total_ok:+v.hdr.total_ok===1,declared_total:v.hdr.declared_total,src:'email'}))) });
   const bd=new Map(); PRODORD.byPo.forEach((v,k)=>{const dk=digitsOf(k);if(dk&&dk.length>=4){if(bd.has(dk))bd.set(dk,null);else bd.set(dk,k)}}); PRODORD.byDigits=bd;
   PRODORD._cpo=I;
