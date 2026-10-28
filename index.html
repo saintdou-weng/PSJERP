@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.1';
+const APP_VER='0.9.2';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3110,7 +3110,8 @@ async function syncTpl(man){
  /* ── ERP 資料時間（哪個 ERP 報表進到哪一天） ── */
  const MAXD=(()=>{const d=new Date();d.setFullYear(d.getFullYear()+1);return ymd(d)})();   /* 超過一年後的日期多半是 ERP 打錯（如 2051-02-01），不拿來當「資料到」 */
  function fileUpto(f){ let u=''; const imp=f.at?String(f.at).slice(0,10):''; if(f.range&&f.range[1])u=String(f.range[1]).slice(0,10); else if(f.asof)u=String(f.asof).slice(0,10); else if(f.year)u=(+f.year<TODAY.getFullYear())?f.year+'-12-31':imp;   /* 今年的整年檔：資料只到匯入那天 */
-  if(u>MAXD||(imp&&u>imp&&f.year))u=imp; return u }
+  if(imp&&u>imp)u=imp;   /* 資料不可能比匯入那天還新 */
+  if(u>MAXD)u=imp; return u }
  function erpFresh(reps){ const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep)); if(!F.length)return null;
   let upto='',at=''; F.forEach(f=>{const u=fileUpto(f);if(u>upto)upto=u;if(f.at&&f.at>at)at=f.at}); return {upto,at,n:F.length} }
  window.erpFreshAll=function(){ return erpFresh((DB.erpfiles||[]).map(f=>f.rep)) };
@@ -3370,15 +3371,17 @@ async function syncTpl(man){
   const SH=new Map(), SH2=new Map(); live(DB.shipping||[]).forEach(s=>{const a=ordKey(s.my_no,s.po_no);const x=SH.get(a)||{qty:0,last:'',n:0};x.qty+=+s.qty||0;x.n++;if(d10(s.ship_date)>x.last)x.last=d10(s.ship_date);SH.set(a,x);const b=keyN(s.my_no);const y=SH2.get(b)||{qty:0,last:'',n:0};y.qty+=+s.qty||0;y.n++;if(d10(s.ship_date)>y.last)y.last=d10(s.ship_date);SH2.set(b,y)});
   /* INVOICE W_CBL140 */
   const IV=new Map(), IV2=new Map(); live(DB.invoices||[]).forEach(v=>{const add=(m,key)=>{if(!key)return;const x=m.get(key)||{qty:0,amount:0,inv:new Set(),last:''};x.qty+=+v.qty||0;x.amount+=+v.amount||0;if(v.invoice)x.inv.add(v.invoice);if(d10(v.inv_date)>x.last)x.last=d10(v.inv_date);m.set(key,x)};add(IV,keyN(v.po_no)+'|'+keyN(v.style));add(IV2,keyN(v.po_no))});
+  /* 同一張 PO 同一款在 ERP 可能拆成好幾個自編單號（顏色、分批），客戶 PO 是整款一筆：核對時用「PO＋款」的 ERP 合計 */
+  const PS=new Map(); G.forEach(g=>{const k=keyN(g.po_no)+'|'+skey(g.style);PS.set(k,(PS.get(k)||0)+g.qty)});
   const rows=[...G.values()].map(g=>{
-   g.colors=[...g.colors]; const sh=SH.get(ordKey(g.my_no,g.po_no))||null; g.ship={qty:sh?sh.qty:g.ship_qty,last:sh?sh.last:'',n:sh?sh.n:0,src:sh?'cbl300':'cod700'};
+   g.colors=[...g.colors]; g.erp_ps=PS.get(keyN(g.po_no)+'|'+skey(g.style))||g.qty; const sh=SH.get(ordKey(g.my_no,g.po_no))||null; g.ship={qty:sh?sh.qty:g.ship_qty,last:sh?sh.last:'',n:sh?sh.n:0,src:sh?'cbl300':'cod700'};
    const iv=IV.get(keyN(g.po_no)+'|'+keyN(g.style))||IV2.get(keyN(g.po_no))||null; g.inv=iv?{qty:iv.qty,amount:iv.amount,n:iv.inv.size,last:iv.last}:null;
    /* 客戶 PO（生產平台） */
    if(!PRODORD){g.po={state:'loading'}}
    else{const P=prodPoFor(g.po_no); if(!P)g.po={state:'missing'};
     else{const sk=skey(g.style); const L=P.lines.filter(l=>skey(l.style_code||l.sku)===sk||(sk&&skey(l.style_code||l.sku).startsWith(sk))); const q=L.reduce((s,l)=>s+(+l.qty||0),0); const tot=P.lines.reduce((s,l)=>s+(+l.qty||0),0);
      const h=P.hdrs[0]||{}; const revs=P.hdrs.length; const price=L.find(l=>+l.unit_price>0); const sd=L.map(l=>d10(l.ship_date||l.cancel_date)).filter(Boolean).sort();
-     g.po={state:L.length?(q===g.qty?'ok':'diff'):'nostyle',qty:L.length?q:tot,lines:L.length,total:tot,customer:h.customer||(L[0]&&L[0].customer)||'',order_date:d10(h.order_date||(L[0]&&L[0].order_date)),required:d10(h.required_date)||sd[sd.length-1]||'',revision:h.revision||null,revs,price:price?+price.unit_price:null,file:h.source_file||(L[0]&&L[0].source_file)||'',fuzzy:!!P.fuzzy,key:P.key}}}
+     g.po={state:L.length?(q===g.erp_ps?'ok':'diff'):'nostyle',qty:L.length?q:tot,erp:g.erp_ps,lines:L.length,total:tot,customer:h.customer||(L[0]&&L[0].customer)||'',order_date:d10(h.order_date||(L[0]&&L[0].order_date)),required:d10(h.required_date)||sd[sd.length-1]||'',revision:h.revision||null,revs,price:price?+price.unit_price:null,file:h.source_file||(L[0]&&L[0].source_file)||'',fuzzy:!!P.fuzzy,key:P.key}}}
    return g });
   GC.set('ocrows',rows); return rows;
  }
@@ -3411,7 +3414,7 @@ async function syncTpl(man){
   const per=OC.per||100, pages=Math.max(1,Math.ceil(rows.length/per)); if(OC.page>=pages)OC.page=pages-1; const pg=rows.slice(OC.page*per,(OC.page+1)*per);
   const L=(z,e)=>LANG===0?z:e; const dot=s=>`<span class="ocdot ${s}" title="${esc(srcName_(s))}"></span>`;
   h+=`<div class="tbl-wrap"><table class="t cards oc"><thead><tr><th>${L('客戶','Customer')}</th><th>${L('款號','Style')}</th><th>PO</th><th>${L('訂單日','Order')}</th><th>${L('交期','Delivery')}</th><th class="r">${dot('erp')}${L('訂單量','Order qty')}</th><th class="r">${dot('email')}${L('客戶 PO','Cust. PO')}</th><th class="r">${dot('erp')}${L('已裁','Cut')}</th><th class="r">${dot('manual')}${L('已縫','Sewn')}</th><th class="r">${dot('erp')}${L('入庫','FG')}</th><th class="r">${dot('erp')}${L('出貨','Shipped')}</th><th class="r">${dot('erp')}INVOICE</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
-  pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-r.qty)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
+  pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-po.erp)}${po.erp!==r.qty?` · ${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}`:''}</div>`:po.state==='ok'&&po.erp!==r.qty?`<div class="small muted">${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
    h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cut_qty?fmt(r.cut_qty):'—'}</td><td class="r num muted" data-l="${L('已縫','Sewn')}">—</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
   h+=`</tbody></table></div>`;
   if(pages>1)h+=`<div class="oc-pages"><button class="btn sm" ${OC.page?'':'disabled'} onclick="ocSet('page',${OC.page-1})">◀</button><span class="small">${OC.page+1} / ${pages} · ${fmt(rows.length)} ${L('列','rows')}</span><button class="btn sm" ${OC.page<pages-1?'':'disabled'} onclick="ocSet('page',${OC.page+1})">▶</button></div>`;
