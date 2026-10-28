@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.0';
+const APP_VER='0.9.1';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3108,7 +3108,9 @@ async function syncTpl(man){
  }
 
  /* ── ERP 資料時間（哪個 ERP 報表進到哪一天） ── */
- function fileUpto(f){ if(f.range&&f.range[1])return String(f.range[1]).slice(0,10); if(f.asof)return String(f.asof).slice(0,10); if(f.year)return f.year+'-12-31'; return '' }
+ const MAXD=(()=>{const d=new Date();d.setFullYear(d.getFullYear()+1);return ymd(d)})();   /* 超過一年後的日期多半是 ERP 打錯（如 2051-02-01），不拿來當「資料到」 */
+ function fileUpto(f){ let u=''; const imp=f.at?String(f.at).slice(0,10):''; if(f.range&&f.range[1])u=String(f.range[1]).slice(0,10); else if(f.asof)u=String(f.asof).slice(0,10); else if(f.year)u=(+f.year<TODAY.getFullYear())?f.year+'-12-31':imp;   /* 今年的整年檔：資料只到匯入那天 */
+  if(u>MAXD||(imp&&u>imp&&f.year))u=imp; return u }
  function erpFresh(reps){ const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep)); if(!F.length)return null;
   let upto='',at=''; F.forEach(f=>{const u=fileUpto(f);if(u>upto)upto=u;if(f.at&&f.at>at)at=f.at}); return {upto,at,n:F.length} }
  window.erpFreshAll=function(){ return erpFresh((DB.erpfiles||[]).map(f=>f.rep)) };
@@ -3317,10 +3319,11 @@ async function syncTpl(man){
   try{
    const m=await fetch(PROD_GAS+'?action=smartManifest&tool=orders&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const d=m.data||m; const H=d.hashes||{};
    cache=cache&&cache.buckets?cache:{hashes:{},buckets:{}}; let changed=false;
-   for(const k of Object.keys(H)){ if(cache.hashes[k]===H[k]&&cache.buckets[k])continue;
-    const bj=await fetch(PROD_GAS+'?action=smartBucket&tool=orders&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json());
-    const rows=(bj.data&&bj.data.records)||bj.records||[]; cache.buckets[k]=rows; cache.hashes[k]=H[k]; changed=true }
-   for(const k of Object.keys(cache.buckets)){ if(!H[k]){delete cache.buckets[k];delete cache.hashes[k];changed=true} }
+   /* 只拿訂單中心用得到的桶：PO 行（h:xx）與 PO 表頭（p:headers）；稽核、匯入紀錄、週報快照先不拿。一次 4 個桶並行，拉過且 hash 沒變的不再拉。 */
+   const want=Object.keys(H).filter(k=>/^h:/.test(k)||k==='p:headers'); const todo=want.filter(k=>!(cache.hashes[k]===H[k]&&cache.buckets[k])); window.PRODORD_PROG={done:0,total:todo.length};
+   const one=async k=>{const bj=await fetch(PROD_GAS+'?action=smartBucket&tool=orders&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json()); const rows=(bj.data&&bj.data.records)||bj.records||[]; cache.buckets[k]=rows; cache.hashes[k]=H[k]; changed=true; PRODORD_PROG.done++; if(CUR==='ordercenter'){const el=document.getElementById('poProg');if(el)el.textContent=PRODORD_PROG.done+'/'+PRODORD_PROG.total}};
+   for(let i=0;i<todo.length;i+=4)await Promise.all(todo.slice(i,i+4).map(one));
+   for(const k of Object.keys(cache.buckets)){ if(!H[k]||!want.includes(k)){delete cache.buckets[k];delete cache.hashes[k];changed=true} }
    cache.updatedAt=d.updatedAt||''; cache.recordCount=d.recordCount||0; cache.at=nowStamp();
    if(changed||!cache.savedAt){cache.savedAt=nowStamp(); try{await IDB.set(PC_KEY,cache)}catch(e){}}
    PRODORD=indexProd(cache);
@@ -3390,7 +3393,7 @@ async function syncTpl(man){
   /* 資料時間 */
   const fr=(reps)=>{const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep));let u='';F.forEach(f=>{const x=(f.range&&f.range[1])||f.asof||(f.year?f.year+'-12-31':'');if(x>u)u=String(x).slice(0,10)});return u};
   h+=`<div class="fresh"><div class="fc">${srcChip('erp')}<span>${tt('訂單到 ','orders to ')}<b>${esc(fr(['cod700','cod690'])||'—')}</b> · ${tt('出貨到 ','shipping to ')}<b>${esc(fr(['cbl300'])||'—')}</b> · INVOICE <b>${esc(fr(['cbl140'])||'—')}</b> · ${tt('入庫到 ','FG to ')}<b>${esc(fr(['cst580'])||'—')}</b></span></div>
-   <div class="fc">${srcChip('email',tt('客戶 PO','customer PO'))}<span>${!PRODORD?tt('讀取生產平台…','loading production cloud…'):PRODORD.err&&!PRODORD.headers.length?tt('生產平台雲端沒回應','production cloud not responding'):`${fmt(PRODORD.hdrByPo.size)} ${tt('張 PO','POs')} · ${fmt(PRODORD.lines.length)} ${tt('行','lines')} · ${tt('同步 ','synced ')}${esc(String(PRODORD.updatedAt).replace('T',' ').slice(0,16))}`}</span></div></div>`;
+   <div class="fc">${srcChip('email',tt('客戶 PO','customer PO'))}<span>${!PRODORD?tt('讀取生產平台… ','loading production cloud… ')+`<span id="poProg">${window.PRODORD_PROG?PRODORD_PROG.done+'/'+PRODORD_PROG.total:''}</span>`:PRODORD.err&&!PRODORD.headers.length?tt('生產平台雲端沒回應','production cloud not responding'):`${fmt(PRODORD.hdrByPo.size)} ${tt('張 PO','POs')} · ${fmt(PRODORD.lines.length)} ${tt('行','lines')} · ${tt('同步 ','synced ')}${esc(String(PRODORD.updatedAt).replace('T',' ').slice(0,16))}`}</span></div></div>`;
   /* 過濾 */
   const custs=[...new Set(all.map(r=>r.cust).filter(Boolean))].sort(); const yrs=[...new Set(all.map(r=>String(r.order_date).slice(0,4)).filter(Boolean))].sort().reverse();
   h+=`<div class="panel oc-filters"><input class="inp" id="ocq" value="${esc(OC.q)}" placeholder="${tt('搜尋 PO／款號／自編單號／客戶','Search PO / style / order no / customer')}" oninput="clearTimeout(window._ocT);window._ocT=setTimeout(()=>ocSet('q',this.value.trim()),250)">
