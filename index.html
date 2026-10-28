@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.4';
+const APP_VER='0.9.5';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3560,6 +3560,98 @@ async function syncTpl(man){
  #tintBtn{font-size:16px}
  @media (max-width:760px){.tint-pop{right:6px;left:6px;max-width:none}}`;
  document.head.appendChild(st);
+})();
+
+
+/* ══════════ v0.9.5：客戶 PO 資料集（Email PDF 解析 → PSJERP 本機＋雲端），訂單中心優先用它核對；匯入 CUSTPO_*.json ══════════ */
+(function(){
+ REP_DS.custpo='custpo'; REP_SHEET.custpo='ORDERS';   /* 存在 ORDERS 試算表裡自己的分頁（custpo|年），GAS 不用改 */
+ const _ld95=loadDB; loadDB=async function(){ await _ld95.apply(this,arguments); if(!Array.isArray(DB.custpo))DB.custpo=[] };
+ if(DB&&!Array.isArray(DB.custpo))DB.custpo=[];
+ const _por=pageOfRep; pageOfRep=function(r){return r==='custpo'?'ordercenter':_por(r)};
+ if(Array.isArray(COVER)&&!COVER.some(c=>c[1]==='custpo'))COVER.push(['orders','custpo','客戶 PO（Email PDF）']);
+ const d10=v=>String(v||'').slice(0,10);
+ const keyS=s=>keyN(s).replace(/[^A-Z0-9]+/g,'');
+ const digitsOf=s=>String(s||'').replace(/\D+/g,'');
+
+ /* ── 索引：PO 號 → 各版本（依 email 日期排序，最後一版為準）── */
+ function cpoIndex(){
+  if(GC.has('cpo'))return GC.get('cpo');
+  const byPo=new Map(), byCut=new Map();
+  live(DB.custpo||[]).forEach(l=>{ const k=keyN(l.po_no); if(!k)return; let g=byPo.get(k); if(!g){g={key:k,vers:new Map()};byPo.set(k,g)}
+   let v=g.vers.get(l.ver); if(!v){v={ver:l.ver,email_date:l.email_date||'',file:l.file||'',hdr:l,lines:[]};g.vers.set(l.ver,v)} v.lines.push(l);
+   if(l.cut_no){const ck=keyN(l.cut_no); if(ck&&!byCut.has(ck))byCut.set(ck,k)} });
+  byPo.forEach(g=>{ g.versions=[...g.vers.values()].sort((a,b)=>String(a.email_date).localeCompare(String(b.email_date))||String(a.file).localeCompare(String(b.file))); g.latest=g.versions[g.versions.length-1]; delete g.vers });
+  const byDigits=new Map(); byPo.forEach((g,k)=>{const dk=digitsOf(k); if(dk&&dk.length>=4){ if(byDigits.has(dk))byDigits.set(dk,null); else byDigits.set(dk,k) }});
+  const idx={byPo,byDigits,byCut,n:byPo.size,lines:(DB.custpo||[]).length}; GC.set('cpo',idx); return idx;
+ }
+ window.cpoIndex=cpoIndex;
+ window.custPoFor=function(po){
+  const I=cpoIndex(); if(!I.n)return null; const k=keyN(po); if(!k)return null;
+  let key=I.byPo.has(k)?k:null, fuzzy=false, cut='';
+  if(!key){const dk=digitsOf(k); const alt=dk&&dk.length>=4?I.byDigits.get(dk):null; if(alt){key=alt;fuzzy=true}}
+  if(!key&&I.byCut.has(k)){key=I.byCut.get(k);cut=k}
+  if(!key)return null; const g=I.byPo.get(key); return {key,g,latest:g.latest,fuzzy,cut};
+ };
+ function matchLines(V,style,cut){
+  const sk=keyS(style); let L=V.lines;
+  if(cut)L=L.filter(l=>keyN(l.cut_no)===cut);
+  if(!sk)return [];
+  const hit=L.filter(l=>{const a=keyS(l.style),b=keyS(l.cust_style),c=keyS(l.sku);return a===sk||b===sk||c===sk});
+  if(hit.length)return hit;
+  return L.filter(l=>{const a=keyS(l.style),b=keyS(l.cust_style),c=keyS(l.sku);return (a&&a.startsWith(sk))||(b&&b.startsWith(sk))||(c&&c.startsWith(sk))||(a&&sk.startsWith(a)&&a.length>=4)});
+ }
+ function applyCpo(g){
+  const C=custPoFor(g.po_no); if(!C)return false;
+  const V=C.latest, h=V.hdr; const L=matchLines(V,g.style,C.cut);
+  const q=L.reduce((s,l)=>s+(+l.qty||0),0), tot=V.lines.reduce((s,l)=>s+(+l.qty||0),0);
+  const price=L.find(l=>+l.unit_price>0); const sd=L.map(l=>d10(l.ship_date||l.cancel_date)).filter(Boolean).sort();
+  g.po={state:L.length?(q===g.erp_ps?'ok':'diff'):'nostyle',qty:L.length?q:tot,erp:g.erp_ps,lines:L.length,total:tot,customer:h.customer||'',order_date:d10(h.order_date),required:d10(h.required_date)||sd[sd.length-1]||'',revision:h.revision||null,revs:C.g.versions.length,price:price?+price.unit_price:null,file:V.file||'',fuzzy:C.fuzzy,key:C.key,src:'email',email_date:V.email_date,total_ok:+h.total_ok===1,declared_total:h.declared_total,fmt:h.fmt,colors:[...new Set(L.map(l=>l.color).filter(Boolean))]};
+  return true;
+ }
+ /* ── 把客戶 PO 併進 PRODORD（訂單中心原本只看生產平台雲端）：Email 版本優先，平台雲端只補 Email 沒有的 PO ── */
+ function emptyProd(){return {headers:[],lines:[],weekly:[],byPo:new Map(),hdrByPo:new Map(),byDigits:new Map(),updatedAt:'',at:'',recordCount:0,cpoOnly:true}}
+ function mergeCpo(){
+  const I=cpoIndex(); if(!I.n)return;
+  if(!PRODORD||!PRODORD.byPo)PRODORD=emptyProd();
+  if(PRODORD._cpo===I)return; if(PRODORD.prodN==null)PRODORD.prodN=PRODORD.cpoOnly?0:PRODORD.hdrByPo.size;
+  I.byPo.forEach((g,k)=>{ const V=g.latest;
+   PRODORD.byPo.set(k,V.lines.map(l=>({po_number:l.po_no,customer:l.customer,style_code:l.style,sku:l.sku,cust_style:l.cust_style,cut_no:l.cut_no,color:l.color,size:l.size,qty:l.qty,unit_price:l.unit_price,ext_price:l.ext_price,ship_date:l.ship_date,cancel_date:l.cancel_date,order_date:l.order_date,source_file:l.file,src:'email'})));
+   PRODORD.hdrByPo.set(k,g.versions.slice().reverse().map(v=>({customer:v.hdr.customer,po_number:v.hdr.po_no,order_date:v.hdr.order_date,required_date:v.hdr.required_date,revision:v.hdr.revision,source_file:v.file,email_date:v.email_date,total_ok:+v.hdr.total_ok===1,declared_total:v.hdr.declared_total,src:'email'}))) });
+  const bd=new Map(); PRODORD.byPo.forEach((v,k)=>{const dk=digitsOf(k);if(dk&&dk.length>=4){if(bd.has(dk))bd.set(dk,null);else bd.set(dk,k)}}); PRODORD.byDigits=bd;
+  PRODORD._cpo=I;
+ }
+ /* ocRows 是訂單中心內部的函式（不能直接換），改在它把結果放進快取時加工 */
+ const _gset=GC.set.bind(GC);
+ GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._cpo){ try{ mergeCpo(); if(cpoIndex().n)v.forEach(applyCpo); Object.defineProperty(v,'_cpo',{value:1,enumerable:false}) }catch(e){console.error('cpo',e)} } return _gset(k,v) };
+ /* 生產平台雲端照常載入（若還有 Email 沒有的 PO 就補進來）*/
+ const _lpo=window.loadProdOrders; let lpoTried=false;
+ window.loadProdOrders=async function(force){ if(PRODORD&&PRODORD.cpoOnly)PRODORD=null; const r=await _lpo(force); try{mergeCpo()}catch(e){} return r };
+ const _route95=route; route=function(){ const r=_route95.apply(this,arguments); if(!lpoTried&&cpoIndex().n&&(CUR==='ordercenter'||CUR==='dashboard')){lpoTried=true;setTimeout(()=>loadProdOrders(false),50)} return r };
+
+ /* ── 匯入 CUSTPO_*.json（伺服器端解析好的客戶 PO）── */
+ window.importCustPO=async function(input){
+  const files=[...(input.files||[])]; input.value=''; if(!files.length)return; let n=0,rows=0;
+  for(const f of files){
+   try{ const j=JSON.parse(await f.text()); if(!j||j.psjerp!=='custpo'||!Array.isArray(j.recs)||!j.key)throw new Error(tt('不是 CUSTPO 檔','not a CUSTPO file'));
+    const meta=Object.assign({},j.meta||{},{key:j.key,rep:'custpo',fn:'CUSTPO',file:f.name,rows:j.recs.length,at:nowStamp(),dirty:true,version:null,cloud:false});
+    j.recs.forEach(r=>{r.import_key=j.key; if(!r.source_system)r.source_system='EMAIL_PDF'; r.synced_at=meta.at});
+    const r=storeBatch('custpo',j.key,meta,j.recs); if(window.markDS)markDS('custpo'); n++; rows+=r.added;
+    try{(DB.importlog=DB.importlog||[]).unshift({at:meta.at,rep:'custpo',file:f.name,key:j.key,added:r.added,removed:r.removed,user:'paul.weng'})}catch(e){}
+   }catch(e){ console.error(e); toast(tt('客戶 PO 匯入失敗：','Customer PO import failed: ')+(e.message||e)) }
+  }
+  if(n){ GC.clear(); COSTC.clear(); try{updateDataRange()}catch(e){} persist(); toast(tt('客戶 PO 已匯入 ','Customer POs imported ')+fmt(rows)+' '+tt('行','lines')+(cloudReady()?tt('，接著上傳雲端','; uploading to cloud'):'')); rerender(); if(cloudReady())setTimeout(()=>cloudSync(false),300) }
+ };
+ const _roc=RENDER.ordercenter;
+ if(_roc)RENDER.ordercenter=function(){
+  let h=_roc.apply(this,arguments);
+  h=h.replace('<button class="btn sm" onclick="exportOC()">',`<label class="btn sm" style="cursor:pointer">📄 ${tt('匯入客戶 PO','Import customer POs')}<input type="file" accept=".json,application/json" multiple hidden onchange="importCustPO(this)"></label><button class="btn sm" onclick="exportOC()">`);
+  const I=cpoIndex();
+  if(I.n){ const F=(DB.erpfiles||[]).filter(f=>f.rep==='custpo'); const to=F.map(f=>d10((f.range&&f.range[1])||'')).sort().pop()||'';
+   const txt=`${fmt(I.n)} ${tt('張 PO','POs')} · ${fmt(I.lines)} ${tt('行','lines')} · ${tt('Email 到 ','email to ')}<b>${esc(to||'—')}</b>`+(PRODORD&&PRODORD.prodN?` · <span class="muted">${tt('生產平台雲端 ','prod cloud ')}${fmt(PRODORD.prodN)} ${tt('張','POs')}</span>`:'');
+   let n=0; h=h.replace(/<div class="fc">(<span class="src [^"]*">[\s\S]*?<\/span>)<span>[\s\S]*?<\/span><\/div>/g,(m,chip)=>{n++;return n===2?`<div class="fc">${chip}<span>${txt}</span></div>`:m}) }
+  return h;
+ };
 })();
 
 init();
