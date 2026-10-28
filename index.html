@@ -913,7 +913,7 @@ function cloudQuick(){
  if(isDemo())return '';
  if(!cloudKey())return cloudBanner();
  const F=DB.erpfiles||[], dirty=F.filter(f=>f.dirty||!f.version).length, busy=CLOUD.state==='busy';
- const st=CLOUD.state==='err'?stChip('crit',tt('同步失敗','Sync failed')):busy?stChip('info',CLOUD.msg||tt('同步中…','Syncing…')):stChip('good',tt('已連線','Connected'));
+ const st=CLOUD.state==='err'?stChip('crit',tt('同步失敗','Sync failed')+(CLOUD.msg?'：'+CLOUD.msg:'')):busy?stChip('info',CLOUD.msg||tt('同步中…','Syncing…')):stChip('good',tt('已連線','Connected'));
  const boxes=SYNC_GROUPS.map(([sh,ic,l])=>{const n=F.filter(f=>REP_SHEET[f.rep]===sh).length;return `<label class="sync-pick"><input type="checkbox" value="${sh}"><span>${ic} ${esc(l[LANG===0?0:1])}</span><span class="small muted">${n?fmt(n)+tt(' 批',' batches'):'—'}</span></label>`}).join('');
  return `<div class="panel cloud-quick" id="cloudQuick"><div class="cq-head"><b>☁️ ${tt('雲端同步','Cloud sync')}</b>${st}<span class="small muted">${tt('上次 ','Last ')}${esc((CLOUD.last||'—').slice(0,16))}${dirty?` · <b class="diff-neg">${fmt(dirty)} ${tt('批未上傳','not uploaded')}</b>`:''}</span>
   <div class="cq-acts"><button class="btn sm pri" ${busy?'disabled':''} onclick="cloudSync(true)">🔄 ${tt('全部同步','Sync all')}</button><button class="btn sm" ${busy?'disabled':''} onclick="cloudSyncPicked()">☑️ ${tt('同步所選','Sync selected')}</button><button class="btn sm" onclick="togglePick()">${tt('選擇資料集','Choose datasets')} ▾</button></div></div>
@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.3';
+const APP_VER='0.9.4';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3445,6 +3445,120 @@ async function syncTpl(man){
  .oc-pages{display:flex;gap:10px;align-items:center;justify-content:center;margin:10px 0}
  table.t.oc td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
  @media (max-width:860px){.oc-filters .inp{flex:1 1 44%;min-width:0}.oc-filters #ocq{flex-basis:100%}}`;
+ document.head.appendChild(st);
+})();
+
+
+/* ══════════ v0.9.4：背景可選色（同 VRT HR）、雲端同步自動重試／一批失敗不中斷／錯誤原因看得到、手機大資料集用到才下載 ══════════ */
+(function(){
+ /* ── A. 背景顏色 ── */
+ const TINTS=[['white','#F0F2F5','白色','White','ពណ៌ស'],['green','#D3EADB','淡綠','Light green','បៃតងខ្ចី'],['yellow','#F0E4BC','淡黃','Light yellow','លឿងខ្ចី'],['blue','#CFE0F2','淡藍','Light blue','ខៀវខ្ចី'],['pink','#F0D4DF','粉紅','Pink','ផ្កាឈូក'],['beige','#E6DACA','米色','Beige','ពណ៌ក្រែម']];
+ window.TINTS=TINTS;
+ function applyTint(k){const d=document.documentElement;if(!k||k==='white')delete d.dataset.tint;else d.dataset.tint=k}
+ window.setTint=function(k){LS.set('psjerp_tint',k);applyTint(k);const p=$('#tintPop');if(p)p.remove();if(CUR==='settings')rerender();toast(tt('背景顏色已記住','Background colour saved','បានរក្សាទុកពណ៌ផ្ទៃខាងក្រោយ'))};
+ window.tintSwHTML=function(){const cur=LS.get('psjerp_tint','white');return `<div class="tint-row">${TINTS.map(([k,c,z,en,km])=>`<div style="text-align:center"><div class="tint-sw ${cur===k?'on':''}" style="background:${c}" onclick="setTint('${k}')" title="${esc(tt(z,en,km))}">${cur===k?'✓':''}</div><div class="tint-lbl">${esc(tt(z,en,km))}</div></div>`).join('')}</div>`};
+ window.tintPop=function(ev){ev&&ev.stopPropagation();const old=$('#tintPop');if(old){old.remove();return}const d=document.createElement('div');d.id='tintPop';d.className='tint-pop';d.innerHTML=`<div style="width:100%;font-weight:600;font-size:13px">🎨 ${tt('背景顏色（這台裝置會記住）','Background colour (remembered on this device)','ពណ៌ផ្ទៃខាងក្រោយ')}</div>`+tintSwHTML();d.onclick=e=>e.stopPropagation();document.body.appendChild(d);setTimeout(()=>document.addEventListener('click',()=>{const p=$('#tintPop');if(p)p.remove()},{once:true}),0)};
+ applyTint(LS.get('psjerp_tint','white'));
+ const ls=$('#langSw'); if(ls&&!$('#tintBtn')){const b=document.createElement('button');b.className='icon-btn';b.id='tintBtn';b.title=tt('背景顏色','Background colour');b.setAttribute('aria-label','Background colour');b.textContent='🎨';b.onclick=tintPop;ls.parentNode.insertBefore(b,ls)}
+
+ /* ── B. 設定頁：顏色列＋「大資料集用到才下載」 ── */
+ const DEFER_LS='psjerp_defer';
+ const isPhone=()=>{try{return matchMedia('(max-width:760px)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)}catch(e){return false}};
+ const deferOn=()=>{const v=LS.get(DEFER_LS,null);return (v===true||v===false)?v:isPhone()};
+ window.setDefer=function(v){if(v==='auto')LS.del(DEFER_LS);else LS.set(DEFER_LS,v==='on');if(CUR==='settings')rerender()};
+ const _rs=RENDER.settings;
+ if(_rs)RENDER.settings=function(){const h=_rs.apply(this,arguments);
+  setTimeout(()=>{const h2=[...document.querySelectorAll('#page .panel h2')].find(x=>/語言與外觀|Language|ភាសា/.test(x.textContent));
+   if(h2&&!h2.parentNode.querySelector('.tint-row')){const cur=LS.get(DEFER_LS,null);const sel=cur===true?'on':cur===false?'off':'auto';
+    const d=document.createElement('div');d.style.marginTop='12px';
+    d.innerHTML=`<div class="small muted" style="margin-bottom:6px">🎨 ${tt('背景顏色（這台裝置會記住）','Background colour (remembered on this device)')}</div>${tintSwHTML()}
+     <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="small">${tt('大資料集（BOM／領料／採購／進貨／庫存異動…）','Large datasets (BOM / issues / purchase / receiving / stock moves…)')}</span>
+     <select class="inp" style="width:auto" onchange="setDefer(this.value)"><option value="auto" ${sel==='auto'?'selected':''}>${tt('自動（手機用到才下載，電腦全部下載）','Auto (phone: on demand; PC: all)')}</option><option value="on" ${sel==='on'?'selected':''}>${tt('用到才下載','On demand')}</option><option value="off" ${sel==='off'?'selected':''}>${tt('同步時全部下載','Download all on sync')}</option></select>
+     <span class="small muted">${tt('目前：','Now: ')}${deferOn()?tt('用到才下載','on demand'):tt('全部下載','all')}</span></div>`;
+    h2.parentNode.appendChild(d)}},0);
+  return h};
+
+ /* ── C. 雲端連線：逾時 120 秒、自動重試 3 次（密碼錯不重試） ── */
+ const AUTHRE=/密碼|KEY|unauthor|forbidden|401|403/i;
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ async function fetchJSON(url,opt,label){ let last=null;
+  for(let i=0;i<3;i++){ const ac=('AbortController' in window)?new AbortController():null; const tm=ac?setTimeout(()=>ac.abort(),120000):null;
+   try{ const r=await fetch(url,Object.assign({},opt,ac?{signal:ac.signal}:{})); if(tm)clearTimeout(tm);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    let j; try{j=await r.json()}catch(e){throw new Error(tt('回應不是 JSON（可能是登入頁或網路被攔截）','Response is not JSON (login page / captive portal?)'))}
+    if(!j.ok){const m=String(j.msg||j.error||'error');const e=new Error(m);e.fatal=AUTHRE.test(m);throw e} return j }
+   catch(e){ if(tm)clearTimeout(tm); if(e&&e.name==='AbortError')e=new Error(tt('連線逾時（120 秒）','Timed out (120 s)')); last=e; if(e.fatal)throw e;
+    if(i<2){cloudSetState('busy',tt('連線不穩，重試 ','Retrying ')+(i+1)+'/2 …');await sleep(1500*(i+1))} } }
+  throw new Error((label?label+'：':'')+String(last&&last.message||last)) }
+ cget=async function(params){const q=new URLSearchParams(Object.assign({k:cloudKey()},params)).toString();return fetchJSON(cloudUrl()+'?'+q,{},params.action)};
+ cpost=async function(body){return fetchJSON(cloudUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({api:'psjerp',k:cloudKey()},body))},body.action)};
+
+ /* ── D. 同步：一批失敗記下來繼續做其他的；手機上大資料集先記住清單，用到才下載 ── */
+ const LAZY=(window.DS_LAZY||{}).LAZY||[];
+ const dsOf=rep=>[REP_DS[rep],SNAPREP[rep]&&SNAPREP[rep][1]].filter(Boolean);
+ const lazyRep=rep=>dsOf(rep).some(k=>LAZY.includes(k));
+ const repLoaded=rep=>dsOf(rep).every(k=>window.dsLoaded?dsLoaded(k):true);
+ function deferMeta(m){return {key:m.key,rep:m.rep,fn:m.fn,file:m.file,rows:+m.rows||0,label:m.label,range:PJ(m.range),asof:m.asof||'',year:m.year?+m.year:null,totals:PJ(m.totals),checks:PJ(m.checks)||[],at:m.at,batch:m.batch,version:String(m.version),dirty:false,cloud:true,deferred:true,_m:m}}
+ let lastErrToast='';
+ function errToast(msg){if(msg===lastErrToast)return;lastErrToast=msg;toast(tt('雲端同步失敗：','Cloud sync failed: ')+msg)}
+ cloudSync=async function(manual,only){
+  if(CLOUD.busy||isDemo())return; const want=only&&only.size?f=>only.has(REP_SHEET[f.rep]||f.sheet):()=>true;
+  if(!cloudReady()){cloudSetState('off');if(manual)toast(tt('請先在「設定 → 雲端同步」輸入同步密碼','Enter the sync password in Settings → Cloud sync first'));return}
+  CLOUD.busy=true; let pulled=0, pushed=0, deferred=0; const fails=[];
+  try{
+   cloudSetState('busy',tt('讀取雲端清單…','Reading cloud list…'));
+   for(const k of (DB.dropq||[]).slice()){await cpost({action:'erp_drop',key:k});DB.dropq=DB.dropq.filter(x=>x!==k);persist()}
+   const man=await cget({action:'erp_manifest'}); CLOUD.url=man.url||''; const files=man.files||[]; CLOUD.files=files.length;
+   if(files.length&&!only){const inCloud=new Set(files.map(m=>String(m.key)));const gone=(DB.erpfiles||[]).filter(f=>f.version&&!f.dirty&&!inCloud.has(String(f.key))&&!SNAPREP[f.rep]);if(gone.length&&gone.length<=Math.max(3,files.length*0.2)){gone.forEach(dropLocalBatch);updateDataRange();GC.clear();COSTC.clear();persist()}}
+   const justPushed=new Set();
+   for(const f of (DB.erpfiles||[]).filter(f=>(f.dirty||!f.version)&&want(f))){try{await pushBatch(f);justPushed.add(f.key);pushed++;persist()}catch(e){console.error(e);if(e.fatal)throw e;fails.push({fn:f.fn,msg:String(e.message||e)})}}
+   const defer=deferOn();
+   for(const m of files){if(justPushed.has(m.key)||!want(m))continue;const loc=(DB.erpfiles||[]).find(f=>f.key===m.key);if(loc&&(loc.dirty||String(loc.version)===String(m.version)))continue;
+    if(defer&&lazyRep(m.rep)&&!repLoaded(m.rep)){DB.erpfiles=(DB.erpfiles||[]).filter(f=>f.key!==m.key);DB.erpfiles.unshift(deferMeta(m));deferred++;persist();continue}
+    try{await pullBatch(m);pulled++;persist()}catch(e){console.error(e);if(e.fatal)throw e;fails.push({fn:m.fn,msg:String(e.message||e)})}}
+   /* 之前延後、現在頁面已經在用的資料集：補下載 */
+   for(const f of (DB.erpfiles||[]).filter(f=>f.deferred&&repLoaded(f.rep))){try{await pullBatch(f._m||f);pulled++;persist()}catch(e){console.error(e);if(e.fatal)throw e;fails.push({fn:f.fn,msg:String(e.message||e)})}}
+   if(!only){try{await syncTpl(man)}catch(e){console.error(e);fails.push({fn:'templates',msg:String(e.message||e)})}}
+   for(const n of NOTEQ.splice(0)){try{await cpost({action:'erp_note',id:n.id,ds:n.ds,notes:n.notes,tags:n.tags,user:'paul.weng'})}catch(e){console.error(e);NOTEQ.push(n);fails.push({fn:'notes',msg:String(e.message||e)})}}
+   (man.notes||[]).forEach(n=>{const arr=DB[n.ds]||[];const r=arr.find(x=>x.id===n.id);if(!r)return;if(r._nat&&r._nat>String(n.at))return;r.notes=String(n.notes||'');r.tags=String(n.tags||'').split(',').map(x=>x.trim()).filter(Boolean);r._nat=String(n.at)});
+   if(!fails.length&&(DB.digest||[]).length&&!(DB.erpfiles||[]).some(f=>f.dirty||!f.version)){try{await sendDigest(false)}catch(e){console.error(e)}}
+   try{updateDataRange()}catch(e){}
+   if(fails.length){const msg=(fails.length>1?fails.length+' '+tt('個檔案失敗','files failed')+' · ':'')+fails[0].fn+' — '+fails[0].msg;cloudSetState('err',msg);persist();errToast(msg);rerender();return}
+   CLOUD.last=nowStamp(); LS.set('psjerp_cloud_last',CLOUD.last); cloudSetState('ok'); persist();
+   if(pulled||pushed||deferred||manual){toast(tt('雲端同步完成','Cloud sync done')+(pushed?` · ${tt('上傳','up')} ${pushed}`:'')+(pulled?` · ${tt('下載','down')} ${pulled}`:'')+(deferred?` · ${tt('用到才下載','on demand')} ${deferred}`:''));rerender()}
+  }catch(e){console.error(e);const msg=String(e.message||e);cloudSetState('err',msg);if(manual||e.fatal||/密碼|KEY/.test(msg))errToast(msg)}
+  finally{CLOUD.busy=false}
+ };
+ /* 頁面要用到某資料集時：先載入本機，再把延後的批次補下載 */
+ const _ensureDS=window.ensureDS;
+ window.ensureDS=async function(keys){ const r=await _ensureDS(keys); const ks=(Array.isArray(keys)?keys:[keys]);
+  const need=(DB.erpfiles||[]).filter(f=>f.deferred&&dsOf(f.rep).some(k=>ks.includes(k)));
+  if(need.length&&cloudReady()&&!CLOUD.busy){ CLOUD.busy=true; const fails=[]; try{ for(const f of need){ try{ await pullBatch(f._m||f); persist() }catch(e){ console.error(e); fails.push({fn:f.fn,msg:String(e.message||e)}) } }
+    if(fails.length){const msg=fails[0].fn+' — '+fails[0].msg;cloudSetState('err',msg);errToast(msg)} else cloudSetState('ok') } finally{ CLOUD.busy=false } }
+  return r };
+ /* 載入提示跟著下載進度走 */
+ const _css=cloudSetState; cloudSetState=function(st,msg){_css(st,msg);const n=$('#page .note.lazy');if(n&&st==='busy'&&msg)n.textContent='⏳ '+msg};
+ const _route94=route; route=function(){const r=_route94.apply(this,arguments);const n=$('#page > .note');if(n&&/⏳/.test(n.textContent))n.classList.add('lazy');return r};
+
+ /* ── E. 樣式 ── */
+ const st=document.createElement('style'); st.textContent=`
+ :root[data-tint="green"]{--bg:#D3EADB!important;--surface:#EAF6EE!important;--surface-2:#DDEFE3!important;--sunk:#C7E2D0!important;--line-2:#C9DFD0!important}
+ :root[data-tint="yellow"]{--bg:#F0E4BC!important;--surface:#FDF6DC!important;--surface-2:#F7ECC8!important;--sunk:#E8D9AA!important;--line-2:#E6D8AE!important}
+ :root[data-tint="blue"]{--bg:#CFE0F2!important;--surface:#E8F1FB!important;--surface-2:#DAE8F7!important;--sunk:#C3D7EE!important;--line-2:#C6D8EC!important}
+ :root[data-tint="pink"]{--bg:#F0D4DF!important;--surface:#FBEBF1!important;--surface-2:#F5DCE6!important;--sunk:#EAC6D4!important;--line-2:#E8CCD8!important}
+ :root[data-tint="beige"]{--bg:#E6DACA!important;--surface:#F7F0E6!important;--surface-2:#EFE5D7!important;--sunk:#DDCEBA!important;--line-2:#DED1BF!important}
+ :root[data-tint] body{background:var(--bg)!important}
+ :root[data-tint] .top{background:var(--surface)!important;border-bottom-color:var(--line)!important}
+ :root[data-tint] .top .icon-btn,:root[data-tint] .top .lang,:root[data-tint] .top .search input{background:var(--surface-2)!important}
+ :root[data-tint] .frame-bar{background:var(--surface-2)!important}:root[data-tint] .frame-bar .icon-btn,:root[data-tint] .frame-bar a{background:var(--surface)!important}
+ :root[data-tint] table.t th{background:var(--surface-2)}
+ .tint-pop{position:fixed;right:8px;top:54px;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:10px;display:flex;gap:8px;flex-wrap:wrap;max-width:360px}
+ .tint-sw{width:40px;height:40px;border-radius:50%;border:2px solid #CBD5E1;cursor:pointer;display:grid;place-items:center;font-size:16px;color:#0F766E}
+ .tint-sw.on{border-color:#0F766E;box-shadow:0 0 0 2px #99F6E4}
+ .tint-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+ .tint-lbl{font-size:11px;margin-top:3px;color:var(--ink-2)}
+ #tintBtn{font-size:16px}
+ @media (max-width:760px){.tint-pop{right:6px;left:6px;max-width:none}}`;
  document.head.appendChild(st);
 })();
 
