@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.9.6';
+const APP_VER='0.9.7';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3701,7 +3701,7 @@ async function syncTpl(man){
   const one=async k=>{ const bj=await fetch(PROD_GAS+'?action=smartBucket&tool='+t+'&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json());
    const rows=(bj.data&&bj.data.records)||bj.records; if(!Array.isArray(rows))throw new Error(t+' '+k+'：'+(bj.error||(bj.data&&bj.data.error)||'沒有資料'));
    c.b[k]=rows.map(T.slim).filter(Boolean); c.h[k]=H[k]; changed=true; CHAIN.prog.done++; const el=document.getElementById('chainProg'); if(el)el.textContent=CHAIN.prog.done+'/'+CHAIN.prog.total };
-  for(let i=0;i<todo.length;i+=4)await Promise.all(todo.slice(i,i+4).map(k=>one(k).catch(e=>one(k))));   /* 一個桶失敗就再試一次 */
+  for(let i=0;i<todo.length;i+=3)await Promise.all(todo.slice(i,i+3).map(k=>one(k).catch(e=>one(k))));   /* 一個桶失敗就再試一次 */
   Object.keys(c.b).forEach(k=>{ if(!H[k]||!want.includes(k)){delete c.b[k];delete c.h[k];changed=true} });
   c.updatedAt=d.updatedAt||''; CHAIN.up[t]=c.updatedAt;
   if(changed){c.savedAt=nowStamp(); try{await IDB.set(CK(t),c)}catch(e){}}
@@ -3710,7 +3710,7 @@ async function syncTpl(man){
  let RAW={};
  window.loadChain=async function(force){
   if(CHAIN.busy||isDemo())return; if(CHAIN.loaded&&!force)return; CHAIN.busy=true; CHAIN.prog={done:0,total:0}; CHAIN.err='';
-  try{ for(const t of ['smv','sewing','cutting','qc']){ try{RAW[t]=await loadTool(t)}catch(e){ CHAIN.err=(CHAIN.err?CHAIN.err+'；':'')+t+'：'+(e.message||e); try{const c=await IDB.get(CK(t)); if(c&&c.b)RAW[t]=c}catch(_){} } }
+  try{ await Promise.all(['smv','sewing','cutting','qc'].map(async t=>{ try{RAW[t]=await loadTool(t)}catch(e){ CHAIN.err=(CHAIN.err?CHAIN.err+'；':'')+t+'：'+(e.message||e); try{const c=await IDB.get(CK(t)); if(c&&c.b)RAW[t]=c}catch(_){} } }));   /* 四種日報同時讀，第一次約快 3 倍 */
    buildIdx(); CHAIN.loaded=true; CHAIN.at=nowStamp();
   }finally{ CHAIN.busy=false; GC.delete('ordv'); GC.delete('ocrows'); try{COSTC.clear()}catch(e){} if(['ordercenter','dashboard','orders','exceptions','costing'].includes(CUR))rerender() }
  };
@@ -3740,9 +3740,12 @@ async function syncTpl(man){
   for(const c of cands){ const k=ks(c); for(let n=k.length-1;n>=4;n--){ if(IX.smv.has(k.slice(0,n)))return IX.smv.get(k.slice(0,n)) } }   /* A318-W-SP-CHP → A318 */
   return null };
  /* 一張訂單（款＋PO）在日報裡的量：先用 PO 號（客戶 PO／訂單編號／自編單號）找，再用款號篩 */
- function poHit(map,o){ for(const p of [o.po_no,o.od_no,o.my_no]){ const k=keyN(p); if(k&&map.has(k))return {key:k,e:map.get(k)} } return null }
+ const GENERIC_PO=/^(SAMPLES?|STOCK|TBA|TBC|NA|N\/A|-|0|NONE)$/;
+ function poHit(map,o){ for(const p of [o.po_no,o.od_no,o.my_no]){ const k=keyN(p); if(k&&!GENERIC_PO.test(k)&&map.has(k))return {key:k,e:map.get(k)} } return null }
  function styHit(e,o){ const E=[ks(o.style)].concat(String(o.style_name||'').split(/[\s,/=()]+/).filter(t=>/\d/.test(t)&&t.length>=4).map(ks)).filter(Boolean);
   const hit=[...e.sty.entries()].filter(([s])=>E.some(x=>styleHit(s,x))); if(hit.length)return {list:hit.map(h=>h[1]),how:'style'};
+  /* 同一張 PO 裡，用款號中的數字段對（GL335 ↔ GSPC335LSWH、GH393 ↔ GPPC393WH）；只在對到 1–2 款時採用 */
+  const dg=x=>x.match(/\d{3,}/g)||[]; const ed=new Set(E.flatMap(dg)); if(ed.size){ const dh=[...e.sty.entries()].filter(([s])=>dg(s).some(d=>ed.has(d))); if(dh.length&&dh.length<=2)return {list:dh.map(h=>h[1]),how:'digits'} }
   if(e.sty.size===1)return {list:[...e.sty.values()],how:'po_only'}; return null }
  function agg(list){ const r={pcs:0,yds:0,first:'',last:'',lines:new Set(),rows:[]}; list.forEach(x=>{r.pcs+=x.pcs;r.yds+=x.yds||0;x.lines.forEach(l=>r.lines.add(l));if(x.first&&(!r.first||x.first<r.first))r.first=x.first;if(x.last>r.last)r.last=x.last;r.rows=r.rows.concat(x.rows)}); return r }
  window.chainFor=function(o,share){
@@ -3787,7 +3790,7 @@ async function syncTpl(man){
   h+=line('✂️',L('裁剪','Cutting'),srcChip('email','Cutting report'),cr&&!cr.none?bar(cr.pcs,q):cr&&cr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(cr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:`<span class="muted">${L('裁剪日報沒有這張 PO','not in cutting reports')}</span>`,q,[cr&&!cr.none?`${esc(cr.first)} → ${esc(cr.last)}${cr.yds?` · ${fmt(cr.yds,0)} ${L('碼','yds')}`:''}${cr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${cr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}`:'',erpCut?`ERP ${L('裁剪 ','cut ')}${fmt(erpCut)}`:''].filter(Boolean).join(' · '));
   /* 5 車縫 */
   const sr=g&&g.sewr;
-  h+=line('🪡',L('車縫','Sewing'),srcChip('email','Sewing report'),sr&&!sr.none?bar(sr.pcs,q):sr&&sr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(sr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:`<span class="muted">${L('車縫日報沒有這張 PO','not in sewing reports')}</span>`,q,sr&&!sr.none?`${esc(sr.first)} → ${esc(sr.last)} · ${esc(sr.lines.slice(0,6).join('、'))}${sr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${sr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}`:'');
+  h+=line('🪡',L('車縫','Sewing'),srcChip('email','Sewing report'),sr&&!sr.none?bar(sr.pcs,q):sr&&sr.none?`<span class="muted">${L('日報有這張 PO（共 ','PO in report (')}${fmt(sr.poTotal)}${L(' 件），但款號不同',' pcs), different style')}</span>`:`<span class="muted">${L('車縫日報沒有這張 PO','not in sewing reports')}</span>`,q,sr&&!sr.none?`${esc(sr.first)} → ${esc(sr.last)} · ${esc(sr.lines.slice(0,6).join('、'))}${sr.alloc?' · '+L('依訂單量分攤','allocated by qty'):''}${sr.how==='po_only'?' · '+L('PO 只有一款，直接採用','single-style PO'):''}${sr.how==='digits'?' · '+L('款號數字段相同','matched by style number'):''}`:'');
   /* 6 QC */
   const qr=g&&g.qcr;
   h+=line('✅','Final QC',srcChip('tg'),qr?`<span>${L('檢驗 ','inspected ')}<b>${fmt(qr.ins)}</b> · ${L('退修 ','rejected ')}<b>${fmt(qr.rej)}</b>${qr.ins?` · ${L('不良率 ','defect ')}${fmt(qr.rej/qr.ins*100,1)}%`:''}</span>`:`<span class="muted">${L('QC 報告沒有這張 PO','no QC record')}</span>`,0,qr?`${esc(qr.first)} → ${esc(qr.last)} · ${qr.n} ${L('份報告','reports')}`:'');
