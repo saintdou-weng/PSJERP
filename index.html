@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='0.8.0';
+const APP_VER='0.9.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3241,6 +3241,204 @@ async function syncTpl(man){
 
  /* 側欄底部的「生產平台 ↗」改成入口頁（嵌入版） */
  const pl=document.getElementById('prodLinks'); if(pl){const a=pl.querySelector('a[href*="portal_v2"]'); if(a){a.href='#p-portal';a.removeAttribute('target')}}
+})();
+
+
+/* ---------- v0.9.0 (2026-10-28)：大資料集「用到才載入」＋ 🧭 訂單中心（第一版）＋ 淺色頂列 ----------
+   A. 效能：以前整個資料庫（含 32 萬列領料、32 萬列 BOM…）是一包 JSON，一開頁全部載進記憶體，主電腦卡 2 分鐘以上。
+      現在 BOM／領料／採購／採購單價／進貨驗收／進耗存／應付明細，以及各種庫存快照，各自存一份（IndexedDB 另一把鍵），
+      進到用得到的頁面才載入；存檔時也只寫有改動的那一份。第一次開啟會自動把舊格式拆開（只做一次）。
+   B. 🧭 訂單中心：一列一款／PO。ERP 訂單（W_COD700／690）是主檔與正式數字；客戶 PO（生產平台從 PDF 解析、存在生產雲端）
+      只做核對；出貨（W_CBL300）、INVOICE（W_CBL140）、成品入庫（W_CST580）往主檔上掛。對不上的列在「待對照」。
+      生產平台的訂單資料用 smartManifest 的 hash 比對，只拉有變的桶，存在本機（IndexedDB）不重抓。
+   C. 頂列改淺色（Paul 10/28：別太暗）。 */
+(function(){
+ /* ══════════ A. 用到才載入 ══════════ */
+ const LAZY=['bom','issues','purchase','price','receiving','stockmove','payables','fabsnaps','accsnaps','fgsnaps','apsnaps'];
+ const isObj=k=>/snaps$/.test(k);
+ const emptyOf=k=>isObj(k)?{}:[];
+ const LKEY=k=>dbKey()+'#'+k;
+ const LOADED=new Set(), DIRTY=new Set();
+ window.DS_LAZY={LAZY,LOADED,DIRTY};
+ window.dsLoaded=k=>!LAZY.includes(k)||LOADED.has(k);
+ const sizeOf=k=>{const v=DB[k];return isObj(k)?Object.keys(v||{}).length:(v||[]).length};
+ window.ensureDS=async function(keys){
+  keys=(Array.isArray(keys)?keys:[keys]).filter(k=>LAZY.includes(k)&&!LOADED.has(k)); if(!keys.length)return false;
+  for(const k of keys){
+   let v=null; try{v=await IDB.get(LKEY(k))}catch(e){v=null}
+   if(v==null)v=emptyOf(k); DB[k]=v; LOADED.add(k);
+   const pd=(DB._pdrops||{})[k];   /* 之前在沒載入時被作廢的批次，現在補刪 */
+   if(pd&&pd.length&&!isObj(k)){const set=new Set(pd);const b=DB[k].length;DB[k]=DB[k].filter(x=>!set.has(x.import_key));if(DB[k].length!==b)DIRTY.add(k);delete DB._pdrops[k]}
+  }
+  GC.clear(); COSTC.clear(); try{updateDataRange()}catch(e){} return true;
+ };
+ window.markDS=k=>{if(LAZY.includes(k))DIRTY.add(k)};
+
+ const _loadDB=loadDB;
+ loadDB=async function(){
+  LOADED.clear(); DIRTY.clear();
+  await _loadDB();
+  if(isDemo()){LAZY.forEach(k=>LOADED.add(k));return}
+  if(!DB._lazyv){   /* 一次性：把舊的大包拆開 */
+   for(const k of LAZY){ if(sizeOf(k)){ try{await IDB.set(LKEY(k),DB[k])}catch(e){console.error('split',k,e)} } DB[k]=emptyOf(k) }
+   DB._lazyv=1; try{await IDB.set(dbKey(),DB)}catch(e){}
+  } else { for(const k of LAZY)DB[k]=emptyOf(k) }
+  try{updateDataRange()}catch(e){}
+ };
+ persist=function(){clearTimeout(persistT);persistT=setTimeout(async()=>{HOL=null;let ok=true;
+  if(isDemo()||!DB._lazyv){ok=await IDB.set(dbKey(),DB)}
+  else{ const main=Object.assign({},DB); LAZY.forEach(k=>{main[k]=emptyOf(k)}); ok=await IDB.set(dbKey(),main);
+   for(const k of [...DIRTY]){ if(!LOADED.has(k))continue; const o=await IDB.set(LKEY(k),DB[k]); if(o)DIRTY.delete(k); else ok=false } }
+  if(!ok&&SAVE_OK){SAVE_OK=false;toast(tt('瀏覽器無法儲存資料（可能是無痕模式），關閉後會遺失','This browser cannot save data (private mode?) — it will be lost on close'))}},400)};
+
+ const dsOfRep=rep=>[REP_DS[rep],SNAPREP[rep]&&SNAPREP[rep][1]].filter(Boolean);
+ const _storeBatch=storeBatch;
+ storeBatch=function(rep,key,meta,recs){ const ds=dsOfRep(rep); const miss=ds.filter(k=>LAZY.includes(k)&&!LOADED.has(k)); if(miss.length)throw new Error('資料集尚未載入：'+miss.join(',')+'（請重新整理後再匯入）'); const r=_storeBatch(rep,key,meta,recs); ds.forEach(k=>DIRTY.add(k)); return r };
+ const _dropLocalBatch=dropLocalBatch;
+ dropLocalBatch=function(f){ const ds=REP_DS[f.rep]; if(ds&&LAZY.includes(ds)&&!LOADED.has(ds)&&!SNAPREP[f.rep]){ DB._pdrops=DB._pdrops||{}; (DB._pdrops[ds]=DB._pdrops[ds]||[]).push(f.key); DB.erpfiles=(DB.erpfiles||[]).filter(x=>x.key!==f.key); return 0 } const n=_dropLocalBatch(f); dsOfRep(f.rep).forEach(k=>DIRTY.add(k)); return n };
+ const _pullBatch=pullBatch; pullBatch=async function(m){ await ensureDS(dsOfRep(m.rep)); return _pullBatch(m) };
+ const _pushBatch=pushBatch; pushBatch=async function(f){ await ensureDS(dsOfRep(f.rep)); return _pushBatch(f) };
+ const _confirmERPAll=confirmERPAll;
+ confirmERPAll=async function(){ const need=new Set(); IMPQ.filter(q=>q.P&&!q.done&&!q.skip).forEach(q=>{const rep=(q.R&&q.R.k)||(q.P&&q.P.rep); dsOfRep(rep).forEach(k=>need.add(k))}); await ensureDS([...need]); return _confirmERPAll() };
+ const PAGE_DS={bom:['bom'],purchase:['purchase'],pprice:['price'],receiving:['receiving'],stockmove:['stockmove'],payables:['payables'],issues:['issues'],fabric:['fabsnaps'],accessories:['accsnaps'],fgstock:['fgsnaps'],apsum:['apsnaps'],costing:['bom','price','purchase'],compare:LAZY,exceptions:['bom'],reports:['bom','price']};
+ const _route9=route;
+ route=function(){ let h=decodeURIComponent((location.hash||'#dashboard').slice(1)); if(h.startsWith('solo-'))h=h.slice(5);
+  const need=(PAGE_DS[h]||[]).filter(k=>!dsLoaded(k)); if(!need.length)return _route9();
+  $('#page').innerHTML=`<div class="note">⏳ ${tt('載入資料…','Loading data…')}</div>`; ensureDS(need).then(()=>_route9()) };
+ const _audit=audit; audit=function(module){ (PAGE_DS[module]||[]).forEach(k=>DIRTY.add(k)); return _audit.apply(this,arguments) };
+
+ /* ══════════ B. 生產平台訂單（客戶 PO）快取 ══════════ */
+ const PC_KEY='prodcache#orders'; window.PRODORD=null; let poBusy=false;
+ const digits=s=>String(s||'').replace(/\D+/g,'');
+ const skey=s=>keyN(s).replace(/[^A-Z0-9]+/g,'');
+ window.loadProdOrders=async function(force){
+  if(poBusy)return PRODORD; if(PRODORD&&!PRODORD.err&&!force)return PRODORD; poBusy=true;
+  let cache=null; try{cache=await IDB.get(PC_KEY)}catch(e){}
+  try{
+   const m=await fetch(PROD_GAS+'?action=smartManifest&tool=orders&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const d=m.data||m; const H=d.hashes||{};
+   cache=cache&&cache.buckets?cache:{hashes:{},buckets:{}}; let changed=false;
+   for(const k of Object.keys(H)){ if(cache.hashes[k]===H[k]&&cache.buckets[k])continue;
+    const bj=await fetch(PROD_GAS+'?action=smartBucket&tool=orders&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json());
+    const rows=(bj.data&&bj.data.records)||bj.records||[]; cache.buckets[k]=rows; cache.hashes[k]=H[k]; changed=true }
+   for(const k of Object.keys(cache.buckets)){ if(!H[k]){delete cache.buckets[k];delete cache.hashes[k];changed=true} }
+   cache.updatedAt=d.updatedAt||''; cache.recordCount=d.recordCount||0; cache.at=nowStamp();
+   if(changed||!cache.savedAt){cache.savedAt=nowStamp(); try{await IDB.set(PC_KEY,cache)}catch(e){}}
+   PRODORD=indexProd(cache);
+  }catch(e){ PRODORD=cache&&cache.buckets?Object.assign(indexProd(cache),{err:String(e&&e.message||e)}):{err:String(e&&e.message||e),headers:[],lines:[],byPo:new Map(),hdrByPo:new Map()} }
+  finally{poBusy=false; GC.delete('ocrows'); if(CUR==='ordercenter'||CUR==='dashboard')rerender()}
+  return PRODORD;
+ };
+ function indexProd(c){
+  const headers=[],lines=[],weekly=[];
+  Object.values(c.buckets||{}).forEach(rows=>(rows||[]).forEach(r=>{const ent=r._vrtEntity;const v=r._vrtValue||r;if(ent==='orders.header')headers.push(v);else if(ent==='orders.weekly')weekly.push(v);else if(!ent&&(v.po_number||v.style_code||v.sku))lines.push(v)}));
+  const byPo=new Map(), hdrByPo=new Map();
+  lines.forEach(l=>{const k=keyN(l.po_number);if(!k)return;(byPo.get(k)||byPo.set(k,[]).get(k)).push(l)});
+  headers.forEach(h=>{const k=keyN(h.po_number);if(!k)return;(hdrByPo.get(k)||hdrByPo.set(k,[]).get(k)).push(h)});
+  const byDigits=new Map(); byPo.forEach((v,k)=>{const dk=digits(k);if(dk&&dk.length>=4){if(byDigits.has(dk))byDigits.set(dk,null);else byDigits.set(dk,k)}});
+  return {headers,lines,weekly,byPo,hdrByPo,byDigits,updatedAt:c.updatedAt||'',at:c.at||'',recordCount:c.recordCount||0};
+ }
+ window.prodPoFor=function(po){ if(!PRODORD||!PRODORD.byPo)return null; const k=keyN(po); if(!k)return null; if(PRODORD.byPo.has(k))return {key:k,lines:PRODORD.byPo.get(k),hdrs:PRODORD.hdrByPo.get(k)||[]}; const dk=digits(k); const alt=dk&&dk.length>=4?PRODORD.byDigits.get(dk):null; if(alt)return {key:alt,lines:PRODORD.byPo.get(alt),hdrs:PRODORD.hdrByPo.get(alt)||[],fuzzy:true}; return null };
+
+ /* ══════════ B. 🧭 訂單中心 ══════════ */
+ Object.assign(T,{
+  ordercenter:['訂單中心','Order center','មជ្ឈមណ្ឌលបញ្ជាទិញ'],
+  sub_ordercenter:['一列一款／PO。ERP 訂單（W_COD700／690）是正式數字；客戶 PO（PDF，生產平台解析）只做核對；出貨、INVOICE、成品入庫往同一列掛。對不上的在最下面「待對照」。','One row per style / PO. ERP orders are the official numbers; customer POs (PDF, parsed by the production platform) are cross-checks; shipping, invoices and FG receipts hang on the same row. Unmatched items are listed under “To reconcile”.'],
+ });
+ const OCI=MODS.findIndex(m=>m[0]==='orders'); MODS.splice(OCI<0?0:OCI,0,['ordercenter','🧭','g_order','prod']);
+ const OC_DEF={q:'',cust:'',st:'',yr:'',chk:'',sort:'delivery',page:0,per:100};
+ const OC=Object.assign({},OC_DEF,LS.get('psjerp_oc',{})); window.OC=OC;
+ window.ocSet=function(k,v){OC[k]=v;if(k!=='page')OC.page=0;LS.set('psjerp_oc',OC);rerender()};
+ const PO_ST={ok:['good',['相符','matches']],diff:['warn',['有差異','differs']],nostyle:['warn',['PO 有、款對不上','PO found, style not matched']],missing:['neu',['缺客戶 PO 檔','no customer PO file']],none:['neu',['— ','—']],loading:['neu',['讀取中','loading']]};
+ const stChip2=(cls,txt)=>`<span class="st ${cls}">${esc(txt)}</span>`;
+ const poChip=s=>{const x=PO_ST[s]||PO_ST.none;return stChip2(x[0],LANG===0?x[1][0]:x[1][1])};
+ const OST={open:['info',['未結','open']],late:['crit',['逾期','late']],closed:['good',['已結','closed']]};
+ const ostChip=s=>{const x=OST[s]||OST.open;return stChip2(x[0],LANG===0?x[1][0]:x[1][1])};
+ const d10=v=>String(v||'').slice(0,10);
+ function ocRows(){
+  if(GC.has('ocrows'))return GC.get('ocrows');
+  const ov=ordersView(); const G=new Map();
+  ov.forEach(o=>{ const k=keyN(o.my_no)+'|'+keyN(o.po_no)+'|'+keyN(o.style); let g=G.get(k);
+   if(!g){g={k,id:o.id,my_no:o.my_no,od_no:o.od_no,po_no:o.po_no,cust:o.cust,style:o.style,style_name:o.style_name||'',order_date:o.order_date||'',delivery:o.delivery||'',closed_date:o.closed_date||'',qty:0,ship_qty:0,open_qty:0,amount:0,fg_qty:0,cut_qty:0,price:0,colors:new Set(),lines:0,status:'closed',ids:[]};G.set(k,g)}
+   g.lines++; g.ids.push(o.id); g.qty+=+o.qty||0; g.ship_qty+=+o.ship_qty||0; g.open_qty+=+o.open_qty||0; g.amount+=+o.amount||0; g.fg_qty+=+o.fg_qty||0; g.cut_qty+=+o.cut_qty||0; if(o.clr)g.colors.add(o.clr); if(!g.price&&o.price)g.price=o.price;
+   if(o.order_date&&(!g.order_date||o.order_date<g.order_date))g.order_date=o.order_date; if(o.delivery&&(!g.delivery||o.delivery>g.delivery))g.delivery=o.delivery;
+   const st=o.status||'open'; if(st==='late')g.status='late'; else if(st==='open'&&g.status!=='late')g.status='open';
+   if(!o.closed_date)g.closed_date='' });
+  /* 出貨 W_CBL300 */
+  const SH=new Map(), SH2=new Map(); live(DB.shipping||[]).forEach(s=>{const a=ordKey(s.my_no,s.po_no);const x=SH.get(a)||{qty:0,last:'',n:0};x.qty+=+s.qty||0;x.n++;if(d10(s.ship_date)>x.last)x.last=d10(s.ship_date);SH.set(a,x);const b=keyN(s.my_no);const y=SH2.get(b)||{qty:0,last:'',n:0};y.qty+=+s.qty||0;y.n++;if(d10(s.ship_date)>y.last)y.last=d10(s.ship_date);SH2.set(b,y)});
+  /* INVOICE W_CBL140 */
+  const IV=new Map(), IV2=new Map(); live(DB.invoices||[]).forEach(v=>{const add=(m,key)=>{if(!key)return;const x=m.get(key)||{qty:0,amount:0,inv:new Set(),last:''};x.qty+=+v.qty||0;x.amount+=+v.amount||0;if(v.invoice)x.inv.add(v.invoice);if(d10(v.inv_date)>x.last)x.last=d10(v.inv_date);m.set(key,x)};add(IV,keyN(v.po_no)+'|'+keyN(v.style));add(IV2,keyN(v.po_no))});
+  const rows=[...G.values()].map(g=>{
+   g.colors=[...g.colors]; const sh=SH.get(ordKey(g.my_no,g.po_no))||null; g.ship={qty:sh?sh.qty:g.ship_qty,last:sh?sh.last:'',n:sh?sh.n:0,src:sh?'cbl300':'cod700'};
+   const iv=IV.get(keyN(g.po_no)+'|'+keyN(g.style))||IV2.get(keyN(g.po_no))||null; g.inv=iv?{qty:iv.qty,amount:iv.amount,n:iv.inv.size,last:iv.last}:null;
+   /* 客戶 PO（生產平台） */
+   if(!PRODORD){g.po={state:'loading'}}
+   else{const P=prodPoFor(g.po_no); if(!P)g.po={state:'missing'};
+    else{const sk=skey(g.style); const L=P.lines.filter(l=>skey(l.style_code||l.sku)===sk||(sk&&skey(l.style_code||l.sku).startsWith(sk))); const q=L.reduce((s,l)=>s+(+l.qty||0),0); const tot=P.lines.reduce((s,l)=>s+(+l.qty||0),0);
+     const h=P.hdrs[0]||{}; const revs=P.hdrs.length; const price=L.find(l=>+l.unit_price>0); const sd=L.map(l=>d10(l.ship_date||l.cancel_date)).filter(Boolean).sort();
+     g.po={state:L.length?(q===g.qty?'ok':'diff'):'nostyle',qty:L.length?q:tot,lines:L.length,total:tot,customer:h.customer||(L[0]&&L[0].customer)||'',order_date:d10(h.order_date||(L[0]&&L[0].order_date)),required:d10(h.required_date)||sd[sd.length-1]||'',revision:h.revision||null,revs,price:price?+price.unit_price:null,file:h.source_file||(L[0]&&L[0].source_file)||'',fuzzy:!!P.fuzzy,key:P.key}}}
+   return g });
+  GC.set('ocrows',rows); return rows;
+ }
+ function ocUnmatched(rows){ if(!PRODORD||!PRODORD.hdrByPo)return []; const used=new Set(rows.filter(r=>r.po&&r.po.key).map(r=>r.po.key)); const out=[]; PRODORD.hdrByPo.forEach((hs,k)=>{if(used.has(k))return;const h=hs[0];const L=PRODORD.byPo.get(k)||[];out.push({po:h.po_number,customer:h.customer,order_date:d10(h.order_date),required:d10(h.required_date),qty:L.reduce((s,l)=>s+(+l.qty||0),0),lines:L.length,file:h.source_file||''})}); return out.sort((a,b)=>String(b.order_date).localeCompare(String(a.order_date))) }
+ const ocOpt=(v,l,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(l)}</option>`;
+ function renderOrderCenter(){
+  const k='ordercenter';
+  let h=pageHead(k,`<button class="btn sm" onclick="loadProdOrders(true);toast('${tt('重新讀取客戶 PO','Reloading customer POs')}')">↻ ${tt('客戶 PO','Customer POs')}</button><button class="btn sm" onclick="exportOC()">${esc(t('export'))}</button>`);
+  if(!PRODORD)setTimeout(()=>loadProdOrders(false),30);
+  const all=ocRows();
+  if(!all.length){h+=needHTML('orders');return h}
+  /* 資料時間 */
+  const fr=(reps)=>{const F=(DB.erpfiles||[]).filter(f=>reps.includes(f.rep));let u='';F.forEach(f=>{const x=(f.range&&f.range[1])||f.asof||(f.year?f.year+'-12-31':'');if(x>u)u=String(x).slice(0,10)});return u};
+  h+=`<div class="fresh"><div class="fc">${srcChip('erp')}<span>${tt('訂單到 ','orders to ')}<b>${esc(fr(['cod700','cod690'])||'—')}</b> · ${tt('出貨到 ','shipping to ')}<b>${esc(fr(['cbl300'])||'—')}</b> · INVOICE <b>${esc(fr(['cbl140'])||'—')}</b> · ${tt('入庫到 ','FG to ')}<b>${esc(fr(['cst580'])||'—')}</b></span></div>
+   <div class="fc">${srcChip('email',tt('客戶 PO','customer PO'))}<span>${!PRODORD?tt('讀取生產平台…','loading production cloud…'):PRODORD.err&&!PRODORD.headers.length?tt('生產平台雲端沒回應','production cloud not responding'):`${fmt(PRODORD.hdrByPo.size)} ${tt('張 PO','POs')} · ${fmt(PRODORD.lines.length)} ${tt('行','lines')} · ${tt('同步 ','synced ')}${esc(String(PRODORD.updatedAt).replace('T',' ').slice(0,16))}`}</span></div></div>`;
+  /* 過濾 */
+  const custs=[...new Set(all.map(r=>r.cust).filter(Boolean))].sort(); const yrs=[...new Set(all.map(r=>String(r.order_date).slice(0,4)).filter(Boolean))].sort().reverse();
+  h+=`<div class="panel oc-filters"><input class="inp" id="ocq" value="${esc(OC.q)}" placeholder="${tt('搜尋 PO／款號／自編單號／客戶','Search PO / style / order no / customer')}" oninput="clearTimeout(window._ocT);window._ocT=setTimeout(()=>ocSet('q',this.value.trim()),250)">
+   <select class="inp" onchange="ocSet('cust',this.value)">${ocOpt('',tt('全部客戶','All customers'),OC.cust)}${custs.map(c=>ocOpt(c,c,OC.cust)).join('')}</select>
+   <select class="inp" onchange="ocSet('st',this.value)">${ocOpt('',tt('全部狀態','All status'),OC.st)}${ocOpt('open',tt('未結','Open'),OC.st)}${ocOpt('late',tt('逾期','Late'),OC.st)}${ocOpt('closed',tt('已結','Closed'),OC.st)}</select>
+   <select class="inp" onchange="ocSet('yr',this.value)">${ocOpt('',tt('全部年份','All years'),OC.yr)}${yrs.map(y=>ocOpt(y,y,OC.yr)).join('')}</select>
+   <select class="inp" onchange="ocSet('chk',this.value)">${ocOpt('',tt('客戶 PO：全部','PO check: all'),OC.chk)}${ocOpt('ok',tt('相符','matches'),OC.chk)}${ocOpt('diff',tt('有差異','differs'),OC.chk)}${ocOpt('nostyle',tt('款對不上','style not matched'),OC.chk)}${ocOpt('missing',tt('缺客戶 PO 檔','no PO file'),OC.chk)}</select>
+   <select class="inp" onchange="ocSet('sort',this.value)">${ocOpt('delivery',tt('交期 新→舊','Delivery, newest'),OC.sort)}${ocOpt('order_date',tt('訂單日 新→舊','Order date, newest'),OC.sort)}${ocOpt('cust',tt('客戶','Customer'),OC.sort)}${ocOpt('style',tt('款號','Style'),OC.sort)}${ocOpt('open',tt('未交量 多→少','Open qty, most'),OC.sort)}</select></div>`;
+  const q=keyN(OC.q);
+  let rows=all.filter(r=>(!OC.cust||r.cust===OC.cust)&&(!OC.st||r.status===OC.st)&&(!OC.yr||String(r.order_date).startsWith(OC.yr))&&(!OC.chk||(r.po&&r.po.state===OC.chk))&&(!q||[r.po_no,r.style,r.my_no,r.od_no,r.cust,r.style_name].some(v=>keyN(v).includes(q))));
+  const sorters={delivery:(a,b)=>String(b.delivery).localeCompare(String(a.delivery))||String(b.order_date).localeCompare(String(a.order_date)),order_date:(a,b)=>String(b.order_date).localeCompare(String(a.order_date)),cust:(a,b)=>String(a.cust).localeCompare(String(b.cust))||String(b.delivery).localeCompare(String(a.delivery)),style:(a,b)=>String(a.style).localeCompare(String(b.style)),open:(a,b)=>(b.open_qty-a.open_qty)};
+  rows.sort(sorters[OC.sort]||sorters.delivery);
+  const tq=sum(rows,'qty'),ts=sum(rows,r=>r.ship.qty),tf=sum(rows,'fg_qty'),to=sum(rows,'open_qty'); const late=rows.filter(r=>r.status==='late').length; const pod=rows.filter(r=>r.po&&r.po.state==='diff').length, pom=rows.filter(r=>r.po&&r.po.state==='missing').length;
+  h+=`<div class="kpis" style="margin:12px 0">${kpi(tt('款／PO','Style / PO'),fmt(rows.length),'',late?tt('逾期 ','late ')+late:'',late?'warn':'')}${kpi(tt('訂單量','Order qty'),fmt(tq),'',srcChip('erp'))}${kpi(tt('已入庫','FG received'),fmt(tf),'',tq?Math.round(tf/tq*100)+'%':'')}${kpi(tt('已出貨','Shipped'),fmt(ts),'',tq?Math.round(ts/tq*100)+'%':'')}${kpi(tt('未交','Open'),fmt(to),'',to?'':tt('全部出完','all shipped'),to?'warn':'good')}${kpi(tt('客戶 PO 核對','PO check'),PRODORD?fmt(pod+pom):'…','',PRODORD?(pod?tt('有差異 ','differs ')+pod+' · ':'')+(pom?tt('缺檔 ','missing ')+pom:''):tt('讀取中','loading'),(pod||pom)?'warn':'good')}</div>`;
+  const per=OC.per||100, pages=Math.max(1,Math.ceil(rows.length/per)); if(OC.page>=pages)OC.page=pages-1; const pg=rows.slice(OC.page*per,(OC.page+1)*per);
+  const L=(z,e)=>LANG===0?z:e; const dot=s=>`<span class="ocdot ${s}" title="${esc(srcName_(s))}"></span>`;
+  h+=`<div class="tbl-wrap"><table class="t cards oc"><thead><tr><th>${L('客戶','Customer')}</th><th>${L('款號','Style')}</th><th>PO</th><th>${L('訂單日','Order')}</th><th>${L('交期','Delivery')}</th><th class="r">${dot('erp')}${L('訂單量','Order qty')}</th><th class="r">${dot('email')}${L('客戶 PO','Cust. PO')}</th><th class="r">${dot('erp')}${L('已裁','Cut')}</th><th class="r">${dot('manual')}${L('已縫','Sewn')}</th><th class="r">${dot('erp')}${L('入庫','FG')}</th><th class="r">${dot('erp')}${L('出貨','Shipped')}</th><th class="r">${dot('erp')}INVOICE</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
+  pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-r.qty)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
+   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cut_qty?fmt(r.cut_qty):'—'}</td><td class="r num muted" data-l="${L('已縫','Sewn')}">—</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
+  h+=`</tbody></table></div>`;
+  if(pages>1)h+=`<div class="oc-pages"><button class="btn sm" ${OC.page?'':'disabled'} onclick="ocSet('page',${OC.page-1})">◀</button><span class="small">${OC.page+1} / ${pages} · ${fmt(rows.length)} ${L('列','rows')}</span><button class="btn sm" ${OC.page<pages-1?'':'disabled'} onclick="ocSet('page',${OC.page+1})">▶</button></div>`;
+  /* 待對照 */
+  const un=ocUnmatched(all); const miss=all.filter(r=>r.po&&r.po.state==='missing'&&r.status!=='closed').sort((a,b)=>String(b.order_date).localeCompare(String(a.order_date)));
+  h+=`<div class="panel mt"><h2>🔎 ${L('待對照','To reconcile')}</h2><p class="hint">${L('左：ERP 有單但找不到客戶 PO 檔（未結案的）。右：客戶 PO 已收到但 ERP 還沒建單。鍵只對不猜：PO 號對不上就列在這裡，不會硬配。','Left: ERP orders (open) with no customer PO file. Right: customer POs received but not yet in the ERP. Keys are matched, never guessed.')}</p>
+   <div class="grid2"><div><h3>${srcChip('erp')} ${L('缺客戶 PO 檔','No customer PO file')} <span class="small muted">${fmt(miss.length)}</span></h3>${miss.length?`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('客戶','Cust')}</th><th>PO</th><th>${L('款號','Style')}</th><th>${L('訂單日','Order')}</th><th class="r">${L('訂單量','Qty')}</th></tr></thead><tbody>${miss.slice(0,40).map(r=>`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Cust')}">${esc(r.cust)}</td><td data-l="PO" class="mono">${esc(r.po_no)}</td><td data-l="${L('款號','Style')}" class="mono">${esc(r.style)}</td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date)}</td><td data-l="${L('訂單量','Qty')}" class="r num">${fmt(r.qty)}</td></tr>`).join('')}</tbody></table></div>${miss.length>40?`<div class="small muted">+${miss.length-40}</div>`:''}`:`<div class="small muted">${PRODORD?L('沒有','none'):L('讀取中','loading')}</div>`}</div>
+   <div><h3>${srcChip('email')} ${L('客戶 PO 已收、ERP 未建單','PO received, not in ERP')} <span class="small muted">${fmt(un.length)}</span></h3>${un.length?`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('客戶','Cust')}</th><th>PO</th><th>${L('PO 日期','PO date')}</th><th>${L('客戶交期','Required')}</th><th class="r">${L('數量','Qty')}</th></tr></thead><tbody>${un.slice(0,40).map(u=>`<tr><td data-l="${L('客戶','Cust')}" class="small">${esc(u.customer)}</td><td data-l="PO" class="mono">${esc(u.po)}</td><td data-l="${L('PO 日期','PO date')}" class="mono small">${esc(u.order_date||'—')}</td><td data-l="${L('客戶交期','Required')}" class="mono small">${esc(u.required||'—')}</td><td data-l="${L('數量','Qty')}" class="r num">${fmt(u.qty)}</td></tr>`).join('')}</tbody></table></div>${un.length>40?`<div class="small muted">+${un.length-40}</div>`:''}`:`<div class="small muted">${PRODORD?L('沒有','none'):L('讀取中','loading')}</div>`}</div></div></div>`;
+  return h;
+ }
+ const srcName_=s=>({erp:'ERP',email:'Email',tg:'Telegram',manual:LANG===0?'手動／第 2 版':'manual / v2'})[s]||s;
+ RENDER.ordercenter=renderOrderCenter; window.ocRows=ocRows; window.ocUnmatched=ocUnmatched;
+ window.exportOC=function(){ const rows=ocRows(); const head=['客戶','款號','款名','PO','自編單號','訂單編號','訂單日','交期','訂單量(ERP)','客戶PO量','客戶PO核對','已裁','已入庫','已出貨','最近出貨日','未交','INVOICE件數','INVOICE金額','狀態']; const data=rows.map(r=>[r.cust,r.style,r.style_name,r.po_no,r.my_no,r.od_no,r.order_date,r.delivery,r.qty,r.po&&r.po.qty!=null?r.po.qty:'',r.po?(PO_ST[r.po.state]||PO_ST.none)[1][0]:'',r.cut_qty,r.fg_qty,r.ship.qty,r.ship.last,r.open_qty,r.inv?r.inv.qty:'',r.inv?r.inv.amount:'',(OST[r.status]||OST.open)[1][0]]); const name='VRT_訂單中心_'+nowStamp().replace(/[-: ]/g,'').slice(0,12);
+  if(!window.XLSX){showCSV(name+'.csv',[head].concat(data));return} try{const wb=XLSX.utils.book_new();const s=XLSX.utils.aoa_to_sheet([head].concat(data));s['!freeze']={xSplit:0,ySplit:1};XLSX.utils.book_append_sheet(wb,s,'訂單中心');XLSX.writeFile(wb,name+'.xlsx');toast(tt('已匯出 ','Exported ')+fmt(rows.length)+tt(' 列',' rows'))}catch(e){showCSV(name+'.csv',[head].concat(data))} };
+
+ /* ══════════ C. 樣式：淺色頂列、訂單中心 ══════════ */
+ const st=document.createElement('style'); st.textContent=`
+ .top{background:#FFFFFF!important;border-bottom:1px solid #E2E8F0!important;box-shadow:0 1px 2px rgba(15,23,42,.05)!important;color:#0F172A!important}
+ .top .user-chip{color:#334155!important}.top .avatar{background:#2563EB!important}
+ .top .search input{border-color:#CBD5E1!important}.top .search svg{stroke:#94A3B8!important}
+ .top-title{color:#0F172A!important}
+ .frame-bar{background:#F8FAFC;color:#0F172A;border-bottom:1px solid #E2E8F0}.frame-bar .icon-btn,.frame-bar a{color:#0F172A;background:#FFFFFF;border-color:#CBD5E1}
+ .oc-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px}.oc-filters .inp{width:auto;min-width:120px;flex:0 1 auto}.oc-filters #ocq{flex:1 1 220px;min-width:180px}
+ .ocdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}.ocdot.erp{background:#2563EB}.ocdot.email{background:#F97316}.ocdot.tg{background:#16A34A}.ocdot.manual{background:#CBD5E1}
+ .rowlink{cursor:pointer}.rowlink:hover td{background:var(--surface-2)}
+ .warn-t{color:var(--warn)}
+ .oc-pages{display:flex;gap:10px;align-items:center;justify-content:center;margin:10px 0}
+ table.t.oc td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+ @media (max-width:860px){.oc-filters .inp{flex:1 1 44%;min-width:0}.oc-filters #ocq{flex-basis:100%}}`;
+ document.head.appendChild(st);
 })();
 
 init();
