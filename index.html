@@ -2374,7 +2374,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.0.0';
+const APP_VER='1.0.1';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -3737,7 +3737,8 @@ async function syncTpl(man){
  window.smvSrcName=s=>{const x=SMV_SRC[s]||[s,s];return LANG===0?x[0]:x[1]};
  window.erpSmvMap=function(){ if(GC.has('erpsmv'))return GC.get('erpsmv'); const m=new Map(); live(DB.smv||[]).forEach(r=>{const k=ks(r.style); const v=+r.smv||+r.smv_prod||0; if(k&&v>0.01)m.set(k,{v,src:'erp',d:'',rank:0,style:r.style})}); GC.set('erpsmv',m); return m };
  window.smvFor=function(style,styleName){ const cands=[style].concat(String(styleName||'').split(/[\s,/=()]+/).filter(t=>/\d/.test(t)&&t.length>=4));
-  const EM=erpSmvMap(); if(EM.size){ for(const c of cands){ const k=ks(c); if(k&&EM.has(k))return EM.get(k) } }   /* ERP W_CBA190 款式 SMV 優先 */
+  if(IX){ for(const c of cands){ const k=ks(c); const x=k&&IX.smv.get(k); if(x&&x.src==='ie_upd')return x } }   /* Paul 10/29：IE 週報核准 SMV 第一 */
+  const EM=erpSmvMap(); if(EM.size){ for(const c of cands){ const k=ks(c); if(k&&EM.has(k))return EM.get(k) } }   /* 其次 ERP W_CBA190 款式 SMV */
   if(!IX)return null;
   for(const c of cands){ const k=ks(c); if(!k)continue; if(IX.smv.has(k))return IX.smv.get(k); }
   for(const c of cands){ const k=ks(c); const cc=core(k); if(cc.length>=4&&IX.smvCore.get(cc))return IX.smvCore.get(cc); }
