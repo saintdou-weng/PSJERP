@@ -22,7 +22,7 @@ const READ_KEY_DIRECT  = '';   // ← 唯讀密碼（給生產平台讀資料用
 const APP = {
   NAME: 'VRT ERP',
   TECH: 'PSJERP',
-  VERSION: '0.8.0',
+  VERSION: '0.9.0',
   PROD_PORTAL: 'https://saintdou-weng.github.io/vrt-prod/portal_v2.html',
   PROD_ERP_LINK: 'https://saintdou-weng.github.io/vrt-prod/vrt_erp_link_v1.html',
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbzyAaaKlMGdot9YtYAlBp-dktm2xRr_aHbOcQ-TNfouERMjuq4iCfRhCY0_3LsPa2mL/exec',
@@ -257,7 +257,7 @@ function doGet(e) {
   try { if (props_().getProperty('TRIGGER_VER') !== '0.7.5') installDailyTrigger_(); } catch (err) {}   // v0.7.5 自動換成週三 16:30 檢查
   let out;
   try {
-    if (/^erp_/.test(action)) out = erpApi_(Object.assign({}, e.parameter, {action: action}));
+    if (/^(erp_|img_(list|get)$)/.test(action)) out = erpApi_(Object.assign({}, e.parameter, {action: action}));
     else if (action === 'holidays') out = {ok:true, holidays: readSheet_('HOLIDAYS')};
     else if (action === 'synclog') out = {ok:true, rows: readSheet_('SYNC_LOG').slice(-60).reverse()};
     else if (action === 'settings') out = {ok:true, settings: readSheet_('SETTINGS').filter(r => !/TOKEN|CHAT|PASS|SECRET/i.test(String(r.KEY)))};
@@ -532,6 +532,8 @@ function dsSS_(name, need) {   // 目前可寫入的資料集試算表；快滿�
   }
   return ss;
 }
+function imgFolder_() { const p = props_(); let id = p.getProperty('IMG_FOLDER_ID'); if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const f = DriveApp.createFolder('PSJERP_STYLE_IMG'); p.setProperty('IMG_FOLDER_ID', f.getId()); return f; }
 function fileRow_(key) { const fs = erpSS_().getSheetByName('ERP_FILES'); if (!fs) return null; return readTable_(fs).find(f => String(f.key) === String(key)) || null; }
 function dropTab_(meta) {
   if (!meta || !meta.sheet_id || !meta.tab) return 0;
@@ -543,7 +545,7 @@ function erpApi_(b) {
   if (!key0) return {ok:false, error:'NO_SYNC_KEY', msg:'Apps Script 尚未設定同步密碼（SYNC_KEY_DIRECT）'};
   const a = String(b.action || '');
   const rk = String(cfg_('READ_KEY', '') || READ_KEY_DIRECT || '').trim();
-  const isRead = /^erp_(manifest|get|updates)$/.test(a);
+  const isRead = /^(erp_(manifest|get|updates)|img_(list|get))$/.test(a);
   if (String(b.k || '') !== key0 && !(isRead && rk && String(b.k || '') === rk)) return {ok:false, error:'BAD_KEY', msg:'同步密碼不對'};
   const ss = erpSS_();
   if (a === 'erp_manifest') {
@@ -565,6 +567,26 @@ function erpApi_(b) {
     const want = {}; part.forEach(r => want[r] = 1); const rows = [];
     block.forEach((r, i) => { if (want[first + i]) rows.push(r.slice(1).map(x => x instanceof Date ? Utilities.formatDate(x, tz_(), 'yyyy-MM-dd') : x)); });
     return {ok:true, cols:h.slice(1), rows:rows, total:idx.length};
+  }
+  /* v0.9.0（2026-11-03）款式樣衣圖：存在雲端硬碟 PSJERP_STYLE_IMG 資料夾，一款一張（檔名＝款號鍵.jpg） */
+  if (a === 'img_list') {
+    const f = imgFolder_(); const it = f.getFiles(); const out = [];
+    while (it.hasNext()) { const x = it.next(); out.push({k: x.getName().replace(/\.jpg$/i, ''), id: x.getId(), at: Utilities.formatDate(x.getLastUpdated(), tz_(), 'yyyy-MM-dd HH:mm'), size: x.getSize()}); }
+    return {ok:true, rows:out};
+  }
+  if (a === 'img_get') {
+    const it = imgFolder_().getFilesByName(String(b.sk || '') + '.jpg'); if (!it.hasNext()) return {ok:true, data:''};
+    return {ok:true, data:'data:image/jpeg;base64,' + Utilities.base64Encode(it.next().getBlob().getBytes())};
+  }
+  if (a === 'img_put') {
+    const sk = String(b.sk || '').replace(/[^A-Z0-9_-]/gi, '').slice(0, 60); const m = String(b.data || '').match(/^data:image\/\w+;base64,(.+)$/);
+    if (!sk || !m) return {ok:false, error:'BAD_IMG', msg:'圖片格式不對'};
+    const f = imgFolder_(); const old = f.getFilesByName(sk + '.jpg'); while (old.hasNext()) old.next().setTrashed(true);
+    const file = f.createFile(Utilities.newBlob(Utilities.base64Decode(m[1]), 'image/jpeg', sk + '.jpg'));
+    return {ok:true, id:file.getId(), at:now_()};
+  }
+  if (a === 'img_del') {
+    const it = imgFolder_().getFilesByName(String(b.sk || '') + '.jpg'); let n = 0; while (it.hasNext()) { it.next().setTrashed(true); n++; } return {ok:true, removed:n};
   }
   if (a === 'erp_updates') {   // 最近的更新摘要
     const sh = ss.getSheetByName('UPDATE_LOG'); return {ok:true, rows: sh ? readTable_(sh).slice(-30).reverse() : []};
