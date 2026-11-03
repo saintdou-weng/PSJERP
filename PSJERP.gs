@@ -670,3 +670,6 @@ function CHECK_CLOUD() {
   files.forEach(f => Logger.log(f.fn + ' · ' + f.label + ' · ' + f.rows + ' 列 · ' + (f.tab ? '分頁 ' + f.tab : '舊格式') + ' · v' + f.version));
   return files.length + ' 個批次';
 }
+
+/* 一次性：樣衣圖要用雲端硬碟，第一次需要 Paul 在編輯器執行這個函式並按「允許」 */
+function AUTHORIZE_STYLE_IMG() { const f = imgFolder_(); Logger.log('樣衣圖資料夾：' + f.getUrl()); return f.getUrl(); }
