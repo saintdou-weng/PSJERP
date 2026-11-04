@@ -4499,13 +4499,13 @@ async function syncTpl(man){
   if(!I.length)return `<p class="muted">${L('ERP 領料（W_CST780／785）裡沒有這款的紀錄。','No ERP issues for this style.')}</p>`;
   /* 每年：件數（領料單上的生產件數，同一自編單號只算一次）、主副料金額 */
   const Y=new Map(); const matY=new Map(); const shareC=new Map(); const sh=k=>{ if(!shareC.has(k))shareC.set(k,styleShare(k,s.sk)); return shareC.get(k) };
-  I.forEach(r=>{ const y=d10(r.issue_date).slice(0,4)||'?'; let a=Y.get(y); if(!a){a={my:new Map(),main:0,trim:0,miss:0};Y.set(y,a)} if(r.my_no&&!a.my.has(r.my_no))a.my.set(r.my_no,+r.prod_qty||0);
+  I.forEach(r=>{ const y=d10(r.issue_date).slice(0,4)||'?'; let a=Y.get(y); if(!a){a={my:new Map(),sl:new Map(),slt:new Map(),main:0,trim:0,miss:0};Y.set(y,a)} if(r.my_no)a.my.set(r.my_no,1); (r.type==='main'?a.sl:a.slt).set(r.issue_no+'|'+r.my_no,+r.prod_qty||0);   /* 領料單上的生產件數＝這張領料單涵蓋的件數 → 依主料領料單加總 */
    const p=upAt(r._k,r.issue_date,r.color); const amt=p?(+r.qty||0)*p.up:0; if(!p)a.miss++; if(r.type==='main')a.main+=amt; else a.trim+=amt;
    const mk=y+'|'+r._k+'|'+(r.type==='main'?nk(r.color):''); let m=matY.get(mk); if(!m){m={y,k:r._k,nm:r.material||matNm(r._k),clr:r.type==='main'?r.color:'',type:r.type,unit:r.unit||'',qty:0,amt:0,up:p?p.up:null};matY.set(mk,m)} m.qty+=+r.qty||0; m.amt+=amt });
   const ys=[...Y.keys()].sort().reverse();
   let h=`<p class="small muted">${L('只算「領給這款的料」（ERP 領料單上的款號），不會把同一種布給別款的採購混進來。金額＝領料量 × 當時採購單價。','Only material issued to this style (ERP issue slips) — purchases of the same fabric for other styles are not mixed in. Amount = issued qty × purchase price at the time.')}</p>`;
-  const yr=ys.map(y=>{const a=Y.get(y);const pcs=[...a.my.values()].reduce((t,v)=>t+v,0);const tot=a.main+a.trim;return {y,a,pcs,tot,per:pcs?tot/pcs:0}});
-  h+=`<h4>📅 ${L('歷年用料成本','Material cost by year')}</h4>`+tbl('st_buyy',[[L('年','Year')],[L('單數','Orders'),1],[L('件數','Pcs'),1],[L('主料','Fabric'),1],[L('副料','Trims'),1],[L('合計','Total'),1],[L('每件','Per pc'),1]],yr.map(x=>[`<b>${x.y}</b>`,fmt(x.a.my.size),fmt(x.pcs),money(x.a.main),money(x.a.trim),money(x.tot),x.per?`<b>${money(x.per,3)}</b>`:'—']),yr.length>1?['',fmt(sum(yr,x=>x.a.my.size)),fmt(sum(yr,'pcs')),money(sum(yr,x=>x.a.main)),money(sum(yr,x=>x.a.trim)),money(sum(yr,'tot')),'']:null);
+  const yr=ys.map(y=>{const a=Y.get(y);const sm=m=>[...m.values()].reduce((t,v)=>t+v,0);const pcs=a.sl.size?sm(a.sl):sm(a.slt);const tot=a.main+a.trim;return {y,a,pcs,tot,per:pcs?tot/pcs:0}});
+  h+=`<h4>📅 ${L('歷年用料成本','Material cost by year')}</h4>`+tbl('st_buyy',[[L('年','Year')],[L('單數','Orders'),1],[L('件數（主料領料單）','Pcs (fabric issue slips)'),1],[L('主料','Fabric'),1],[L('副料','Trims'),1],[L('合計','Total'),1],[L('每件','Per pc'),1]],yr.map(x=>[`<b>${x.y}</b>`,fmt(x.a.my.size),fmt(x.pcs),money(x.a.main),money(x.a.trim),money(x.tot),x.per?`<b>${money(x.per,3)}</b>`:'—']),yr.length>1?['',fmt(sum(yr,x=>x.a.my.size)),fmt(sum(yr,'pcs')),money(sum(yr,x=>x.a.main)),money(sum(yr,x=>x.a.trim)),money(sum(yr,'tot')),'']:null);
   const per=yr.filter(x=>x.per>0).slice().reverse(); if(per.length>1)h+=`<div class="small muted" style="margin:8px 0 4px">${L('每件用料成本走勢','Material cost per piece by year')}</div>`+hBars(per.map(x=>({l:x.y,v:x.per,t:money(x.per,3)})));
   /* 專屬料：這個料 90% 以上都領給這款 → 它的採購就是這款的採購 */
   const own=[...new Set(I.map(r=>r._k))].filter(k=>{const x=sh(k);return x!=null&&x>=0.9});
