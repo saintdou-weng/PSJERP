@@ -4332,16 +4332,17 @@ async function syncTpl(man){
  window.v12={rngFor,pLabel,subOf,bucketKey,inRg};
 
  /* ══════════ B. 品類（從款名自動分）══════════ */
- const PTYPE=[['LABCOAT',/LAB\s*COAT|LABCOAT|DOCTOR\s*COAT/,['實驗袍／醫師袍','Lab coat']],['SCRUB',/SCRUB/,['手術服','Scrubs']],['COVERALL',/COVERALL|BOILER|OVERALL|DUNGAREE/,['連身工作服','Coverall']],['GOWN',/GOWN|ROBE|KIMONO/,['罩袍','Gown / robe']],['APRON',/APRON|\bBIB\b/,['圍裙','Apron']],
+ const PTYPE=[['FROCK',/FROCK|\bFRK\b|BUTCHER|BTCHR|DUST\s*COAT|WAREHOUSE\s*COAT|SHOP\s*COAT|CKSH/,['工作罩衫／屠夫袍','Frock / butcher coat']],['LABCOAT',/LAB\s*COAT|LABCOAT|DOCTOR\s*COAT/,['實驗袍／醫師袍','Lab coat']],['SCRUB',/SCRUB/,['手術服','Scrubs']],['COVERALL',/COVERALL|BOILER|OVERALL|DUNGAREE/,['連身工作服','Coverall']],['GOWN',/GOWN|ROBE|KIMONO/,['罩袍','Gown / robe']],['APRON',/APRON|\bBIB\b/,['圍裙','Apron']],
   ['JACKET',/JACKET|PARKA|BLOUSON|WINDBREAK|\bCOAT\b|SOFTSHELL|FLEECE|HOODIE/,['外套','Jacket / coat']],['VEST',/\bVEST|GILET|TABARD/,['背心','Vest']],['SHIRT',/SHIRT|BLOUSE|POLO|TUNIC|\bTOP\b|SMOCK|\bTEE\b|T-SHIRT/,['上衣','Shirt / top']],['PANT',/PANT|TROUSER|JEAN|CARGO|SLACK/,['長褲','Pants']],['SHORT',/SHORT/,['短褲','Shorts']],
-  ['SKIRT',/SKIRT|DRESS/,['裙／洋裝','Skirt / dress']],['LINEN',/TOWEL|NAPKIN|SHEET|PILLOW|TABLE|CLOTH|\bMAT\b|\bBAG\b|CURTAIN|DUVET|BLANKET|SERVIETTE|RUNNER/,['布品／毛巾','Linen']],['CAP',/\bCAP\b|\bHAT\b|BEANIE|HEADWEAR/,['帽','Headwear']]];
+  ['SKIRT',/SKIRT|DRESS/,['裙／洋裝','Skirt / dress']],['LINEN',/TOWEL|NAPKIN|SHEET|PILLOW|TABLE|CLOTH|\bMAT\b|\bBAG\b|CURTAIN|DUVET|BLANKET|SERVIETTE|RUNNER|\d{2,3}\s*[X*]\s*\d{2,3}|\d{2,3}\s*R(OUND)?\b|ROUND|\bSERGE\b|\bHEMMED\b|\bHEM\b/,['布品／毛巾','Linen']],['CAP',/\bCAP\b|\bHAT\b|BEANIE|HEADWEAR/,['帽','Headwear']]];
  window.prodType=name=>{ const u=String(name||'').toUpperCase(); for(const [k,re] of PTYPE)if(re.test(u))return k; return 'OTHER' };
  const ptName=k=>{const x=PTYPE.find(p=>p[0]===k);return x?L(x[2][0],x[2][1]):L('其他','Other')};
  window.ptName=ptName;
 
  /* ══════════ C. 訂單列加上：品類、ERP 原訂單 SMV ══════════ */
  const _gs=GC.set.bind(GC);
- GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._v12){ try{ const ov=new Map(ordersView().map(o=>[o.id,o])); v.forEach(g=>{ g.ptype=prodType(g.style_name||g.style); const e=g.ids.map(id=>ov.get(id)).find(o=>o&&o.smv_erpo); g.smv_erpo=e?e.smv_erpo:null }); Object.defineProperty(v,'_v12',{value:1,enumerable:false}) }catch(e){console.error('v12 rows',e)} } return _gs(k,v) };
+ GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._v12){ try{ const ov=new Map(ordersView().map(o=>[o.id,o])); v.forEach(g=>{ g.ptype=prodType(g.style_name||g.style); const e=g.ids.map(id=>ov.get(id)).find(o=>o&&o.smv_erpo); g.smv_erpo=e?e.smv_erpo:null });
+   const TM=new Map(); v.forEach(g=>{ if(g.ptype!=='OTHER'){ const k=ks(g.style); if(k&&!TM.has(k))TM.set(k,g.ptype); const c=core(k); if(c.length>=4&&!TM.has('c:'+c))TM.set('c:'+c,g.ptype) } }); v.forEach(g=>{ if(g.ptype==='OTHER'){ const k=ks(g.style); g.ptype=TM.get(k)||TM.get('c:'+core(k))||'OTHER' } });   /* 款名沒寫品類（ADI 1536）→ 用同款其他單 */ Object.defineProperty(v,'_v12',{value:1,enumerable:false}) }catch(e){console.error('v12 rows',e)} } return _gs(k,v) };
 
  /* ══════════ D. 異常規則 ══════════ */
  const smvOld=r=>r.smv_erpo&&r.smv_src==='ie_upd'&&r.smv>0&&Math.abs(r.smv_erpo-r.smv)>0.02*r.smv;
@@ -4604,7 +4605,7 @@ async function syncTpl(man){
  const delta=(a,b)=>{ if(!b)return ''; const d=(a-b)/b*100; return ` <span class="st ${d>=0?'good':'warn'}">${d>=0?'▲':'▼'} ${fmt(Math.abs(d),0)}%</span>` };
  function keynote(rows,B,prev,R,st,f){ const K=[]; const lbl=pLabel(st.pt,R); const q=sum(rows,'qty'), a=sum(rows,amtOf), sh=sum(rows,r=>r.ship.qty), op=sum(rows,r=>Math.max(0,r.open_qty||0)), late=rows.filter(r=>r.status==='late');
   const fl=L(FLD.find(x=>x[0]===f)[1][0],FLD.find(x=>x[0]===f)[1][1]);
-  K.push(`<b>${esc(lbl)}</b>（${esc(fl)}）：<b>${fmt(rows.length)}</b> ${L('款／PO','styles / POs')} · <b>${fmt(q)}</b> ${L('件','pcs')}${a?` · <b>${money(a)}</b>`:''}${prev?delta(q,sum(prev,'qty'))+` <span class="small muted">${L('比上一期','vs previous')}</span>`:''}`);
+  K.push(`<b>${esc(lbl)}</b>（${esc(fl)}）：<b>${fmt(rows.length)}</b> ${L('款／PO','styles / POs')} · <b>${fmt(q)}</b> ${L('件','pcs')}${a?` · <b>${money(a)}</b>`:''}${prev?delta(q,sum(prev,'qty'))+` <span class="small muted">${window._ocPrevYtd?L('比上一期同一段（到今天為止）','vs same stretch of previous period'):L('比上一期','vs previous')}</span>`:''}`);
   if(rows.length)K.push(`${L('這些單已出貨 ','Shipped so far ')}<b>${fmt(sh)}</b>（${pct(sh,q)}）· ${L('未交 ','open ')}<b>${fmt(op)}</b>${late.length?` · <span class="warn-t">${L('逾期 ','late ')}${late.length} ${L('款','styles')} ${fmt(sum(late,r=>Math.max(0,r.open_qty||r.qty-r.ship.qty)))} ${L('件','pcs')}</span>`:''}`);
   if(!R.all){ const due=B.filter(r=>inRg(r.delivery,R)); if(due.length){ const done=due.filter(r=>r.ship.qty>=r.qty*0.97), ontime=done.filter(r=>r.ship.last&&r.ship.last<=r.delivery); K.push(`${L('交期在這期的 ','Due this period: ')}<b>${due.length}</b> ${L('款','styles')}（${fmt(sum(due,'qty'))} ${L('件','pcs')}）· ${L('已出完 ','fully shipped ')}${done.length}${done.length?` · ${L('準時 ','on time ')}${pct(ontime.length,done.length)}`:''}${due.length-done.length?` · <span class="warn-t">${L('還沒出完 ','not yet shipped ')}${due.length-done.length}</span>`:''}`) } }
   const byC=new Map(); rows.forEach(r=>byC.set(r.cust||'—',(byC.get(r.cust||'—')||0)+r.qty)); const tc=[...byC.entries()].sort((x,y)=>y[1]-x[1]).slice(0,3);
@@ -4613,7 +4614,7 @@ async function syncTpl(man){
   if(tt_.length>1)K.push(`${L('主要品類：','Top categories: ')}${tt_.map(([k,v])=>`<a href="javascript:void 0" onclick="ocPick('ptype','${k}')">${esc(ptName(k))}</a> ${pct(v,q)}`).join(' · ')}`);
   const big=rows.filter(r=>r.open_qty>0&&r.status!=='closed').sort((x,y)=>y.open_qty-x.open_qty).slice(0,3);
   if(big.length)K.push(`${L('未交最多：','Largest open: ')}${big.map(r=>`<a href="javascript:void 0" onclick="openOrder('${esc(r.id)}')" class="mono">${esc(r.style)}</a> ${fmt(r.open_qty)}`).join(' · ')}`);
-  if(window.CHAIN&&CHAIN.loaded&&!R.all&&window.chainRows){ const sw=sum(chainRows('sewing').filter(x=>inRg(x[0],R)),x=>x[5]), ct=sum(chainRows('cutting').filter(x=>inRg(x[0],R)),x=>x[5]); if(sw||ct)K.push(`${L('這期工廠生產（日報，全部客戶）：車縫 ','Factory output this period (all customers): sewn ')}<b>${fmt(sw)}</b> · ${L('裁剪 ','cut ')}<b>${fmt(ct)}</b> ${L('件','pcs')}`) }
+  if(window.CHAIN&&CHAIN.loaded&&!R.all&&window.chainRows){ const sw=sum(chainRows('sewing').filter(x=>inRg(x[0],R)),x=>x[5]); if(sw)K.push(`${L('這期工廠車縫（車縫日報，全部客戶）：','Factory sewing output this period (all customers): ')}<b>${fmt(sw)}</b> ${L('件','pcs')}`) }
   const an=new Map(); rows.forEach(r=>(r._an||[]).forEach(k=>an.set(k,(an.get(k)||0)+1)));
   if(an.size)K.push(`⚠ ${L('異常：','Exceptions: ')}${ANOM.filter(x=>an.has(x[0])).map(x=>`<a href="javascript:void 0" class="st ${x[2]==='crit'?'crit':x[2]==='info'?'info':'warn'}" onclick="ocPick('an','${x[0]}','anom')">${esc(L(x[1][0],x[1][1]))} ${an.get(x[0])}</a>`).join(' ')}`);
   return K }
@@ -4660,7 +4661,7 @@ async function syncTpl(man){
   const B=baseRows(all);
   h+=pnHTML(K,{dates:B.map(r=>dOf(r,f)).filter(Boolean),fields:FLD.map(([v,l])=>[v,L(l[0],l[1])]),hint:L('只算選定期間','selected period only')});
   let rows=B.filter(r=>inRg(dOf(r,f),R)); rows.forEach(r=>{r._an=ocAnom(r)});
-  const prev=R.all?null:(()=>{const Rp=rngFor(st.pt,addDs(R.from,-1));return B.filter(r=>inRg(dOf(r,f),Rp))})();
+  const prev=R.all?null:(()=>{const Rp=Object.assign({},rngFor(st.pt,addDs(R.from,-1))); const td=today(); if(td>=R.from&&td<=R.to){ const days=Math.round((D_(td)-D_(R.from))/864e5); const lim=addDs(Rp.from,days); if(lim<Rp.to)Rp.to=lim; Rp.ytd=1 } window._ocPrevYtd=!!Rp.ytd; return B.filter(r=>inRg(dOf(r,f),Rp))})();
   const rowsAll=rows; if(OC.an)rows=rows.filter(r=>OC.an==='any'?r._an.length:r._an.includes(OC.an));
   rows.sort(SORTS[OC.sort]||SORTS.delivery); window.OC_LAST=rows.map(r=>r.ids[0]); window.OC_ROWS=rows;
   /* 重點＋圖表 */
