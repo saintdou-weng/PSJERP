@@ -431,7 +431,7 @@ const T={
  user:['使用者','User','អ្នកប្រើ'], password:['密碼','Password','ពាក្យសម្ងាត់'], trust:['信任此裝置（下次免登入）','Trust this device (skip login next time)','ទុកចិត្តឧបករណ៍នេះ'],
  login:['登入','Sign in','ចូល'], login_sub:['雲端管理層 · Legacy ERP 唯讀整合','Cloud management layer · read-only legacy integration','ស្រទាប់គ្រប់គ្រងលើពពក'],
  login_note:['原型：任何帳密都可登入。正式版由 Google Apps Script 後端驗證；密碼與 Token 不寫在 HTML / JS / Git。','Prototype: any credentials work. Production authentication is handled by the Google Apps Script backend; passwords and tokens never live in HTML / JS / Git.','គំរូ៖ ចូលបានដោយគណនីណាក៏បាន។'],
- D:['日','D','ថ្ងៃ'], W:['週','W','សប្ដាហ៍'], M:['月','M','ខែ'], Y:['年','Y','ឆ្នាំ'], C:['自訂','Custom','កំណត់'], ALL:['全部','All','ទាំងអស់'],
+ D:['每日','Daily','ប្រចាំថ្ងៃ'], W:['每週','Weekly','ប្រចាំសប្ដាហ៍'], H:['半月','Half-month','កន្លះខែ'], M:['每月','Monthly','ប្រចាំខែ'], Q:['每季','Quarterly','ត្រីមាស'], Y:['每年','Yearly','ប្រចាំឆ្នាំ'], C:['自訂','Custom','កំណត់'], ALL:['全部','All','ទាំងអស់'],
  new:['新增','New','បន្ថែម'], edit:['編輯','Edit','កែ'], save:['儲存','Save','រក្សាទុក'], del:['刪除','Delete','លុប'], cancel:['取消','Cancel','បោះបង់'],
  restore:['還原','Restore','ស្ដារ'], export:['匯出','Export','នាំចេញ'], close:['關閉','Close','បិទ'], confirm_del:['確定刪除？（軟刪除，可在回收區還原）','Delete this record? (soft delete — restorable from Trash)','លុបកំណត់ត្រានេះ?'],
  yes_del:['確定刪除','Yes, delete','បាទ លុប'], open_solo:['單獨開啟','Open standalone','បើកដាច់ដោយឡែក'], send_tg:['發 Telegram 摘要','Send Telegram summary','ផ្ញើសង្ខេប Telegram'],
@@ -1122,6 +1122,8 @@ function rangeFor(pt,a,st){
   case 'D':return {from:new Date(a.getFullYear(),a.getMonth(),a.getDate()),to:new Date(a.getFullYear(),a.getMonth(),a.getDate())};
   case 'W':{const s=addD(new Date(a.getFullYear(),a.getMonth(),a.getDate()),-((a.getDay()+6)%7));return {from:s,to:addD(s,6)}}
   case 'M':return {from:new Date(a.getFullYear(),a.getMonth(),1),to:new Date(a.getFullYear(),a.getMonth()+1,0)};
+  case 'H':return a.getDate()<=15?{from:new Date(a.getFullYear(),a.getMonth(),1),to:new Date(a.getFullYear(),a.getMonth(),15)}:{from:new Date(a.getFullYear(),a.getMonth(),16),to:new Date(a.getFullYear(),a.getMonth()+1,0)};
+  case 'Q':{const q=Math.floor(a.getMonth()/3)*3;return {from:new Date(a.getFullYear(),q,1),to:new Date(a.getFullYear(),q+3,0)}}
   case 'Y':return {from:new Date(a.getFullYear(),0,1),to:new Date(a.getFullYear(),11,31)};
   case 'C':{const f=parseD(st&&st.from)||TODAY,t2=parseD(st&&st.to)||TODAY;return f<=t2?{from:f,to:t2}:{from:t2,to:f}}
   default:return {from:new Date(2000,0,1),to:new Date(2100,0,1),all:true};
@@ -1130,11 +1132,13 @@ function rangeFor(pt,a,st){
 const rangeOf=st=>rangeFor(st.pt,parseD(st.anchor),st);
 const inR=(ds,R)=>{if(R.all)return true;const d=ds instanceof Date?ds:parseD(ds);return !!d&&d>=R.from&&d<=R.to};
 function inPeriod(ds,p,st){return inR(ds,rangeOf(st))}   // legacy call sites
-function shiftDate(pt,a,n){if(pt==='D')return addD(a,n);if(pt==='W')return addD(a,7*n);if(pt==='M')return new Date(a.getFullYear(),a.getMonth()+n,1);if(pt==='Y')return new Date(a.getFullYear()+n,0,1);return a}
+function shiftDate(pt,a,n){if(pt==='D')return addD(a,n);if(pt==='W')return addD(a,7*n);if(pt==='H'){const i=a.getFullYear()*24+a.getMonth()*2+(a.getDate()>15?1:0)+n;return new Date(Math.floor(i/24),Math.floor((i%24)/2),i%2?16:1)}if(pt==='Q')return new Date(a.getFullYear(),Math.floor(a.getMonth()/3)*3+3*n,1);if(pt==='M')return new Date(a.getFullYear(),a.getMonth()+n,1);if(pt==='Y')return new Date(a.getFullYear()+n,0,1);return a}
 function periodLabel(pt,R){
  if(pt==='D')return ymd(R.from)+' ('+WD()[(R.from.getDay()+6)%7]+')';
  if(pt==='W'){const w=isoWeek(R.from);return w.y+'-W'+pad(w.w)+' · '+md(R.from)+'–'+md(R.to)}
  if(pt==='M')return R.from.getFullYear()+'-'+pad(R.from.getMonth()+1);
+ if(pt==='H')return R.from.getFullYear()+'-'+pad(R.from.getMonth()+1)+' · '+(R.from.getDate()===1?tt('上半 01–15','1st half 01–15'):tt('下半 16–','2nd half 16–')+pad(R.to.getDate()));
+ if(pt==='Q')return R.from.getFullYear()+'-Q'+(Math.floor(R.from.getMonth()/3)+1)+' · '+MN(R.from.getMonth())+'–'+MN(R.to.getMonth());
  if(pt==='Y')return String(R.from.getFullYear());
  if(pt==='C')return ymd(R.from)+' → '+ymd(R.to);
  return tt('全部期間','All time');
@@ -1158,13 +1162,17 @@ function selectorsHTML(k,pt,anchor,st,cmp){
   return `<select class="inp" id="${id}y" onchange="${fn}('${k}',ymd(weekStart(+this.value,1)))">${yearOpts(w.y,k)}</select><select class="inp" id="${id}w" onchange="${fn}('${k}',this.value)">${o}</select>`}
  if(pt==='M'){let o='';for(let m=0;m<12;m++){const dis=new Date(a.getFullYear(),m,1)>TODAY;o+=`<option value="${m}" ${m===a.getMonth()?'selected':''} ${dis?'disabled':''}>${periodKeys(k).has(a.getFullYear()+'-'+pad(m+1))?'● ':''}${MN(m)}</option>`}
   return `<select class="inp" id="${id}y" onchange="${fn}('${k}',ymd(new Date(+this.value,Math.min(${a.getMonth()},this.value==TODAY.getFullYear()?TODAY.getMonth():11),1)))">${yearOpts(a.getFullYear(),k)}</select><select class="inp" id="${id}m" onchange="${fn}('${k}',ymd(new Date(${a.getFullYear()},+this.value,1)))">${o}</select>`}
+ if(pt==='H'){const hd=a.getDate()>15?16:1;let o='';for(let m=0;m<12;m++){const dis=new Date(a.getFullYear(),m,1)>TODAY;o+=`<option value="${m}" ${m===a.getMonth()?'selected':''} ${dis?'disabled':''}>${MN(m)}</option>`}
+  return `<select class="inp" id="${id}y" onchange="${fn}('${k}',ymd(new Date(+this.value,${a.getMonth()},${hd})))">${yearOpts(a.getFullYear(),k)}</select><select class="inp" id="${id}m" onchange="${fn}('${k}',ymd(new Date(${a.getFullYear()},+this.value,${hd})))">${o}</select><select class="inp" id="${id}h" onchange="${fn}('${k}',ymd(new Date(${a.getFullYear()},${a.getMonth()},+this.value)))"><option value="1" ${hd===1?'selected':''}>${tt('上半 01–15','1st half')}</option><option value="16" ${hd===16?'selected':''}>${tt('下半 16–月底','2nd half')}</option></select>`}
+ if(pt==='Q'){const q=Math.floor(a.getMonth()/3);let o='';for(let i=0;i<4;i++){const dis=new Date(a.getFullYear(),i*3,1)>TODAY;o+=`<option value="${i}" ${i===q?'selected':''} ${dis?'disabled':''}>Q${i+1} · ${MN(i*3)}–${MN(i*3+2)}</option>`}
+  return `<select class="inp" id="${id}y" onchange="${fn}('${k}',ymd(new Date(+this.value,${q*3},1)))">${yearOpts(a.getFullYear(),k)}</select><select class="inp" id="${id}q" onchange="${fn}('${k}',ymd(new Date(${a.getFullYear()},+this.value*3,1)))">${o}</select>`}
  if(pt==='Y')return `<select class="inp" id="${id}y" onchange="${fn}('${k}',this.value+'-01-01')">${yearOpts(a.getFullYear(),k)}</select>`;
  if(pt==='C'&&!cmp)return `<input class="inp pn-date" type="date" id="${id}f" value="${esc(st.from)}" onchange="S('${k}').from=this.value;navDone('${k}')"><span class="muted">→</span><input class="inp pn-date" type="date" id="${id}t" value="${esc(st.to)}" onchange="S('${k}').to=this.value;navDone('${k}')">`;
  if(pt==='C'&&cmp)return `<input class="inp pn-date" type="date" id="${id}f" value="${esc(st.from2||'')}" onchange="S('${k}').from2=this.value;navDone('${k}')">`;
  return '';
 }
 function pnav(k,o={}){
- const st=S(k); const pts=['D','W','M','Y','C'].concat(o.all?['ALL']:[]); if(!pts.includes(st.pt))st.pt='M';
+ const st=S(k); const pts=['D','W','H','M','Q','Y','C'].concat(o.all?['ALL']:[]); if(!pts.includes(st.pt))st.pt='M';
  const R=rangeOf(st); const nextStart=st.pt==='C'?addD(R.to,1):rangeFor(st.pt,shiftDate(st.pt,parseD(st.anchor)||TODAY,1)).from;
  const canNext=st.pt!=='ALL'&&nextStart<=TODAY, canPrev=st.pt!=='ALL'&&R.from>DATA_START;
  const views=o.views&&PM[k];
@@ -1199,6 +1207,8 @@ function subBuckets(st){
  if(st.pt==='D'){const m=rangeFor('M',R.from);for(let d=new Date(m.from);d<=m.to&&d<=TODAY;d=addD(d,1))out.push({l:ymd(d).slice(5),R:{from:d,to:d},pt:'D',a:ymd(d),on:ymd(d)===ymd(R.from)});return out}
  if(st.pt==='W'){const y=isoWeek(R.from).y;for(let w=1;w<=weeksIn(y);w++){const s=weekStart(y,w);if(s>TODAY)break;out.push({l:'W'+pad(w)+' '+md(s),R:{from:s,to:addD(s,6)},pt:'W',a:ymd(s),on:ymd(s)===ymd(R.from)})}return out}
  if(st.pt==='M'){const y=R.from.getFullYear();for(let m=0;m<12;m++){const f=new Date(y,m,1);if(f>TODAY)break;out.push({l:y+'-'+pad(m+1),R:{from:f,to:new Date(y,m+1,0)},pt:'M',a:ymd(f),on:m===R.from.getMonth()})}return out}
+ if(st.pt==='H'){const y=R.from.getFullYear();for(let m=0;m<12;m++)for(const d of [1,16]){const f=new Date(y,m,d);if(f>TODAY)break;const e=d===1?new Date(y,m,15):new Date(y,m+1,0);out.push({l:y+'-'+pad(m+1)+(d===1?' 上':' 下'),R:{from:f,to:e},pt:'H',a:ymd(f),on:ymd(f)===ymd(R.from)})}return out}
+ if(st.pt==='Q'){const y=R.from.getFullYear();for(let q=0;q<4;q++){const f=new Date(y,q*3,1);if(f>TODAY)break;out.push({l:y+'-Q'+(q+1),R:{from:f,to:new Date(y,q*3+3,0)},pt:'Q',a:ymd(f),on:q===Math.floor(R.from.getMonth()/3)})}return out}
  if(st.pt==='Y'||st.pt==='ALL'){for(let y=DATA_Y0;y<=TODAY.getFullYear();y++)out.push({l:String(y),R:{from:new Date(y,0,1),to:new Date(y,11,31)},pt:'Y',a:y+'-01-01',on:st.pt==='Y'&&y===R.from.getFullYear()});return out}
  const span=(R.to-R.from)/864e5;
  if(span<=62){for(let d=new Date(R.from);d<=R.to&&d<=TODAY;d=addD(d,1))out.push({l:ymd(d).slice(5),R:{from:d,to:d},pt:'D',a:ymd(d)});return out}
@@ -1209,6 +1219,7 @@ function subBuckets(st){
 function innerBuckets(pt,R){
  const out=[];
  if(pt==='Y'){for(let m=0;m<12;m++)out.push({l:MN(m),R:{from:new Date(R.from.getFullYear(),m,1),to:new Date(R.from.getFullYear(),m+1,0)}});return out}
+ if(pt==='Q'){for(let m=0;m<3;m++){const f=new Date(R.from.getFullYear(),R.from.getMonth()+m,1);out.push({l:MN(f.getMonth()),R:{from:f,to:new Date(f.getFullYear(),f.getMonth()+1,0)}})}return out}
  if(pt==='W'){for(let i=0;i<7;i++){const d=addD(R.from,i);out.push({l:WD()[i],R:{from:d,to:d}})}return out}
  if(pt==='M'){for(let i=0;i<31;i++){const d=addD(R.from,i);if(d.getMonth()!==R.from.getMonth())out.push({l:String(i+1),R:null});else out.push({l:String(i+1),R:{from:d,to:d}})}return out}
  if(pt==='D')return [{l:ymd(R.from).slice(5),R}];
@@ -1998,7 +2009,7 @@ function showModal(h){$('#modal').innerHTML=h;$('#modal').hidden=false;$('#scrim
 /* ================= Compare center ================= */
 const CMP={
  fgqr:{l:['訂單統計入庫量 vs 成品入庫明細（ERP 兩張報表）','W_COD690 FG qty vs W_CST580 stock-ins'],key:'自編單號 + PO',srcs:['LEGACY_ERP','LEGACY_ERP'],srcL:['W_COD690 '+tt('入庫量','FG qty'),'W_CST580 '+tt('入庫合計','stock-in total')],rows:R=>{
-  const qm=new Map(); live(DB.orders).filter(o=>o.import_key&&(o.order_date?inR(o.order_date,R):yearCovers(o.order_year,R))).forEach(o=>{const k=ordKey(o.my_no,o.po_no);const x=qm.get(k)||{v:0,o,n:0};x.v+=o.fg_qty||0;x.n++;qm.set(k,x)});
+  const qm=new Map(); live(DB.orders).filter(o=>String(o.import_key||'').startsWith('cod690')&&(o.order_date?inR(o.order_date,R):yearCovers(o.order_year,R))).forEach(o=>{const k=ordKey(o.my_no,o.po_no);const x=qm.get(k)||{v:0,o,n:0,a:[]};x.a.push(o.fg_qty||0);x.v=qtyOnce(x.a);x.n++;qm.set(k,x)});
   const rm=new Map(); live(DB.fg).forEach(g=>{const k=ordKey(g.my_no,g.po_no);rm.set(k,(rm.get(k)||0)+(g.erp_qty||0))});
   return [...qm.entries()].filter(([k,x])=>x.v||rm.has(k)).map(([k,x])=>({k:x.o.my_no+' / '+x.o.po_no,sub:(x.o.style_name||'')+' · '+(x.o.order_year||x.o.order_date||''),v:[x.v,rm.has(k)?rm.get(k):null],open:`openOrder('${x.o.id}')`}))}},
  fg:{l:['成品入庫','Finished goods'],key:'od_no / my_no / PO',srcs:['LEGACY_ERP','ACCOUNT_FLOW','VRT_PROD'],rows:R=>live(DB.fg).filter(g=>inR(g.fg_date,R)).map(g=>({k:g.my_no,sub:g.style+' · '+g.clr+' · '+g.fg_date,v:[g.erp_qty,g.acc_qty,g.prod_qty],open:`openOrder('${(DB.orders.find(o=>o.od_no===g.od_no)||{}).id}')`}))},
@@ -2374,7 +2385,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.1.0';
+const APP_VER='1.2.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -2540,12 +2551,18 @@ const SNAPREP={stkmain:['fabric','fabsnaps'],stktrim:['accessories','accsnaps'],
 const SNAPK={fabric:['fabric','fabsnaps'],accessories:['accessories','accsnaps'],fgstock:['fgstock','fgsnaps']};
 
 /* ---------- views: one order list, shipments with value ---------- */
+/* v1.2.0：W_COD690 的入庫／出貨／裁剪是「整個自編單號」的數字，每條顏色明細都重複寫一次（實測 97% 的單是這樣）→ 一樣就只算一次，不一樣才相加 */
+function qtyOnce(a){if(!a.length)return 0;if(a.length>1&&a.every(v=>v===a[0]))return a[0];return a.reduce((t,v)=>t+v,0)}
+function dedup690(rows){const G=new Map();rows.forEach(o=>{const k=ordKey(o.my_no,o.po_no);(G.get(k)||G.set(k,[]).get(k)).push(o)});const out=[];
+ G.forEach(a=>{if(a.length<2){out.push(a[0]);return}const FS=['fg_qty','cut_qty','ship_qty'];const F={};FS.forEach(f=>{F[f]=a.every(o=>(o[f]||0)===(a[0][f]||0))});
+  const q=sum(a,'qty'),sh=F.ship_qty?(a[0].ship_qty||0):sum(a,'ship_qty');const st=sh>=q&&q>0?'closed':'open';
+  a.forEach((o,i)=>{const x={...o,status:st};if(i)FS.forEach(f=>{if(F[f])x[f]=0});out.push(x)})});return out}
 function ordersView(){if(GC.has('ordv'))return GC.get('ordv');const all=live(DB.orders);const is=(o,p)=>String(o.import_key||'').startsWith(p);const o7=all.filter(o=>is(o,'cod700'));let out;
- if(o7.length){const idx=new Map();all.filter(o=>is(o,'cod690')).forEach(o=>{const k=ordKey(o.my_no,o.po_no);const a=idx.get(k)||{fg:0,cut:0};a.fg+=o.fg_qty||0;a.cut+=o.cut_qty||0;idx.set(k,a)});
+ if(o7.length){const idx=new Map();const g690=new Map();all.filter(o=>is(o,'cod690')).forEach(o=>{const k=ordKey(o.my_no,o.po_no);(g690.get(k)||g690.set(k,[]).get(k)).push(o)});g690.forEach((a,k)=>idx.set(k,{fg:qtyOnce(a.map(o=>o.fg_qty||0)),cut:qtyOnce(a.map(o=>o.cut_qty||0))}));
   const fgi=new Map();live(DB.fg).forEach(g=>{const k=ordKey(g.my_no,g.po_no);fgi.set(k,(fgi.get(k)||0)+(g.erp_qty||0))});
   const used=new Set();out=o7.map(o=>{const k=ordKey(o.my_no,o.po_no);const a=idx.get(k)||(fgi.has(k)?{fg:fgi.get(k),cut:0}:null);const st=o.closed_date?'closed':(o.delivery&&parseD(o.delivery)<TODAY&&o.ship_qty<o.qty?'late':'open');if(a&&!used.has(k)){used.add(k);return {...o,fg_qty:a.fg,cut_qty:a.cut,status:st}}return {...o,fg_qty:o.fg_qty||0,cut_qty:o.cut_qty||0,status:st}});
   const k7=new Set(o7.map(o=>ordKey(o.my_no,o.po_no))), m7=new Set(o7.map(o=>nk(o.my_no)));
-  out=out.concat(all.filter(o=>is(o,'cod690')&&!k7.has(ordKey(o.my_no,o.po_no))&&!m7.has(nk(o.my_no)))).concat(all.filter(o=>!o.import_key))}
+  out=out.concat(dedup690(all.filter(o=>is(o,'cod690')&&!k7.has(ordKey(o.my_no,o.po_no))&&!m7.has(nk(o.my_no))))).concat(all.filter(o=>!o.import_key))}
  else out=all;
  GC.set('ordv',out);return out}
 function priceIdx(){if(GC.has('pidx'))return GC.get('pidx');const m=new Map(),m2=new Map();live(DB.orders).forEach(o=>{if(o.price>0){m.set(ordKey(o.my_no,o.po_no),o.price);if(!m2.has(nk(o.my_no)))m2.set(nk(o.my_no),o.price)}});const r={m,m2};GC.set('pidx',r);return r}
@@ -3415,8 +3432,10 @@ async function syncTpl(man){
   const per=OC.per||100, pages=Math.max(1,Math.ceil(rows.length/per)); if(OC.page>=pages)OC.page=pages-1; const pg=rows.slice(OC.page*per,(OC.page+1)*per);
   const L=(z,e)=>LANG===0?z:e; const dot=s=>`<span class="ocdot ${s}" title="${esc(srcName_(s))}"></span>`;
   h+=`<div class="tbl-wrap"><table class="t cards oc"><thead><tr><th>${L('客戶','Customer')}</th><th>${L('款號','Style')}</th><th>PO</th><th>${L('訂單日','Order')}</th><th>${L('交期','Delivery')}</th><th class="r">${dot('erp')}${L('訂單量','Order qty')}</th><th class="r">${dot('email')}${L('客戶 PO','Cust. PO')}</th><th class="r">${dot('email')}${L('已裁','Cut')}</th><th class="r">${dot('email')}${L('已縫','Sewn')}</th><th class="r">${dot('erp')}${L('入庫','FG')}</th><th class="r">${dot('erp')}${L('出貨','Shipped')}</th><th class="r">${dot('erp')}INVOICE</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
-  pg.forEach(r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-po.erp)}${po.erp!==r.qty?` · ${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}`:''}</div>`:po.state==='ok'&&po.erp!==r.qty?`<div class="small muted">${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
-   h+=`<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}${r.smv?`<div class="small muted">SMV ${fmt(r.smv,2)} · ${esc(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src)}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}${r.bad_delivery?`<div class="small warn-t" title="${L('ERP 交期打錯','ERP delivery date looks wrong')}">⚠ ${esc(r.bad_delivery)}</div>`:''}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cutr&&!r.cutr.none?`<b>${fmt(r.cutr.pcs)}</b><span class="oc-sub">${esc(r.cutr.last)}${r.cutr.alloc?' ≈':''}</span>`:r.cut_qty?`${fmt(r.cut_qty)}<span class="oc-sub">ERP</span>`:'—'}</td><td class="r num" data-l="${L('已縫','Sewn')}">${r.sewr&&!r.sewr.none?`<b>${fmt(r.sewr.pcs)}</b><span class="oc-sub">${esc(r.sewr.last)}${r.sewr.alloc?' ≈':''}</span>`:r.prodq?`${fmt(r.prodq)}<span class="oc-sub">ERP ${L('生產','prod.')}</span>`:'—'}${r.qcr&&r.qcr.ins?`<span class="oc-sub">QC ${fmt(r.qcr.ins)}${r.qcr.rej?' · '+L('退 ','rej ')+fmt(r.qcr.rej):''}</span>`:''}</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`});
+  const rowHTML=r=>{const po=r.po||{state:'none'}; const poCell=po.state==='loading'?'…':po.state==='missing'?poChip('missing'):`<b>${fmt(po.qty)}</b> ${poChip(po.state)}${po.state==='diff'?`<div class="small muted">${L('差','Δ')} ${fmt(po.qty-po.erp)}${po.erp!==r.qty?` · ${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}`:''}</div>`:po.state==='ok'&&po.erp!==r.qty?`<div class="small muted">${L('此款 ERP 合計 ','ERP style total ')}${fmt(po.erp)}</div>`:''}${po.revs>1?`<div class="small muted">${L('改過 ','rev ')}${po.revs}${L(' 次，以 ERP 為準',', ERP rules')}</div>`:''}${po.required?`<div class="small muted">${L('客戶交期 ','cust. ')}${esc(po.required)}</div>`:''}`;
+   return `<tr class="rowlink" onclick="openOrder('${esc(r.id)}')"><td data-l="${L('客戶','Customer')}"><b>${esc(r.cust||'—')}</b></td><td data-l="${L('款號','Style')}"><b class="mono">${esc(r.style||'—')}</b>${r.style_name?`<div class="small muted">${esc(r.style_name)}</div>`:''}${r.colors.length?`<div class="small muted">${esc(r.colors.slice(0,3).join('、'))}${r.colors.length>3?' +'+(r.colors.length-3):''}</div>`:''}${r.smv?`<div class="small muted">SMV ${fmt(r.smv,2)} · ${esc(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src)}</div>`:''}</td><td data-l="PO"><b class="mono">${esc(r.po_no||'—')}</b><div class="small muted mono">${esc(r.my_no)}${r.od_no?' · '+esc(r.od_no):''}</div></td><td data-l="${L('訂單日','Order')}" class="mono small">${esc(r.order_date||'—')}</td><td data-l="${L('交期','Delivery')}" class="mono small">${esc(r.delivery||'—')}${r.bad_delivery?`<div class="small warn-t" title="${L('ERP 交期打錯','ERP delivery date looks wrong')}">⚠ ${esc(r.bad_delivery)}</div>`:''}</td><td class="r num" data-l="${L('訂單量','Order qty')}"><b>${fmt(r.qty)}</b>${r.price?`<div class="small muted">@${fmt(r.price,2)}</div>`:''}</td><td class="r" data-l="${L('客戶 PO','Cust. PO')}">${poCell}</td><td class="r num" data-l="${L('已裁','Cut')}">${r.cutr&&!r.cutr.none?`<b>${fmt(r.cutr.pcs)}</b><span class="oc-sub">${esc(r.cutr.last)}${r.cutr.alloc?' ≈':''}</span>`:r.cut_qty?`${fmt(r.cut_qty)}<span class="oc-sub">ERP</span>`:'—'}</td><td class="r num" data-l="${L('已縫','Sewn')}">${r.sewr&&!r.sewr.none?`<b>${fmt(r.sewr.pcs)}</b><span class="oc-sub">${esc(r.sewr.last)}${r.sewr.alloc?' ≈':''}</span>`:r.prodq?`${fmt(r.prodq)}<span class="oc-sub">ERP ${L('生產','prod.')}</span>`:'—'}${r.qcr&&r.qcr.ins?`<span class="oc-sub">QC ${fmt(r.qcr.ins)}${r.qcr.rej?' · '+L('退 ','rej ')+fmt(r.qcr.rej):''}</span>`:''}</td><td class="r num" data-l="${L('入庫','FG')}">${r.fg_qty?fmt(r.fg_qty):'—'}</td><td class="r num" data-l="${L('出貨','Shipped')}">${r.ship.qty?`<b>${fmt(r.ship.qty)}</b>${r.ship.last?`<div class="small muted">${esc(r.ship.last)}</div>`:''}`:'—'}${r.open_qty>0?`<div class="small warn-t">${L('未交 ','open ')}${fmt(r.open_qty)}</div>`:''}</td><td class="r num" data-l="INVOICE">${r.inv?`<b>${fmt(r.inv.qty)}</b><div class="small muted">${r.inv.n} ${L('張','inv')} · $${fmt(r.inv.amount)}</div>`:'—'}</td><td data-l="${esc(t('status'))}">${ostChip(r.status)}</td></tr>`};
+  window.ocRowHTML=rowHTML; const headH=h.slice(h.lastIndexOf('<thead>'),h.lastIndexOf('<tbody>')); window.ocHeadHTML=()=>headH;
+  pg.forEach(r=>{h+=rowHTML(r)});
   h+=`</tbody></table></div>`;
   if(pages>1)h+=`<div class="oc-pages"><button class="btn sm" ${OC.page?'':'disabled'} onclick="ocSet('page',${OC.page-1})">◀</button><span class="small">${OC.page+1} / ${pages} · ${fmt(rows.length)} ${L('列','rows')}</span><button class="btn sm" ${OC.page<pages-1?'':'disabled'} onclick="ocSet('page',${OC.page+1})">▶</button></div>`;
   /* 待對照 */
@@ -3765,7 +3784,10 @@ async function syncTpl(man){
  /* ── 1) ordersView：ERP 沒有 SMV（或 0.01 佔位）就用 IE／日報的 SMV，並記下來源 ── */
  const _ov=ordersView;
  ordersView=function(){ if(GC.has('ordv'))return GC.get('ordv'); const out=_ov(); if(!IX&&!erpSmvMap().size)return out;
-  const res=out.map(o=>{ if(o.smv>0.01)return o.smv_src?o:Object.assign({},o,{smv_src:'erpo'}); const s=smvFor(o.style,o.style_name); return s?Object.assign({},o,{smv:s.v,smv_src:s.src,smv_date:s.d}):o });
+  const res=out.map(o=>{ const e=o.smv>0.01?+o.smv:0; const isNew=String(o.order_date||'')>=(window.SMV_NEW||'2026-07-01'); const s=(isNew||!e)?smvFor(o.style,o.style_name):null;
+   if(isNew&&s&&s.src==='ie_upd')return Object.assign({},o,{smv:s.v,smv_src:s.src,smv_date:s.d,smv_erpo:e||null});   /* 2026-07 以後：IE 週報（核准）優先，ERP 沒改就記下來比對 */
+   if(e)return o.smv_src?Object.assign({},o,{smv_erpo:e}):Object.assign({},o,{smv_src:'erpo',smv_erpo:e});   /* 以前的單照當時 ERP 紀錄 */
+   return s?Object.assign({},o,{smv:s.v,smv_src:s.src,smv_date:s.d}):o });
   GC.set('ordv',res); return res };
 
  /* ── 2) 訂單中心每列加上 已裁／已縫／QC／SMV ── */
@@ -3887,13 +3909,14 @@ async function syncTpl(man){
 
  /* ══════════ 訂單資料卡 ══════════ */
  const TABS=[['info','📋',['基本資料','Details']],['chain','🧭',['從頭追到尾','End-to-end']],['bom','🧵',['主副料明細','Materials']],['cut','✂️',['裁剪','Cutting']],['sew','🪡',['車縫','Sewing']],['ship','🚢',['出貨／INVOICE','Shipping / invoice']],['cost','💰',['成本','Cost']],['hist','📎',['附件・歷程','Files & history']]];
- let OCUR={id:null,tab:LS.get('psjerp_otab','info')};
+ let OCUR={id:null,tab:LS.get('psjerp_otab','info')}; window.ORD_TABS=TABS; window.OCUR=OCUR; window.ordCtx=id=>ctx(id); window.ordTabBody=(tab,id)=>tabBody(tab,ctx(id)); window.ordRender=id=>render(id);
  const kv=(l,v)=>`<div><dt>${esc(l)}</dt><dd>${v==null||v===''?'<span class="muted">—</span>':v}</dd></div>`;
  const tbl=(id,head,rows,foot)=>rows.length?`<div class="tbl-wrap"><table class="t" id="${id}"><thead><tr>${head.map(h=>`<th${h[1]?' class="r"':''}>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot?`<tfoot><tr>${foot.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}><b>${c}</b></td>`).join('')}</tr></tfoot>`:''}</table></div>`:`<p class="muted small">${L('沒有資料','No data')}</p>`;
  const ctx=id=>{ const ov=ordersView(); const o=ov.find(x=>x.id===id)||findRec('orders',id); const rows=window.ocRows?ocRows():[]; const g=rows.find(r=>r.ids&&r.ids.includes(id))||null;
   const ids=g?g.ids:[id]; const os=ids.map(i=>ov.find(x=>x.id===i)).filter(Boolean); const my=new Set(os.map(x=>keyN(x.my_no)).filter(Boolean)); const od=new Set(os.map(x=>x.od_no).filter(Boolean));
   const same=x=>(x.od_no&&od.has(x.od_no))||(x.my_no&&my.has(keyN(x.my_no))); return {o,g,os,same,my} };
  function tabBody(tab,C){
+  if(window.OTAB_EXT&&OTAB_EXT[tab])return OTAB_EXT[tab](C);
   const {o,g,os,same}=C; const q=g?g.qty:o.qty;
   if(tab==='info'){ const P=prodFor(o.my_no); const po=g&&g.po;
    let h=`<div class="kv">${kv(L('自編單號','Order no.'),`<span class="mono">${esc([...new Set(os.map(x=>x.my_no))].join('、'))}</span>`)}${kv(L('訂單編號','ERP order'),`<span class="mono">${esc([...new Set(os.map(x=>x.od_no).filter(Boolean))].join('、'))}</span>`)}${kv(L('客戶 PO','Customer PO'),`<span class="mono">${esc(o.po_no)}</span>`)}${kv(L('客戶','Customer'),esc(o.cust))}
@@ -4148,7 +4171,7 @@ async function syncTpl(man){
 
  /* ══════════ E. 款式資料卡 ══════════ */
  const STABS=[['info','📋',['基本資料','Details']],['smv','⏱️',['SMV 歷程','SMV history']],['ops','🧩',['工序','Operations']],['orders','🧾',['訂單','Orders']],['out','🪡',['產量','Output']],['img','🖼️',['樣衣圖','Photo']]];
- const STY={sk:null,tab:LS.get('psjerp_stab','info'),g:LS.get('psjerp_sg','M')};
+ const STY={sk:null,tab:LS.get('psjerp_stab','info'),g:LS.get('psjerp_sg','M')}; window.STY_TABS=STABS; window.STY=STY;
  const kv=(l,v)=>`<div><dt>${esc(l)}</dt><dd>${v==null||v===''?'<span class="muted">—</span>':v}</dd></div>`;
  let OPS=null, opsBusy=false;
  async function loadOps(){ if(OPS||opsBusy)return; opsBusy=true; try{
@@ -4161,6 +4184,7 @@ async function syncTpl(man){
   }catch(e){ OPS=new Map(); OPS.err=String(e.message||e) } finally{ opsBusy=false; if(STY.sk&&STY.tab==='ops')renderStyle(STY.sk) } }
  const tbl=(id,head,rows,foot)=>rows.length?`<div class="tbl-wrap"><table class="t" id="${id}"><thead><tr>${head.map(h=>`<th${h[1]?' class="r"':''}>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr${r._click?` class="rowlink" onclick="${r._click}"`:''}>${r.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot?`<tfoot><tr>${foot.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}><b>${c}</b></td>`).join('')}</tr></tfoot>`:''}</table></div>`:`<p class="muted small">${L('沒有資料','No data')}</p>`;
  function sBody(tab,s){
+  if(window.STAB_EXT&&STAB_EXT[tab])return STAB_EXT[tab](s);
   const c=s.cur; const erp=s.erp; const ieU=s.ie.find(v=>v.kind==='upd'), ieO=s.ie.find(v=>v.kind==='obd');
   if(tab==='info'){ const totMin=c?s.sew.pcs*c.v:0;
    return `<div class="kv">${kv(L('款號','Style'),`<span class="mono">${esc(s.style)}</span>`)}${kv(L('款名','Name'),esc(s.name))}${kv(L('客戶','Customer'),esc(s.custs.join('、')))}${kv(L('類別','Category'),esc(s.cat))}
@@ -4202,6 +4226,7 @@ async function syncTpl(man){
    <div class="db od-body"><div class="od-acts"><button class="btn sm" onclick="styExport()">⬇ ${L('匯出 Excel','Export Excel')}</button><button class="btn sm" onclick="window.print()">🖨 ${L('列印','Print')}</button><a class="btn sm" href="#p-ie" onclick="closeDrawer()">⏱️ ${L('IE 報告中心','IE report centre')}</a></div><div id="odTab">${sBody(tab,s)}</div></div>`);
   document.getElementById('drawer').classList.add('od'); setTimeout(()=>fillImgs(document.getElementById('drawer')),20) }
  window.openStyle=function(sk){ sk=ks(sk); if(!styleIdx().map.has(sk)){ const c=core(sk); const hit=styleIdx().list.find(s=>core(s.sk)===c&&c.length>=4); if(hit)sk=hit.sk } if(!imgList.done){imgList().then(()=>{if(STY.sk===sk)fillImgs(document.getElementById('drawer'))})} renderStyle(sk) };
+ window.styTabBody=(tab,sk)=>{const s=styleIdx().map.get(sk);return s?sBody(tab,s):''}; window.renderStyle=renderStyle; window.STY_IMG=()=>IMG; window.styPh=ph;
  window.styTab=k=>{STY.tab=k;LS.set('psjerp_stab',k);renderStyle(STY.sk)};
  window.styG=g=>{STY.g=g;LS.set('psjerp_sg',g);renderStyle(STY.sk)};
  window.styGo=d=>{ const list=window.STY_LAST&&STY_LAST.length?STY_LAST:styleIdx().list.map(x=>x.sk); const i=list.indexOf(STY.sk); const j=i+d; if(i<0||j<0||j>=list.length)return; renderStyle(list[j]) };
@@ -4237,6 +4262,533 @@ async function syncTpl(man){
  .sty-big-smv{font-size:24px;font-weight:700;color:var(--accent)}
  .sty-imgbox{text-align:center}.sty-big{max-width:100%;max-height:70vh;border-radius:10px;background:var(--surface-2);min-width:200px;min-height:200px;object-fit:contain}
  @media (max-width:860px){.sty-grid{grid-template-columns:1fr}.sty-hd{width:72px;height:72px;flex-basis:72px}.sty-big-smv{font-size:20px}}`;
+ document.head.appendChild(st);
+})();
+
+
+/* ══════════ v1.2.0（2026-11-04）：日週月年（同 PSJHR）、分類、連續往下捲、料品卡（布料／輔料可點）、款式歷年採購・用料、BOM 版本、2026-07 起 SMV 比對、訂單中心重點＋圖表＋異常、生產雲端即時連動 ══════════ */
+(function(){
+ const L=(z,e)=>LANG===0?z:e;
+ const ks=s=>keyN(s).replace(/[^A-Z0-9]+/g,'');
+ const core=x=>String(x||'').replace(/^(HA|NU|DI|A|O|K|RES)/,'').replace(/[A-Z]+$/,'');
+ const d10=v=>String(v||'').slice(0,10);
+ const nk=v=>keyN(v);
+ const pad=x=>String(x).padStart(2,'0');
+ window.SMV_NEW=window.SMV_NEW||'2026-07-01';
+ const today=()=>ymd(TODAY);
+ const D_=s=>new Date(s+'T00:00:00');
+ const addDs=(s,k)=>{const d=D_(s);d.setDate(d.getDate()+k);return ymd(d)};
+ const opt=(v,l,c)=>`<option value="${esc(v)}" ${String(v)===String(c)?'selected':''}>${esc(l)}</option>`;
+ const tbl=(id,head,rows,foot)=>rows.length?`<div class="tbl-wrap"><table class="t"${id?` id="${id}"`:''}><thead><tr>${head.map(h=>`<th${h[1]?' class="r"':''}>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr${r._click?` class="rowlink" onclick="${r._click}"`:''}${r._cls?` class="${r._cls}"`:''}>${r.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot?`<tfoot><tr>${foot.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r"':''}><b>${c}</b></td>`).join('')}</tr></tfoot>`:''}</table></div>`:`<p class="muted small">${L('沒有資料','No data')}</p>`;
+ const jsq=s=>String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/\n/g,' ');
+
+ /* ══════════ A. 期間列（同 PSJHR：◀ 有資料的期間 ▶ ＋ 每日／每週／半月／每月／每季／每年／全部）══════════ */
+ function rngFor(pt,a){ a=a||today(); const d=D_(a), y=d.getFullYear(), m=d.getMonth();
+  if(pt==='D')return {from:a,to:a};
+  if(pt==='W'){const s=addDs(a,-((d.getDay()+6)%7));return {from:s,to:addDs(s,6)}}
+  if(pt==='H')return d.getDate()<=15?{from:ymd(new Date(y,m,1)),to:ymd(new Date(y,m,15))}:{from:ymd(new Date(y,m,16)),to:ymd(new Date(y,m+1,0))};
+  if(pt==='M')return {from:ymd(new Date(y,m,1)),to:ymd(new Date(y,m+1,0))};
+  if(pt==='Q'){const q=Math.floor(m/3)*3;return {from:ymd(new Date(y,q,1)),to:ymd(new Date(y,q+3,0))}}
+  if(pt==='Y')return {from:y+'-01-01',to:y+'-12-31'};
+  return {from:'0000-01-01',to:'9999-12-31',all:true} }
+ const isoW=s=>{const x=D_(s);x.setDate(x.getDate()-((x.getDay()+6)%7)+3);const yy=x.getFullYear();const j4=new Date(yy,0,4);return {y:yy,w:1+Math.round(((x-j4)/864e5-3+((j4.getDay()+6)%7))/7)}};
+ function pLabel(pt,R){ if(!R||R.all)return L('全部期間','All time');
+  if(pt==='D')return R.from; if(pt==='W'){const w=isoW(R.from);return `${w.y}-W${pad(w.w)} · ${R.from.slice(5)}–${R.to.slice(5)}`}
+  if(pt==='H')return R.from.slice(0,7)+' · '+R.from.slice(8)+'–'+R.to.slice(8);
+  if(pt==='M')return R.from.slice(0,7); if(pt==='Q')return R.from.slice(0,4)+'-Q'+(Math.floor((+R.from.slice(5,7)-1)/3)+1); return R.from.slice(0,4) }
+ const PTS=[['D',['每日','Daily']],['W',['每週','Weekly']],['H',['半月','Half-month']],['M',['每月','Monthly']],['Q',['每季','Quarterly']],['Y',['每年','Yearly']],['ALL',['全部','All']]];
+ const PN={}, PNOPT={}, PNC=new Map();
+ function pnS(k,def){ if(!PN[k])PN[k]=Object.assign({pt:'Y',anchor:today(),f:''},def||{},LS.get('psjerp_pn_'+k,{})); return PN[k] }
+ window.pnS=pnS;
+ window.pnRange=k=>{const s=pnS(k);return rngFor(s.pt,s.anchor)};
+ function pnOpts(pt,dates){ const seen=new Set(),out=[]; const td=today(); dates.forEach(d=>{ d=d10(d); if(!d||d<'2000'||d>td)return; const R=rngFor(pt,d); if(seen.has(R.from))return; seen.add(R.from); out.push({v:R.from,l:pLabel(pt,R)}) }); return out.sort((a,b)=>a.v<b.v?-1:1) }
+ window.pnHTML=function(k,o){ o=o||{}; const s=pnS(k,o.def); const pts=o.pts||PTS.map(p=>p[0]); if(!pts.includes(s.pt))s.pt=pts.includes('Y')?'Y':pts[0];
+  const dates=o.dates||[]; let h=`<div class="pnav pnx" role="group" aria-label="${L('期間','Period')}"><div class="pn-row">`;
+  if(s.pt!=='ALL'){ const R=rngFor(s.pt,s.anchor); const ck=k+'|'+s.pt+'|'+dates.length+'|'+(dates[0]||'')+'|'+(dates[dates.length-1]||''); let os=PNC.get(ck); if(!os){os=pnOpts(s.pt,dates);PNC.set(ck,os)} PNOPT[k]=os; os=os.slice(); if(!os.some(x=>x.v===R.from)){os.push({v:R.from,l:pLabel(s.pt,R)+' · '+L('無資料','no data')});os.sort((a,b)=>a.v<b.v?-1:1)} const i=os.findIndex(x=>x.v===R.from);
+   h+=`<div class="pn-sel"><button class="icon-btn pn-a" ${i>0?'':'disabled'} onclick="pnStep('${k}',-1)" aria-label="${L('上一期','Previous')}">◀</button><select class="inp pn-p" aria-label="${L('期間','Period')}" onchange="pnSet('${k}',this.value)">${os.slice().reverse().map(x=>`<option value="${x.v}" ${x.v===R.from?'selected':''}>${esc(x.l)}</option>`).join('')}</select><button class="icon-btn pn-a" ${i<os.length-1?'':'disabled'} onclick="pnStep('${k}',1)" aria-label="${L('下一期','Next')}">▶</button></div>`;
+   h+=`<span class="pn-hint">${esc(pLabel(s.pt,R))}${o.hint?' · '+esc(o.hint):''}</span>` }
+  else { PNOPT[k]=[]; h+=`<span class="pn-hint">${L('全部期間','All time')}${o.hint?' · '+esc(o.hint):''}</span>` }
+  if(o.fields)h+=`<select class="inp pn-f" aria-label="${L('依哪個日期','Date field')}" onchange="pnField('${k}',this.value)">${o.fields.map(([v,l])=>opt(v,l,s.f||o.fields[0][0])).join('')}</select>`;
+  if(o.extra)h+=o.extra;
+  h+=`</div><div class="pn-row"><span class="pn-cap">${L('時間','Time')}</span><div class="seg pn-pt">${PTS.filter(p=>pts.includes(p[0])).map(([p,l])=>`<button class="${s.pt===p?'on':''}" onclick="pnPt('${k}','${p}')">${esc(L(l[0],l[1]))}</button>`).join('')}</div></div></div>`;
+  PN[k]._dates=dates; return h };
+ const pnSave=k=>{ const s=PN[k]; LS.set('psjerp_pn_'+k,{pt:s.pt,anchor:s.anchor,f:s.f}); if(window.OC)OC.page=0; const y=window.scrollY; rerender(); if(k!=='ordercenter'&&k!=='styles')return; try{window.scrollTo(0,y)}catch(e){} };
+ window.pnSet=(k,v)=>{ if(!v)return; pnS(k).anchor=v; pnSave(k) };
+ window.pnStep=(k,d)=>{ const s=pnS(k); const os=PNOPT[k]||[]; const R=rngFor(s.pt,s.anchor); let i=os.findIndex(x=>x.v===R.from);
+  if(i<0){ const j=d>0?os.findIndex(x=>x.v>R.from):(()=>{for(let q=os.length-1;q>=0;q--)if(os[q].v<R.from)return q;return -1})(); if(j<0)return; s.anchor=os[j].v; return pnSave(k) }
+  const j=Math.max(0,Math.min(os.length-1,i+d)); if(j!==i){s.anchor=os[j].v;pnSave(k)} };
+ window.pnPt=(k,p)=>{ const s=pnS(k); s.pt=p; if(p!=='ALL'){ const os=pnOpts(p,s._dates||[]); const v=rngFor(p,s.anchor).from; if(os.length&&!os.some(x=>x.v===v))s.anchor=os[os.length-1].v } pnSave(k) };
+ window.pnField=(k,f)=>{ pnS(k).f=f; pnSave(k) };
+ window.pnDrill=(k,pt,a,view)=>{ const s=pnS(k); s.pt=pt; s.anchor=a; if(view&&window.OC&&k==='ordercenter'){OC.view=view;LS.set('psjerp_oc',OC)} if(view&&k==='styles'&&window.SF){SF.view=view;LS.set('psjerp_sf',SF)} pnSave(k) };
+ const inRg=(d,R)=>{ if(R.all)return true; d=d10(d); return !!d&&d>=R.from&&d<=R.to };
+ /* 一個期間底下的小格：年→月、季→週、半月／月／週→日、全部→年 */
+ function subOf(pt,R,minD){ const out=[]; const td=today();
+  if(pt==='ALL'){ const y0=+(String(minD||'2014').slice(0,4))||2014; for(let y=y0;y<=+td.slice(0,4);y++)out.push({k:String(y),l:String(y),s:String(y),pt:'Y',a:y+'-01-01',R:{from:y+'-01-01',to:y+'-12-31'}}); return {g:'Y',list:out} }
+  if(pt==='Y'){ const y=R.from.slice(0,4); for(let m=1;m<=12;m++){const f=`${y}-${pad(m)}-01`;out.push({k:f.slice(0,7),l:f.slice(0,7),s:LANG===0?m+'月':['J','F','M','A','M','J','J','A','S','O','N','D'][m-1],pt:'M',a:f,R:rngFor('M',f)})} return {g:'M',list:out} }
+  if(pt==='Q'){ let w=rngFor('W',R.from).from; while(w<=R.to){ out.push({k:w,l:pLabel('W',rngFor('W',w)),s:w.slice(5),pt:'W',a:w,R:rngFor('W',w)}); w=addDs(w,7) } return {g:'W',list:out} }
+  if(pt==='D'){ for(let i=13;i>=0;i--){const d=addDs(R.from,-i);out.push({k:d,l:d,s:d.slice(8),pt:'D',a:d,R:{from:d,to:d}})} return {g:'D',list:out} }
+  for(let d=R.from;d<=R.to;d=addDs(d,1))out.push({k:d,l:d,s:d.slice(8),pt:'D',a:d,R:{from:d,to:d}}); return {g:'D',list:out} }
+ const bucketKey=(g,d)=>{ d=d10(d); if(!d)return ''; return g==='Y'?d.slice(0,4):g==='M'?d.slice(0,7):g==='W'?rngFor('W',d).from:d };
+ window.v12={rngFor,pLabel,subOf,bucketKey,inRg};
+
+ /* ══════════ B. 品類（從款名自動分）══════════ */
+ const PTYPE=[['LABCOAT',/LAB\s*COAT|LABCOAT|DOCTOR\s*COAT/,['實驗袍／醫師袍','Lab coat']],['SCRUB',/SCRUB/,['手術服','Scrubs']],['COVERALL',/COVERALL|BOILER|OVERALL|DUNGAREE/,['連身工作服','Coverall']],['GOWN',/GOWN|ROBE|KIMONO/,['罩袍','Gown / robe']],['APRON',/APRON|\bBIB\b/,['圍裙','Apron']],
+  ['JACKET',/JACKET|PARKA|BLOUSON|WINDBREAK|\bCOAT\b|SOFTSHELL|FLEECE|HOODIE/,['外套','Jacket / coat']],['VEST',/\bVEST|GILET|TABARD/,['背心','Vest']],['SHIRT',/SHIRT|BLOUSE|POLO|TUNIC|\bTOP\b|SMOCK|\bTEE\b|T-SHIRT/,['上衣','Shirt / top']],['PANT',/PANT|TROUSER|JEAN|CARGO|SLACK/,['長褲','Pants']],['SHORT',/SHORT/,['短褲','Shorts']],
+  ['SKIRT',/SKIRT|DRESS/,['裙／洋裝','Skirt / dress']],['LINEN',/TOWEL|NAPKIN|SHEET|PILLOW|TABLE|CLOTH|\bMAT\b|\bBAG\b|CURTAIN|DUVET|BLANKET|SERVIETTE|RUNNER/,['布品／毛巾','Linen']],['CAP',/\bCAP\b|\bHAT\b|BEANIE|HEADWEAR/,['帽','Headwear']]];
+ window.prodType=name=>{ const u=String(name||'').toUpperCase(); for(const [k,re] of PTYPE)if(re.test(u))return k; return 'OTHER' };
+ const ptName=k=>{const x=PTYPE.find(p=>p[0]===k);return x?L(x[2][0],x[2][1]):L('其他','Other')};
+ window.ptName=ptName;
+
+ /* ══════════ C. 訂單列加上：品類、ERP 原訂單 SMV ══════════ */
+ const _gs=GC.set.bind(GC);
+ GC.set=function(k,v){ if(k==='ocrows'&&Array.isArray(v)&&!v._v12){ try{ const ov=new Map(ordersView().map(o=>[o.id,o])); v.forEach(g=>{ g.ptype=prodType(g.style_name||g.style); const e=g.ids.map(id=>ov.get(id)).find(o=>o&&o.smv_erpo); g.smv_erpo=e?e.smv_erpo:null }); Object.defineProperty(v,'_v12',{value:1,enumerable:false}) }catch(e){console.error('v12 rows',e)} } return _gs(k,v) };
+
+ /* ══════════ D. 異常規則 ══════════ */
+ const smvOld=r=>r.smv_erpo&&r.smv_src==='ie_upd'&&r.smv>0&&Math.abs(r.smv_erpo-r.smv)>0.02*r.smv;
+ const ANOM=[
+  ['late',['逾期未交','Late, not shipped'],'crit',r=>r.status==='late',r=>`${L('交期 ','due ')}${r.delivery} · ${L('未交 ','open ')}${fmt(r.open_qty||Math.max(0,r.qty-r.ship.qty))}`],
+  ['baddl',['ERP 交期打錯','Bad ERP delivery date'],'warn',r=>!!r.bad_delivery,r=>'⚠ '+r.bad_delivery],
+  ['nodl',['未結但沒有交期','Open, no delivery date'],'warn',r=>r.status!=='closed'&&!r.delivery&&!r.bad_delivery,r=>L('訂單日 ','ordered ')+r.order_date],
+  ['podiff',['客戶 PO 數量不同','Customer PO qty differs'],'warn',r=>r.po&&r.po.state==='diff',r=>`PO ${fmt(r.po.qty)} · ERP ${fmt(r.po.erp)} · ${L('差 ','Δ ')}${fmt(r.po.qty-r.po.erp)}`],
+  ['smvold',['ERP SMV 沒跟上 IE 週報（2026-07 起）','ERP SMV behind IE weekly (from 2026-07)'],'warn',smvOld,r=>`ERP ${fmt(r.smv_erpo,2)} → IE ${fmt(r.smv,2)}`],
+  ['nosmv',['未結但缺 SMV','Open, no SMV'],'warn',r=>r.status!=='closed'&&!(r.smv>0.01),r=>esc(r.style_name||'')],
+  ['over',['出貨比訂單多 5% 以上','Shipped > order +5%'],'warn',r=>r.qty>0&&r.ship.qty>r.qty*1.05,r=>`${fmt(r.ship.qty)} / ${fmt(r.qty)}`],
+  ['short',['已結案但短交 3% 以上','Closed, short-shipped >3%'],'warn',r=>r.status==='closed'&&r.qty>0&&r.ship.qty>0&&r.ship.qty<r.qty*0.97,r=>`${fmt(r.ship.qty)} / ${fmt(r.qty)}`],
+  ['fgover',['入庫比訂單多 10% 以上','FG > order +10%'],'warn',r=>r.qty>0&&r.fg_qty>r.qty*1.1,r=>`${fmt(r.fg_qty)} / ${fmt(r.qty)}`],
+  ['shipfg',['出貨比入庫多','Shipped > FG received'],'info',r=>r.fg_qty>0&&r.ship.qty>r.fg_qty*1.02,r=>`${L('出 ','ship ')}${fmt(r.ship.qty)} · ${L('入 ','FG ')}${fmt(r.fg_qty)}`],
+  ['nosew',['已出貨但車縫日報找不到','Shipped, not in sewing reports'],'info',r=>r.ship.qty>0&&String(r.order_date)>='2020-07'&&r.sewr&&r.sewr.none,r=>L('日報同 PO 有 ','PO in reports: ')+fmt(r.sewr.poTotal||0)],
+ ];
+ window.ocAnom=r=>ANOM.filter(a=>{try{return a[3](r)}catch(e){return false}}).map(a=>a[0]);
+
+ /* ══════════ E. 小圖表（HTML 長條；滑過看數字；配色同資料視覺規範，深色主題另一組）══════════ */
+ function colChart(bk,series,o){ o=o||{}; const max=Math.max(1,...series.flatMap(s=>s.vals)); const many=bk.length>16, mid=bk.length>9;
+  const peak=series.map(s=>s.vals.indexOf(Math.max(...s.vals)));
+  return `<div class="vz">${series.length>1?`<div class="vz-legend">${series.map(s=>`<span><i style="background:var(${s.c})"></i>${esc(s.name)}</span>`).join('')}</div>`:''}<div class="vz-cols${many?' many':''}${mid?' mid':''}">${bk.map((b,i)=>`<div class="vz-col${o.click?' click':''}" ${o.click?`onclick="${o.click(b)}"`:''} title="${esc(b.l)}&#10;${series.map(s=>esc(s.name)+'：'+fmt(s.vals[i])).join('&#10;')}"><div class="vz-bars">${series.map((s,j)=>`<div class="vz-bar" style="height:${Math.max(s.vals[i]?2:0,s.vals[i]/max*100)}%;background:var(${s.c})">${peak[j]===i&&s.vals[i]&&!many?`<span class="vz-pk">${fmt(s.vals[i])}</span>`:''}</div>`).join('')}</div><div class="vz-x">${esc(b.s||b.l)}</div></div>`).join('')}</div></div>` }
+ function hBars(items){ const max=Math.max(1,...items.map(x=>x.v)); return `<div class="vz-h">${items.map(x=>`<div class="vz-hr${x.click?' click':''}" ${x.click?`onclick="${x.click}"`:''} title="${esc(x.l)}：${esc(x.t||fmt(x.v))}"><span class="vz-hl">${esc(x.l)}</span><span class="vz-ht"><span class="vz-hb" style="width:${x.v/max*100}%;background:var(${x.c||'--vz1'})"></span></span><span class="vz-hv">${esc(x.t||fmt(x.v))}</span></div>`).join('')}</div>` }
+ window.v12chart={colChart,hBars};
+
+ /* ══════════ F. 料品索引：料號／料名互認；領料、採購、單價、進貨、庫存、BOM 都用同一把鑰匙 ══════════ */
+ function MI(){ if(GC.has('v12mi'))return GC.get('v12mi');
+  const M={alias:new Map(),name:new Map(),info:new Map(),bomSty:new Map(),bomMy:new Map(),bomMat:new Map(),issMy:new Map(),issSty:new Map(),issMat:new Map(),price:new Map(),rec:new Map(),stock:new Map(),has:{iss:dsLoaded('issues'),price:dsLoaded('price'),rec:dsLoaded('receiving')}};
+  const add=(m,k,v)=>{ if(!k)return; let a=m.get(k); if(!a){a=[];m.set(k,a)} a.push(v) };
+  const al=(no,nm)=>{ const a=nk(no),b=nk(nm); if(a&&b&&a!==b&&!M.alias.has(b))M.alias.set(b,a); if(a&&nm&&!M.name.has(a))M.name.set(a,String(nm)) };
+  (DB.materials||[]).forEach(m=>{ al(m.material_no,m.material); const k=nk(m.material_no); if(k)M.info.set(k,m) });
+  const isI=M.has.iss?live(DB.issues||[]):[], pr=M.has.price?(DB.price||[]):[], rc=M.has.rec?live(DB.receiving||[]):[];
+  isI.forEach(r=>al(r.material_no,r.material)); pr.forEach(r=>al(r.material_no,r.material)); rc.forEach(r=>al(r.material_no,r.material));
+  (DB.fabric||[]).forEach(r=>al(r.material_no,r.name)); (DB.accessories||[]).forEach(r=>al(r.material_no,r.name));
+  const ck=(no,nm)=>{ const a=nk(no); if(a)return a; const b=nk(nm); return M.alias.get(b)||b };
+  M.ck=ck;
+  live(DB.bom||[]).forEach(b=>{ const k=ck('',b.material); b._k=k; add(M.bomSty,ks(b.style),b); add(M.bomMy,nk(b.my_no),b); add(M.bomMat,k,b) });
+  isI.forEach(r=>{ const k=ck(r.material_no,r.material); r._k=k; add(M.issMy,nk(r.my_no),r); add(M.issSty,ks(r.style),r); add(M.issMat,k,r) });
+  if(pr.length)pr.forEach(r=>{ const up=+r.unit_price||+r.price||0; add(M.price,ck(r.material_no,r.material),{d:d10(r.purchase_date),up,qty:+r.qty||0,sup:r.supplier||'',pno:r.purchase_no||'',clr:r.color||'',size:r.size||'',unit:r.unit||'',cur:r.currency||'',eta:d10(r.eta),nm:r.material||''}) });
+  else live(DB.purchase||[]).forEach(r=>{ add(M.price,ck('',r.material),{d:d10(r.purchase_date),up:+r.price||0,qty:+r.qty||0,sup:r.supplier||'',pno:r.purchase_no||'',clr:r.color||'',size:r.size||'',unit:r.unit||'',cur:r.currency||'',eta:d10(r.eta),nm:r.material||'',rec:+r.received||0,out:+r.outstanding||0}) });
+  M.price.forEach(a=>a.sort((x,y)=>x.d<y.d?-1:1));
+  rc.forEach(r=>add(M.rec,ck(r.material_no,r.material),r));
+  (DB.fabric||[]).forEach(r=>add(M.stock,ck(r.material_no,r.name),Object.assign({_t:'main'},r))); (DB.accessories||[]).forEach(r=>add(M.stock,ck(r.material_no,r.name),Object.assign({_t:'trim'},r)));
+  GC.set('v12mi',M); return M }
+ window.matIdx=MI;
+ const clrHit=(a,b)=>{ a=nk(a); b=nk(b); return !a||!b||a.includes(b)||b.includes(a) };
+ /* 某日的單價：那天（含之後 30 天內）最近一次採購價；同色優先 */
+ function upAt(k,d,clr){ const a=MI().price.get(k); if(!a||!a.length)return null; const lim=d?addDs(d10(d),30):'9999'; const P=a.filter(x=>x.up>0); if(!P.length)return null;
+  const pick=list=>{ let best=null; for(const x of list){ if(x.d<=lim)best=x; else { if(!best)best=x; break } } return best };
+  const c=clr?P.filter(x=>clrHit(x.clr,clr)):[]; const b=pick(c.length?c:P); return b?{up:b.up,d:b.d,cur:b.cur}:null }
+ window.matUpAt=upAt;
+ const matNm=k=>{ const M=MI(); return M.name.get(k)||k };
+ /* 這個料主要給哪些款用（依領料量）*/
+ function shareOf(k){ const a=MI().issMat.get(k)||[]; const m=new Map(); let t=0; a.forEach(r=>{const s=ks(r.style)||'?';const q=+r.qty||0;m.set(s,(m.get(s)||0)+q);t+=q}); return {t,m} }
+ const styleShare=(k,sk)=>{ const S=shareOf(k); if(!S.t)return null; let q=S.m.get(sk)||0; if(!q){ const c=core(sk); if(c.length>=4)S.m.forEach((v,s)=>{if(core(s)===c)q+=v}) } return q/S.t };
+ const NEED=['issues','price','receiving'];
+ const needMat=()=>NEED.filter(x=>!dsLoaded(x));
+ function loadingMat(after){ const need=needMat(); if(!need.length)return null; setTimeout(()=>ensureDS(need).then(()=>{GC.delete('v12mi');after()}).catch(e=>toast(String(e.message||e))),30); return `<p class="note">⏳ ${L('載入領料、單價、進貨資料…（第一次較久，之後秒開）','Loading issues, prices and receipts… (first time is slower)')}</p>` }
+
+ /* ══════════ G. 抽屜返回鍵（料品卡 ⇄ 訂單卡 ⇄ 款式卡）══════════ */
+ window.DSTACK=window.DSTACK||[];
+ const curDrawer=()=>{ const dr=document.getElementById('drawer'); if(!dr||dr.hidden)return null; if(window.OCUR&&OCUR.id&&dr.querySelector('.od-tabs')&&!dr.querySelector('.sty-dh')&&!dr.querySelector('.mat-dh'))return {k:'ord',id:OCUR.id}; if(window.STY&&STY.sk&&dr.querySelector('.sty-dh'))return {k:'sty',id:STY.sk}; if(MAT.k&&dr.querySelector('.mat-dh'))return {k:'mat',id:MAT.k,c:MAT.clr}; return null };
+ window.drawerPush=()=>{ const c=curDrawer(); if(c){ const t=DSTACK[DSTACK.length-1]; if(!t||t.k!==c.k||t.id!==c.id)DSTACK.push(c); if(DSTACK.length>20)DSTACK.shift() } };
+ window.drawerBack=()=>{ const c=DSTACK.pop(); if(!c)return closeDrawer(); if(c.k==='ord')openOrder(c.id); else if(c.k==='sty')openStyle(c.id); else if(c.k==='mat')openMat(c.id,c.c,true) };
+ const backBtn=()=>DSTACK.length?`<button class="btn sm d-back" onclick="drawerBack()">← ${L('返回','Back')}</button>`:'';
+ window.goOrder=id=>{ drawerPush(); openOrder(id) };
+ window.goStyle=sk=>{ drawerPush(); openStyle(sk) };
+ window.goMat=(k,c)=>{ drawerPush(); openMat(k,c) };
+ const mlink=(name,k,c)=>`<a href="javascript:void 0" class="mlink" onclick="event.stopPropagation();goMat('${jsq(k)}','${jsq(c||'')}')">${esc(name)}</a>`;
+ const slink=(st)=>`<a href="javascript:void 0" class="mlink mono" onclick="event.stopPropagation();goStyle('${jsq(ks(st))}')">${esc(st)}</a>`;
+
+ /* ══════════ H. 🧶 料品卡 ══════════ */
+ const MAT={k:null,clr:''};
+ window.openMat=function(raw,clr,fromBack){
+  const need=needMat(); if(need.length){ openDrawer(`<div class="db"><p class="note">⏳ ${L('載入領料、單價、進貨資料…','Loading issues, prices and receipts…')}</p></div>`); ensureDS(need).then(()=>{GC.delete('v12mi');openMat(raw,clr,fromBack)}).catch(e=>toast(String(e.message||e))); return }
+  const M=MI(); const k=M.alias.get(nk(raw))||nk(raw); MAT.k=k; MAT.clr=clr||''; if(window.OCUR)OCUR.id=null; if(window.STY)STY.sk=null;
+  const info=M.info.get(k)||{}; const nm=M.name.get(k)||info.material||raw; const C=MAT.clr;
+  const P=(M.price.get(k)||[]).filter(x=>!C||clrHit(x.clr,C)); const I=(M.issMat.get(k)||[]).filter(r=>!C||clrHit(r.color,C)); const R=(M.rec.get(k)||[]).filter(r=>!C||clrHit(r.color||r.color_name,C)); const S=(M.stock.get(k)||[]).filter(r=>!C||clrHit(r.color_name||r.color,C)); const B=M.bomMat.get(k)||[];
+  const type=info.type||(P[0]&&P[0].unit==='YD'?'main':'')||(S[0]&&S[0]._t)||(I[0]&&I[0].type)||'';
+  const clrs=new Map(); (M.price.get(k)||[]).forEach(x=>{if(x.clr)clrs.set(nk(x.clr),x.clr)}); (M.issMat.get(k)||[]).forEach(r=>{if(r.color&&clrs.size<60&&![...clrs.keys()].some(c=>clrHit(c,r.color)))clrs.set(nk(r.color),r.color)});
+  const last=P.filter(x=>x.up>0).slice(-1)[0]; const unit=(last&&last.unit)||info.unit||(I[0]&&I[0].unit)||'';
+  const stock=sum(S,r=>+r.balance||0);
+  /* 歷年採購 */
+  const byY=new Map(); P.forEach(x=>{ const y=x.d.slice(0,4); const a=byY.get(y)||{n:0,qty:0,amt:0,upq:0,ups:new Set(),sup:new Set()}; a.n++; a.qty+=x.qty; a.amt+=x.qty*x.up; if(x.up>0)a.upq+=x.qty; a.sup.add(x.sup); byY.set(y,a) });
+  const ys=[...byY.keys()].sort().reverse();
+  /* 用在哪些款（依領料）*/
+  const bySty=new Map(); I.forEach(r=>{ const s=r.style||'?'; const a=bySty.get(s)||{qty:0,my:new Set(),last:'',cust:''}; a.qty+=+r.qty||0; a.my.add(r.my_no); if(d10(r.issue_date)>a.last)a.last=d10(r.issue_date); bySty.set(s,a) });
+  const tot=sum([...bySty.values()],'qty'); const styl=[...bySty.entries()].sort((a,b)=>b[1].last.localeCompare(a[1].last)||b[1].qty-a[1].qty);
+  const bomSty=new Set(B.map(b=>b.style)); 
+  let h=`<div class="dh od-h mat-dh"><div class="od-title"><div class="small muted">${type==='main'?'🧶 '+L('主料','Main fabric'):type==='trim'?'🧷 '+L('副料','Trim'):'📦 '+L('料品','Material')}${info.material_no||k!==nk(nm)?` · <span class="mono">${esc(info.material_no||k)}</span>`:''}${info.supplier_id?' · '+esc(info.supplier_id):''}</div><h2>${esc(nm)}</h2><div class="small muted">${C?L('顏色：','Colour: ')+esc(C)+' · ':''}${unit?esc(unit)+' · ':''}${info.width&&+info.width?L('幅寬 ','width ')+esc(info.width)+' · ':''}${last?L('最近單價 ','last price ')+money(last.up,3)+' '+esc(last.cur||'')+' ('+esc(last.d)+')':''}</div></div>
+   <div class="od-nav">${backBtn()}<button class="icon-btn x" onclick="closeDrawer()" aria-label="${esc(t('close'))}">✕</button></div></div>
+   <div class="db od-body"><div class="od-acts"><select class="inp" style="width:auto;max-width:100%" onchange="openMat('${jsq(k)}',this.value,true)">${opt('',L('全部顏色','All colours'),C)}${[...clrs.values()].slice(0,80).map(c=>opt(c,c,C)).join('')}</select><button class="btn sm" onclick="matExport()">⬇ ${L('匯出 Excel','Export Excel')}</button></div>
+   <div class="kpis" style="margin-bottom:12px">${kpi(L('目前庫存','Stock now'),S.length?fmt(stock,unit==='YD'?0:0):'—',esc(unit),S.length?L('ERP 庫存明細','ERP stock list'):L('庫存表沒有這料','not in stock list'))}${kpi(L('歷年採購','Purchased'),fmt(sum(P,'qty')),esc(unit),fmt(P.length)+' '+L('筆','lines'))}${kpi(L('採購金額','Purchase value'),money(sum(P,x=>x.qty*x.up)),'',ys.length?ys[ys.length-1]+'–'+ys[0]:'')}${kpi(L('用在','Used in'),fmt(bySty.size||bomSty.size),L('款','styles'),L('依領料','by issues'))}</div>`;
+  if(S.length)h+=`<h4>📦 ${L('庫存','Stock')}</h4>`+tbl('mt_stock',[[L('顏色','Colour')],[L('色名','Colour name')],[L('尺寸','Size')],[L('疋數','Rolls'),1],[L('庫存','Balance'),1],[L('單位','Unit')]],S.slice(0,60).map(r=>[esc(r.color||''),esc(r.color_name||''),esc(r.size||''),r.rolls!=null?fmt(r.rolls):'',fmt(r.balance,1),esc(r.unit||'')]),S.length>1?['','','','',fmt(stock,1),'']:null);
+  h+=`<h4 style="margin-top:14px">🛒 ${L('歷年採購','Purchases by year')}</h4>`+tbl('mt_year',[[L('年','Year')],[L('筆數','Lines'),1],[L('數量','Qty'),1],[L('平均單價','Avg price'),1],[L('金額','Amount'),1],[L('供應商','Supplier')]],ys.map(y=>{const a=byY.get(y);return [`<b>${y}</b>`,fmt(a.n),fmt(a.qty),a.upq?money(a.amt/a.upq,3):'—',money(a.amt),esc([...a.sup].filter(Boolean).join('、'))]}),ys.length>1?['',fmt(P.length),fmt(sum(P,'qty')),'',money(sum(P,x=>x.qty*x.up)),'']:null);
+  if(ys.length>1){ const it=ys.slice().reverse().map(y=>{const a=byY.get(y);return {l:y,v:a.upq?a.amt/a.upq:0,t:a.upq?money(a.amt/a.upq,3):'—'}}).filter(x=>x.v>0); if(it.length>1)h+=`<div class="small muted" style="margin:8px 0 4px">${L('平均單價走勢','Average price by year')}</div>`+hBars(it) }
+  const PL=P.slice().reverse();
+  h+=`<details class="mt-det" ${P.length<=40?'open':''}><summary><h4 style="display:inline">🧾 ${L('採購明細','Purchase lines')} (${fmt(P.length)})</h4></summary>`+tbl('mt_pur',[[L('日期','Date')],[L('採購單','PO no.')],[L('供應商','Supplier')],[L('顏色','Colour')],[L('尺寸','Size')],[L('數量','Qty'),1],[L('單價','Price'),1],[L('金額','Amount'),1],['ETA']],PL.slice(0,300).map(x=>[esc(x.d),`<span class="mono">${esc(x.pno)}</span>`,esc(x.sup),esc(x.clr),esc(x.size),fmt(x.qty),x.up?money(x.up,3):'—',x.up?money(x.qty*x.up):'—',esc(x.eta||'')]))+(PL.length>300?`<p class="small muted">${L('只列最近 300 筆，全部請匯出','Latest 300 shown; export for all')}</p>`:'')+`</details>`;
+  h+=`<h4 style="margin-top:14px">👕 ${L('用在哪些款（依領料）','Used in styles (by issues)')}</h4>`+(styl.length?tbl('mt_sty',[[L('款號','Style')],[L('單數','Orders'),1],[L('領料量','Issued'),1],['%',1],[L('最近領料','Last issue')]],styl.slice(0,80).map(([s,a])=>{const r=[slink(s),fmt(a.my.size),fmt(a.qty,1),tot?fmt(a.qty/tot*100,1):'',esc(a.last)];r._click=`goStyle('${jsq(ks(s))}')`;return r})):`<p class="small muted">${L('還沒有領料紀錄。BOM 用到這料的款：','No issues yet. Styles using it in BOM: ')}${[...bomSty].slice(0,30).map(s=>slink(s)).join('、')||'—'}</p>`);
+  const RL=R.slice().sort((a,b)=>String(b.recv_date).localeCompare(String(a.recv_date)));
+  if(RL.length)h+=`<details class="mt-det"><summary><h4 style="display:inline">📥 ${L('進貨驗收','Receipts')} (${fmt(RL.length)})</h4></summary>`+tbl('mt_rec',[[L('日期','Date')],[L('驗收單','Receipt')],[L('採購單','PO no.')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('倉','Whs')]],RL.slice(0,200).map(r=>[esc(d10(r.recv_date)),`<span class="mono">${esc(r.recv_no)}</span>`,`<span class="mono">${esc(r.purchase_no||'')}</span>`,esc(r.color_name||r.color||''),fmt(r.qty),esc(r.whs||'')]))+`</details>`;
+  const IL=I.slice().sort((a,b)=>String(b.issue_date).localeCompare(String(a.issue_date)));
+  if(IL.length)h+=`<details class="mt-det"><summary><h4 style="display:inline">📤 ${L('領料明細','Issues')} (${fmt(IL.length)})</h4></summary>`+tbl('mt_iss',[[L('日期','Date')],[L('領料單','Issue no.')],[L('自編單號','Order no.')],[L('款號','Style')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單位','Unit')]],IL.slice(0,300).map(r=>{const o=ordersView().find(x=>keyN(x.my_no)===keyN(r.my_no));const row=[esc(d10(r.issue_date)),`<span class="mono">${esc(r.issue_no)}</span>`,`<span class="mono">${esc(r.my_no||'')}</span>`,esc(r.style||''),esc(r.color||''),fmt(r.qty,2),esc(r.unit||'')];if(o)row._click=`goOrder('${o.id}')`;return row}))+`</details>`;
+  h+=`</div>`;
+  openDrawer(h); document.getElementById('drawer').classList.add('od');
+ };
+ window.matExport=function(){ if(!window.XLSX)return toast(L('Excel 元件未載入','Excel library not loaded')); const wb=XLSX.utils.book_new(); document.querySelectorAll('#drawer table').forEach((t,i)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t,{raw:true}),(t.id||'表'+i).replace(/^mt_/,'').slice(0,28))); XLSX.writeFile(wb,`VRT_料品_${(matNm(MAT.k)||MAT.k).replace(/[\\/:*?"<>|]/g,'_').slice(0,40)}.xlsx`) };
+ const _cd=closeDrawer; closeDrawer=function(){ MAT.k=null; DSTACK.length=0; return _cd.apply(this,arguments) };
+
+ /* ══════════ I. BOM 版本（同一款：用量一樣的單算同一版；只在有改的時候才多一版）══════════ */
+ function bomVersions(sk){ const M=MI(); let rows=M.bomSty.get(sk)||[]; if(!rows.length){ const c=core(sk); if(c.length>=4)M.bomSty.forEach((v,s)=>{if(core(s)===c)rows=rows.concat(v)}) }
+  const byMy=new Map(); rows.forEach(b=>{ const k=nk(b.my_no); let o=byMy.get(k); if(!o){o={my:b.my_no,od:b.od_no,d:d10(b.order_date),qty:0,lines:new Map()};byMy.set(k,o)} const own=core(ks(b.material)).includes(core(sk))&&core(sk).length>=4; const lk=own?'@STYLE':b._k; const l=o.lines.get(lk); const c=+b.cons||0; if(!l)o.lines.set(lk,{k:b._k,nm:own?L('款式專屬標／吊牌','style-specific label'):b.material,type:b.type,cons:c,unit:b.unit||'',sup:b.supplier||'',clr:b.color||'',own}); else if(c>l.cons)l.cons=c; if(+b.order_qty>o.qty)o.qty=+b.order_qty });
+  const ords=[...byMy.values()].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  const sig=o=>[...o.lines.entries()].map(([k,l])=>k+'@'+(+l.cons).toFixed(3)).sort().join('|');
+  const V=[]; ords.forEach(o=>{ const s=sig(o); const v=V[V.length-1]; if(v&&v.sig===s){v.orders.push(o);v.to=o.d} else V.push({sig:s,from:o.d,to:o.d,orders:[o],lines:o.lines,same:V.findIndex(x=>x.sig===s)}) });
+  V.forEach((v,i)=>{ v.n=i+1; v.lines=v.orders[v.orders.length-1].lines; if(i){ const p=V[i-1].lines, c=v.lines; const ch=[]; c.forEach((l,k)=>{ const q=p.get(k); if(!q)ch.push('＋'+l.nm); else if(Math.abs(q.cons-l.cons)>0.0005)ch.push(`${l.nm} ${fmt(q.cons,3)}→${fmt(l.cons,3)}`) }); p.forEach((l,k)=>{ if(!c.has(k))ch.push('－'+l.nm) }); v.changes=ch } });
+  const ver=new Map(); V.forEach(v=>v.orders.forEach(o=>ver.set(nk(o.my),v.n)));
+  return {V,ver,ords} }
+ window.bomVersions=bomVersions;
+
+ /* ══════════ J. 款式卡新分頁：🧵 BOM 版本、🛒 採購・用料（歷年） ══════════ */
+ if(window.STY_TABS&&!STY_TABS.some(x=>x[0]==='bomv')){ const i=STY_TABS.findIndex(x=>x[0]==='ops')+1; STY_TABS.splice(i,0,['bomv','🧵',['BOM 版本','BOM versions']],['buy','🛒',['採購・用料（歷年）','Purchasing by year']]) }
+ window.STAB_EXT=window.STAB_EXT||{};
+ const reSty=()=>{ if(window.STY&&STY.sk)styTab(STY.tab) };
+ function smvBox(s){ const c=s.cur; const ieU=s.ie.find(v=>v.kind==='upd'&&(!v.appr||/approved/i.test(v.appr))); const erpV=s.erp&&+s.erp.smv>0.01?+s.erp.smv:null;
+  const ov=ordersView().filter(o=>ks(o.style)===s.sk&&String(o.order_date)>=SMV_NEW);
+  const old=ov.filter(o=>o.smv_erpo&&o.smv_src==='ie_upd'&&Math.abs(o.smv_erpo-o.smv)>0.02*o.smv);
+  let h=`<div class="note smv-box"><b>⏱️ SMV</b> · ${L('現行 ','current ')}<b>${c?fmt(c.v,3):'—'}</b> ${c?esc(window.smvSrcName?smvSrcName(c.src):c.src):''}${ieU?` · IE ${L('週報','weekly')} ${fmt(ieU.v,3)} (${esc(ieU.d)})`:''}${erpV?` · ERP W_CBA190 ${fmt(erpV,3)}`:''}`;
+  if(ieU&&erpV&&Math.abs(ieU.v-erpV)>0.02*ieU.v)h+=`<div class="warn-t small">⚠ ${L('ERP 款式 SMV 跟 IE 週報不同，請在 ERP 更新為 ','ERP style SMV differs from IE weekly — update ERP to ')}${fmt(ieU.v,3)}</div>`;
+  if(ov.length)h+=`<div class="small">${L(`2026-07 以後的新單 ${ov.length} 張，以 IE 週報為準`,`${ov.length} orders since 2026-07 use IE weekly`)}${old.length?`<span class="warn-t">${L(`；其中 ${old.length} 張 ERP 訂單 SMV 還是舊的（`,`; ${old.length} still carry the old ERP SMV (`)}${[...new Set(old.map(o=>fmt(o.smv_erpo,2)))].join('、')}）</span>`:''}</div>`;
+  return h+`</div>` }
+ STAB_EXT.bomv=function(s){ const w=loadingMat(reSty); if(w)return w;
+  const {V,ords}=bomVersions(s.sk); if(!V.length)return smvBox(s)+`<p class="muted">${L('ERP BOM（W_COD550）裡沒有這款。','No ERP BOM (W_COD550) for this style.')}</p>`;
+  const cur=V[V.length-1]; const lines=[...cur.lines.values()].sort((a,b)=>(a.type==='main'?0:1)-(b.type==='main'?0:1)||String(a.nm).localeCompare(String(b.nm)));
+  const lastD=cur.to; let tot=0;
+  const rows=lines.map(l=>{ const p=l.own?null:upAt(l.k,lastD,l.clr); const c=p?l.cons*p.up:null; if(c)tot+=c; return [l.type==='main'?'🧶':'🧷',l.own?esc(l.nm):mlink(l.nm,l.k,l.clr),fmt(l.cons,4),esc(l.unit),esc(l.sup),p?money(p.up,3):'—',c!=null?money(c,3):'—'] });
+  let h=smvBox(s);
+  h+=`<h4>✅ ${L('現行 BOM','Current BOM')} · v${cur.n} <span class="small muted">${esc(cur.from)}${cur.to!==cur.from?' → '+esc(cur.to):''} · ${cur.orders.length} ${L('張單','orders')}${cur.same>=0?` · ${L('同 v','same as v')}${cur.same+1}`:''}</span></h4>`;
+  h+=tbl('st_bomcur',[['',0],[L('料品','Material')],[L('單件用量','Per pc'),1],[L('單位','Unit')],[L('供應商','Supplier')],[L('單價（當時）','Price (then)'),1],[L('每件成本','Cost / pc'),1]],rows,['',L('合計（不含專屬標）','Total (excl. own labels)'),'','','','',tot?money(tot,3):'—']);
+  h+=`<p class="small muted">${L('單價取該版最後一張單日期前後 30 天內最近一次採購價；「款式專屬標／吊牌」各顏色合併成一項，不另算一版。','Price = latest purchase price around the last order of this version; colour-specific labels count as one line.')}</p>`;
+  if(V.length>1)h+=`<h4 style="margin-top:14px">🕓 ${L('版本歷程','Version history')} (${V.length})</h4>`+tbl('st_bomv',[[L('版','Ver')],[L('從','From')],[L('到','To')],[L('單數','Orders'),1],[L('跟上一版比','Changes vs previous')]],V.slice().reverse().map(v=>[`<b>v${v.n}</b>${v.same>=0?` <span class="small muted">=v${v.same+1}</span>`:''}`,esc(v.from),esc(v.to),fmt(v.orders.length),v.changes&&v.changes.length?`<span class="small wrap">${esc(v.changes.slice(0,8).join('；'))}${v.changes.length>8?' …':''}</span>`:`<span class="small muted">${v.n===1?L('第一版','first'):'—'}</span>`]));
+  h+=`<h4 style="margin-top:14px">🧾 ${L('每張單用哪一版','Version per order')}</h4>`+tbl('st_bomo',[[L('訂單日','Ordered')],[L('自編單號','Order no.')],[L('訂單編號','ERP order')],[L('件數','Pcs'),1],[L('BOM 版','BOM ver')]],ords.slice().reverse().slice(0,200).map(o=>{const v=V.find(x=>x.orders.includes(o));const ov=ordersView().find(x=>keyN(x.my_no)===keyN(o.my));const r=[esc(o.d),`<span class="mono">${esc(o.my)}</span>`,`<span class="mono small">${esc(o.od||'')}</span>`,fmt(o.qty),'v'+(v?v.n:'?')+(v===cur?' ✅':'')];if(ov)r._click=`goOrder('${ov.id}')`;return r}));
+  return h };
+ STAB_EXT.buy=function(s){ const w=loadingMat(reSty); if(w)return w;
+  const M=MI(); let I=M.issSty.get(s.sk)||[]; if(!I.length){ const c=core(s.sk); if(c.length>=4)M.issSty.forEach((v,k)=>{if(core(k)===c)I=I.concat(v)}) }
+  if(!I.length)return `<p class="muted">${L('ERP 領料（W_CST780／785）裡沒有這款的紀錄。','No ERP issues for this style.')}</p>`;
+  /* 每年：件數（領料單上的生產件數，同一自編單號只算一次）、主副料金額 */
+  const Y=new Map(); const matY=new Map(); const shareC=new Map(); const sh=k=>{ if(!shareC.has(k))shareC.set(k,styleShare(k,s.sk)); return shareC.get(k) };
+  I.forEach(r=>{ const y=d10(r.issue_date).slice(0,4)||'?'; let a=Y.get(y); if(!a){a={my:new Map(),main:0,trim:0,miss:0};Y.set(y,a)} if(r.my_no&&!a.my.has(r.my_no))a.my.set(r.my_no,+r.prod_qty||0);
+   const p=upAt(r._k,r.issue_date,r.color); const amt=p?(+r.qty||0)*p.up:0; if(!p)a.miss++; if(r.type==='main')a.main+=amt; else a.trim+=amt;
+   const mk=y+'|'+r._k+'|'+(r.type==='main'?nk(r.color):''); let m=matY.get(mk); if(!m){m={y,k:r._k,nm:r.material||matNm(r._k),clr:r.type==='main'?r.color:'',type:r.type,unit:r.unit||'',qty:0,amt:0,up:p?p.up:null};matY.set(mk,m)} m.qty+=+r.qty||0; m.amt+=amt });
+  const ys=[...Y.keys()].sort().reverse();
+  let h=`<p class="small muted">${L('只算「領給這款的料」（ERP 領料單上的款號），不會把同一種布給別款的採購混進來。金額＝領料量 × 當時採購單價。','Only material issued to this style (ERP issue slips) — purchases of the same fabric for other styles are not mixed in. Amount = issued qty × purchase price at the time.')}</p>`;
+  const yr=ys.map(y=>{const a=Y.get(y);const pcs=[...a.my.values()].reduce((t,v)=>t+v,0);const tot=a.main+a.trim;return {y,a,pcs,tot,per:pcs?tot/pcs:0}});
+  h+=`<h4>📅 ${L('歷年用料成本','Material cost by year')}</h4>`+tbl('st_buyy',[[L('年','Year')],[L('單數','Orders'),1],[L('件數','Pcs'),1],[L('主料','Fabric'),1],[L('副料','Trims'),1],[L('合計','Total'),1],[L('每件','Per pc'),1]],yr.map(x=>[`<b>${x.y}</b>`,fmt(x.a.my.size),fmt(x.pcs),money(x.a.main),money(x.a.trim),money(x.tot),x.per?`<b>${money(x.per,3)}</b>`:'—']),yr.length>1?['',fmt(sum(yr,x=>x.a.my.size)),fmt(sum(yr,'pcs')),money(sum(yr,x=>x.a.main)),money(sum(yr,x=>x.a.trim)),money(sum(yr,'tot')),'']:null);
+  const per=yr.filter(x=>x.per>0).slice().reverse(); if(per.length>1)h+=`<div class="small muted" style="margin:8px 0 4px">${L('每件用料成本走勢','Material cost per piece by year')}</div>`+hBars(per.map(x=>({l:x.y,v:x.per,t:money(x.per,3)})));
+  /* 專屬料：這個料 90% 以上都領給這款 → 它的採購就是這款的採購 */
+  const own=[...new Set(I.map(r=>r._k))].filter(k=>{const x=sh(k);return x!=null&&x>=0.9});
+  const OP=[]; own.forEach(k=>(M.price.get(k)||[]).forEach(x=>OP.push(Object.assign({k},x)))); OP.sort((a,b)=>b.d.localeCompare(a.d));
+  const oy=new Map(); OP.forEach(x=>{const y=x.d.slice(0,4);const a=oy.get(y)||{n:0,amt:0};a.n++;a.amt+=x.qty*x.up;oy.set(y,a)});
+  h+=`<h4 style="margin-top:14px">🏷️ ${L('專屬料採購（只給這款用的料：吊牌、標、專用布…）','Own-material purchases (used only by this style)')} <span class="small muted">${fmt(own.length)} ${L('種料','items')} · ${fmt(OP.length)} ${L('筆','lines')}</span></h4>`;
+  if(OP.length){ h+=`<div class="small" style="margin-bottom:6px">${[...oy.entries()].map(([y,a])=>`<span class="st info">${y}：${fmt(a.n)} ${L('筆','lines')} · ${money(a.amt)}</span>`).join(' ')}</div>`;
+   h+=`<details ${OP.length<=40?'open':''}><summary class="small">${L('採購明細','Purchase lines')}</summary>`+tbl('st_buyown',[[L('日期','Date')],[L('採購單','PO no.')],[L('料品','Material')],[L('顏色','Colour')],[L('尺寸','Size')],[L('數量','Qty'),1],[L('單價','Price'),1],[L('金額','Amount'),1],[L('供應商','Supplier')]],OP.slice(0,400).map(x=>[esc(x.d),`<span class="mono">${esc(x.pno)}</span>`,mlink(x.nm||matNm(x.k),x.k),esc(x.clr),esc(x.size),fmt(x.qty),x.up?money(x.up,3):'—',x.up?money(x.qty*x.up):'—',esc(x.sup)]))+`</details>` }
+  else h+=`<p class="small muted">${L('沒有只給這款用的料。','No style-exclusive materials.')}</p>`;
+  /* 共用料：依年列這款領了多少 */
+  h+=`<h4 style="margin-top:14px">🧶 ${L('各年用料明細（依領料）','Materials issued by year')}</h4>`;
+  ys.forEach((y,i)=>{ const ms=[...matY.values()].filter(m=>m.y===y).sort((a,b)=>(a.type==='main'?0:1)-(b.type==='main'?0:1)||b.amt-a.amt);
+   h+=`<details class="mt-det" ${i===0?'open':''}><summary><b>${y}</b> <span class="small muted">${ms.length} ${L('項','items')} · ${money(sum(ms,'amt'))}</span></summary>`+tbl(i===0?'st_buymat':'',[['',0],[L('料品','Material')],[L('顏色','Colour')],[L('領料量','Issued'),1],[L('單位','Unit')],[L('單價','Price'),1],[L('金額','Amount'),1],[L('此料給本款 %','% to this style'),1]],ms.map(m=>{const x=sh(m.k);return [m.type==='main'?'🧶':'🧷',mlink(m.nm,m.k,m.clr),esc(m.clr||''),fmt(m.qty,1),esc(m.unit),m.up?money(m.up,3):'—',m.amt?money(m.amt):'—',x!=null?`${fmt(x*100,0)}%${x>=0.9?' 🏷️':''}`:'']}))+`</details>` });
+  return h };
+
+ /* ══════════ K. 訂單卡：📚 全部（往下捲）、🧵 主副料明細改版（料品可點、單價、BOM vs 領料、版本、相關採購）══════════ */
+ if(window.ORD_TABS&&!ORD_TABS.some(x=>x[0]==='all'))ORD_TABS.splice(1,0,['all','📚',['全部（往下捲）','All (scroll)']]);
+ window.OTAB_EXT=window.OTAB_EXT||{};
+ const reOrd=()=>{ if(window.OCUR&&OCUR.id)ordTab(OCUR.tab) };
+ OTAB_EXT.all=function(C){ const id=C.o.id; const parts=ORD_TABS.filter(x=>x[0]!=='all'&&x[0]!=='hist'); return parts.map(([k,ic,l])=>{ let b=''; try{ b=ordTabBody(k,id) }catch(e){ b=`<p class="muted">${esc(e.message||e)}</p>` } return `<section class="all-sec"><h3 class="all-h">${ic} ${esc(L(l[0],l[1]))}</h3>${b}</section>` }).join('') };
+ OTAB_EXT.bom=function(C){ const w=loadingMat(reOrd); if(w)return w;
+  const {o,same}=C; const M=MI(); const bom=live(DB.bom||[]).filter(same); const d=d10(o.order_date);
+  const mys=[...C.my]; const iss=[].concat(...mys.map(m=>M.issMy.get(m)||[]));
+  const issBy=new Map(); iss.forEach(r=>{const a=issBy.get(r._k)||{qty:0,unit:r.unit||'',amt:0,nm:r.material};a.qty+=+r.qty||0;const p=upAt(r._k,r.issue_date,r.color);if(p)a.amt+=(+r.qty||0)*p.up;issBy.set(r._k,a)});
+  const sk=ks(o.style); const BV=sk?bomVersions(sk):null; const myV=BV&&mys.map(m=>BV.ver.get(m)).find(Boolean); const lastV=BV&&BV.V.length?BV.V[BV.V.length-1].n:null;
+  const main=bom.filter(b=>b.type==='main'||/主/.test(b.type||'')), trim=bom.filter(b=>!(b.type==='main'||/主/.test(b.type||'')));
+  let estT=0; const row=b=>{ const k=b._k||M.ck('',b.material); const p=upAt(k,d,b.color); const est=+b.est_cost||(p?(+b.total_use||0)*p.up:0); estT+=est; return [mlink(b.material||'',k,b.color),esc(b.color||''),esc(b.size||''),fmt(b.cons,4),fmt(b.total_use,1),esc(b.unit||''),esc(b.supplier||''),p?money(p.up,3):'—',est?money(est):'—'] };
+  const head=[[L('料品','Material')],[L('顏色','Colour')],[L('尺寸','Size')],[L('單件用量','Per pc'),1],[L('總用量','Total'),1],[L('單位','Unit')],[L('供應商','Supplier')],[L('單價','Price'),1],[L('預估金額','Est. cost'),1]];
+  let h=`<p class="small muted">${srcChip('erp','W_COD550 BOM')} ${fmt(bom.length)} ${L('項','items')}${myV?` · ${L('款式 BOM ','style BOM ')}<b>v${myV}</b>${lastV&&myV!==lastV?` <span class="warn-t">${L('（最新是 v','(latest is v')}${lastV}${L('，用量有改）',', usage changed)')}</span>`:lastV?` ✅ ${L('最新版','latest')}`:''} · <a href="javascript:void 0" onclick="goStyle('${jsq(sk)}');setTimeout(()=>styTab('bomv'),50)">${L('看版本','versions')}</a>`:''}</p>`;
+  const mr=main.map(row); const estMain=estT; const tr=trim.map(row);
+  h+=`<h4>🧶 ${L('主料','Main fabric')} (${main.length})</h4>`+tbl('ot_bom_main',head,mr,main.length?['','','','',fmt(sum(main,'total_use'),1),'','','',money(estMain)]:null);
+  h+=`<h4 style="margin-top:14px">🧷 ${L('副料','Trims')} (${trim.length})</h4>`+tbl('ot_bom_trim',head,tr,null);
+  h+=`<p class="small"><b>${L('預估料費合計 ','Estimated material cost ')}${money(estT)}</b>${o.qty?` · ${L('每件 ','per pc ')}${money(estT/(C.g?C.g.qty:o.qty),3)}`:''} <span class="muted">${L('（BOM 總用量 × 接單日前後最近一次採購單價）','(BOM total × latest purchase price around the order date)')}</span></p>`;
+  /* BOM vs 實際領料 */
+  const bomBy=new Map(); bom.forEach(b=>{const k=b._k||M.ck('',b.material);const a=bomBy.get(k)||{use:0,unit:b.unit||'',nm:b.material};a.use+=+b.total_use||0;bomBy.set(k,a)});
+  const keys=[...new Set([...bomBy.keys(),...issBy.keys()])];
+  const cmp=keys.map(k=>{const b=bomBy.get(k),i=issBy.get(k);const use=b?b.use:0,q=i?i.qty:0;const df=use?(q-use)/use:null;return {k,nm:(b&&b.nm)||(i&&i.nm)||matNm(k),unit:(b&&b.unit)||(i&&i.unit)||'',use,q,df,amt:i?i.amt:0}}).sort((a,b)=>Math.abs(b.df||0)-Math.abs(a.df||0));
+  h+=`<h4 style="margin-top:14px">⚖️ ${L('BOM 用量 vs 實際領料','BOM vs issued')} ${iss.length?'':`<span class="small muted">${L('（還沒有領料）','(no issues yet)')}</span>`}</h4>`;
+  if(iss.length)h+=tbl('ot_bomiss',[[L('料品','Material')],[L('BOM 總用量','BOM'),1],[L('已領','Issued'),1],[L('差異','Diff'),1],[L('單位','Unit')],[L('領料金額','Issued value'),1]],cmp.map(c=>{const r=[mlink(c.nm,c.k),fmt(c.use,1),fmt(c.q,1),c.df==null?`<span class="small muted">${L('BOM 沒有','not in BOM')}</span>`:`<span class="${c.df>0.05?'warn-t':c.df<-0.2?'muted':''}">${c.df>0?'+':''}${fmt(c.df*100,1)}%</span>`,esc(c.unit),c.amt?money(c.amt):'—'];if(c.df!=null&&c.df>0.05)r._cls='hl-warn';return r}),['',fmt(sum(cmp,'use'),1),fmt(sum(cmp,'q'),1),'','',money(sum(cmp,'amt'))]);
+  /* 相關採購：只列這款專屬料、而且在接單前 60 天到後 120 天之間 */
+  const own=[...bomBy.keys()].filter(k=>{const x=sk?styleShare(k,sk):null;return x!=null&&x>=0.9}); const lo=d?addDs(d,-60):'0000', hi=d?addDs(d,120):'9999';
+  const OP=[]; own.forEach(k=>(M.price.get(k)||[]).forEach(x=>{ if(x.d>=lo&&x.d<=hi)OP.push(Object.assign({k},x)) })); OP.sort((a,b)=>b.d.localeCompare(a.d));
+  h+=`<h4 style="margin-top:14px">🛒 ${L('這張單的專屬料採購','Own-material purchases for this order')} (${OP.length})</h4><p class="small muted">${L('只列只給這款用的料（吊牌、標、專用布），接單前 60 天～後 120 天。共用布料不列，點料品看它的全部採購。','Only style-exclusive materials, 60 days before to 120 days after the order. Shared fabric is not listed — click a material to see all its purchases.')}</p>`+(OP.length?tbl('ot_pur',[[L('日期','Date')],[L('採購單','PO no.')],[L('料品','Material')],[L('顏色','Colour')],[L('尺寸','Size')],[L('數量','Qty'),1],[L('單價','Price'),1],[L('金額','Amount'),1]],OP.slice(0,200).map(x=>[esc(x.d),`<span class="mono">${esc(x.pno)}</span>`,mlink(x.nm||matNm(x.k),x.k),esc(x.clr),esc(x.size),fmt(x.qty),x.up?money(x.up,3):'—',x.up?money(x.qty*x.up):'—'])):'');
+  const IL=iss.slice().sort((a,b)=>String(b.issue_date).localeCompare(String(a.issue_date)));
+  h+=`<details class="mt-det"><summary><h4 style="display:inline">📤 ${L('領料明細','Issues')} (${fmt(IL.length)})</h4></summary>`+tbl('ot_iss',[[L('領料單','Issue no.')],[L('日期','Date')],[L('類別','Type')],[L('料品','Material')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單位','Unit')]],IL.slice(0,300).map(r=>[`<span class="mono">${esc(r.issue_no)}</span>`,esc(d10(r.issue_date)),esc(r.type==='main'?L('主料','main'):L('副料','trim')),mlink(r.material||'',r._k,r.color),esc(r.color||''),fmt(r.qty,2),esc(r.unit||'')]))+`</details>`;
+  return h };
+
+ /* ══════════ L. 連續往下捲（同 PSJHR：捲到底自動接下一張，上方標題跟著換）══════════ */
+ const contOn=()=>LS.get('psjerp_cont',true)!==false;
+ window.contToggle=()=>{ LS.set('psjerp_cont',!contOn()); toast(contOn()?L('已開啟：捲到底會接下一張','On: scrolling to the end opens the next one'):L('已關閉連續往下看','Continuous scrolling off')); if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab) };
+ let CIO=null;
+ const PH="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='16' font-size='12' text-anchor='middle'%3E👕%3C/text%3E%3C/svg%3E";
+ const stc=g=>g?(g.status==='late'?['crit',L('逾期','late')]:g.status==='closed'?['good',L('已結','closed')]:['info',L('未結','open')]):['neu',''];
+ function ordSec(id,list){ const C=ordCtx(id); const o=C.o; if(!o)return ''; const g=C.g; let body=''; try{ body=ordTabBody(OCUR.tab,id) }catch(e){ body=`<p class="muted">${esc(e.message||e)}</p>` } body=body.replace(/\sid="[^"]*"/g,''); const c=stc(g);
+  return `<section class="cont-sec" data-id="${esc(id)}"><div class="cont-hd" onclick="openOrder('${esc(id)}')">${window.styPh?styPh(ks(o.style),'sty-th'):''}<div class="cont-t"><b class="mono">${esc(o.po_no||o.od_no||o.my_no)} · ${esc(o.style)}</b> ${stChip(c[0],c[1])}<div class="small muted">${esc(o.cust)} · ${fmt(g?g.qty:o.qty)} ${L('件','pcs')}${o.style_name?' · '+esc(o.style_name):''}</div></div><span class="small muted">${list.indexOf(id)+1}/${fmt(list.length)}</span></div>${body}</section>` }
+ function stySec(sk,list){ const s=styleIdx().map.get(sk); if(!s)return ''; let body=''; try{ body=styTabBody(STY.tab,sk) }catch(e){ body=`<p class="muted">${esc(e.message||e)}</p>` } body=body.replace(/\sid="[^"]*"/g,''); const c=s.cur;
+  return `<section class="cont-sec" data-id="${esc(sk)}"><div class="cont-hd" onclick="openStyle('${esc(sk)}')">${window.styPh?styPh(sk,'sty-th'):''}<div class="cont-t"><b class="mono">${esc(s.style)}</b> ${c?`<b>${fmt(c.v,2)}</b> <span class="small">SMV</span>`:''}<div class="small muted">${esc(s.custs.join('、'))} · ${esc(s.name||'')}</div></div><span class="small muted">${list.indexOf(sk)+1}/${fmt(list.length)}</span></div>${body}</section>` }
+ function setCur(kind,cur,list){ const dr=document.getElementById('drawer'); if(!dr)return; const pos=dr.querySelector('.od-nav .small'); const img=dr.querySelector('.sty-head img.sty-hd');
+  const swapImg=sk=>{ if(img&&img.dataset.sk!==sk){ img.dataset.sk=sk; delete img.dataset.done; img.classList.remove('has'); img.src=PH; if(window.fillImgs)fillImgs(dr) } };
+  if(kind==='ord'){ if(OCUR.id===cur)return; const C=ordCtx(cur); const o=C.o; if(!o)return; OCUR.id=cur; const h2=dr.querySelector('.od-title h2'); if(h2)h2.innerHTML=`<span class="mono">${esc(o.po_no||o.od_no||o.my_no)}</span> · <span class="mono">${esc(o.style)}</span>`; const sm=dr.querySelectorAll('.od-title > .small'); if(sm[1])sm[1].textContent=`${fmt(C.g?C.g.qty:o.qty)} ${L('件','pcs')}${o.style_name?' · '+o.style_name:''}`; if(sm[0]){const c=stc(C.g);sm[0].innerHTML=`🧾 ${esc(o.cust)} · <span class="mono">${esc(o.my_no)}</span> ${stChip(c[0],c[1])}`} swapImg(ks(o.style)); const b=dr.querySelector('.to-sty'); if(b)b.setAttribute('onclick',`goStyle('${jsq(ks(o.style))}')`) }
+  else { if(STY.sk===cur)return; const s=styleIdx().map.get(cur); if(!s)return; STY.sk=cur; const h2=dr.querySelector('.sty-dh h2'); if(h2)h2.textContent=s.style; swapImg(cur) }
+  if(pos)pos.textContent=(list.indexOf(cur)+1)+'/'+fmt(list.length) }
+ function contAttach(kind){ const dr=document.getElementById('drawer'); const db=dr&&dr.querySelector('.od-body'); if(!db||db.dataset.cont)return; db.dataset.cont='1'; if(CIO){CIO.disconnect();CIO=null}
+  const acts=db.querySelector('.od-acts'); if(acts&&!acts.querySelector('.cont-tg'))acts.insertAdjacentHTML('beforeend',`<button class="btn sm cont-tg ${contOn()?'on':''}" onclick="contToggle()" title="${L('捲到底自動接下一張（同 HR 員工資料）','Scroll to the end to open the next one')}">⬇ ${L('連續往下看：','Keep scrolling: ')}${contOn()?L('開','on'):L('關','off')}</button>`);
+  if(!contOn())return;
+  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let first;
+  if(kind==='ord'){ const C=ordCtx(OCUR.id); first=C.g?C.g.ids[0]:OCUR.id; if(!list.includes(first)){ const j=list.findIndex(x=>C.g&&C.g.ids.includes(x)); if(j<0)return; first=list[j] } }
+  else { first=STY.sk; if(!list.includes(first))return }
+  let last=first; const more=document.createElement('div'); more.className='cont-more'; db.appendChild(more);
+  const nextOf=x=>list[list.indexOf(x)+1];
+  const nameOf=id=>{ if(kind==='sty'){const s=styleIdx().map.get(id);return s?s.style:id} const C=ordCtx(id); return C.o?(C.o.po_no||C.o.my_no)+' · '+C.o.style:id };
+  const label=()=>{ const nx=nextOf(last); more.innerHTML=nx?`⬇ ${L('繼續往下捲：下一張','Keep scrolling — next:')} <b>${esc(nameOf(nx))}</b>`:L('已經是最後一張','That was the last one') };
+  const add=()=>{ const nx=nextOf(last); if(!nx)return false; more.insertAdjacentHTML('beforebegin',kind==='ord'?ordSec(nx,list):stySec(nx,list)); last=nx; label(); if(window.fillImgs)fillImgs(db); return true };
+  label(); more.onclick=()=>add();
+  if(window.IntersectionObserver){ CIO=new IntersectionObserver(es=>{ if(!document.body.contains(more)){CIO&&CIO.disconnect();return} if(es.some(x=>x.isIntersecting)){ let g=0; while(g++<2&&more.getBoundingClientRect().top<db.getBoundingClientRect().bottom+300&&add()); } },{root:db,rootMargin:'0px 0px 400px 0px'}); CIO.observe(more) }
+  let tk=0; db.addEventListener('scroll',()=>{ if(tk)return; tk=setTimeout(()=>{ tk=0; if(!document.body.contains(db))return; const top=db.getBoundingClientRect().top; let cur=first; for(const s2 of db.querySelectorAll('.cont-sec')){ if(s2.getBoundingClientRect().top<=top+80)cur=s2.dataset.id; else break } setCur(kind,cur,list) },100) },{passive:true}) }
+ /* 訂單卡：每次畫完 → SMV 註記、返回鍵、款式鍵改成可返回、連續往下捲 */
+ function smvNote(){ if(!OCUR.id)return; const ov=ordersView(); const C=ordCtx(OCUR.id); const o=ov.find(x=>x.id===C.o.id)||C.o; const dt=[...document.querySelectorAll('#odTab .kv dt')].find(d=>d.textContent.trim()==='SMV'); if(!dt)return; const dd=dt.nextElementSibling; if(!dd||dd.querySelector('.smv-n'))return;
+  const isNew=String(o.order_date||'')>=SMV_NEW; let x='';
+  if(o.smv_erpo&&o.smv_src==='ie_upd'&&Math.abs(o.smv_erpo-o.smv)>0.02*o.smv)x=`<div class="smv-n small warn-t">⚠ ${L('ERP 訂單 SMV ','ERP order SMV ')}${fmt(o.smv_erpo,2)} ${L('沒更新；2026-07 以後的新單以 IE 週報為準','is outdated — IE weekly applies from 2026-07')}</div>`;
+  else if(isNew&&o.smv_src==='ie_upd'&&o.smv_erpo)x=`<div class="smv-n small muted">✓ ${L('ERP 與 IE 週報一致','ERP matches IE weekly')}</div>`;
+  else if(isNew&&o.smv_src!=='ie_upd')x=`<div class="smv-n small muted">${L('2026-07 以後新單：IE 週報還沒核准這款，暫用 ','New order: no approved IE weekly yet — using ')}${esc(window.smvSrcName?smvSrcName(o.smv_src||'erpo'):o.smv_src)}</div>`;
+  else if(!isNew&&o.smv_src==='erpo')x=`<div class="smv-n small muted">${L('2026-07 以前的單：照當時 ERP 紀錄','Before 2026-07: ERP record at the time')}</div>`;
+  if(x)dd.insertAdjacentHTML('beforeend',x) }
+ function addBack(){ const nav=document.querySelector('#drawer .od-nav'); if(nav&&DSTACK.length&&!nav.querySelector('.d-back'))nav.insertAdjacentHTML('afterbegin',backBtn()) }
+ function afterOrd(){ try{ smvNote() }catch(e){console.error('smv note',e)} try{ addBack(); const b=document.querySelector('#drawer .to-sty'); if(b&&window.OCUR&&OCUR.id){const C=ordCtx(OCUR.id);if(C.o)b.setAttribute('onclick',`goStyle('${jsq(ks(C.o.style))}')`)} contAttach('ord') }catch(e){console.error('cont',e)} }
+ function afterSty(){ try{ addBack(); contAttach('sty') }catch(e){console.error('cont',e)} }
+ const fromOther=k=>{ if(window._dBack)return; const c=curDrawer(); if(c&&c.k!==k)drawerPush() };
+ const _oo=openOrder; openOrder=async function(){ fromOther('ord'); const r=await _oo.apply(this,arguments); afterOrd(); return r };
+ const _ot=window.ordTab; window.ordTab=function(){ const r=_ot.apply(this,arguments); afterOrd(); return r };
+ ['openStyle','styTab','styGo','styG'].forEach(fn=>{ const f0=window[fn]; if(!f0)return; window[fn]=function(){ if(fn==='openStyle')fromOther('sty'); const r=f0.apply(this,arguments); afterSty(); return r } });
+ const _db=window.drawerBack; window.drawerBack=function(){ window._dBack=true; try{ return _db.apply(this,arguments) } finally{ setTimeout(()=>{window._dBack=false},0) } };
+
+ /* ══════════ M. 🧭 訂單中心 v2：期間列、分類、重點＋圖表、異常、分組檢視、往下捲自動載入 ══════════ */
+ ['view','ptype','an'].forEach(k=>{ if(OC[k]===undefined)OC[k]=k==='view'?'list':'' }); if(OC.kn===undefined)OC.kn=true;
+ if(OC.yr){ if(!LS.get('psjerp_pn_ordercenter',null))LS.set('psjerp_pn_ordercenter',{pt:'Y',anchor:OC.yr+'-01-01',f:''}); OC.yr=''; LS.set('psjerp_oc',OC) }
+ const FLD=[['order_date',['依接單日','By order date']],['delivery',['依交期','By delivery date']],['ship',['依最近出貨日','By last shipment']],['closed',['依結案日','By closed date']]];
+ const dOf=(r,f)=>f==='delivery'?r.delivery:f==='ship'?r.ship.last:f==='closed'?r.closed_date:r.order_date;
+ const SORTS={delivery:(a,b)=>String(b.delivery).localeCompare(String(a.delivery))||String(b.order_date).localeCompare(String(a.order_date)),order_date:(a,b)=>String(b.order_date).localeCompare(String(a.order_date)),cust:(a,b)=>String(a.cust).localeCompare(String(b.cust))||String(b.delivery).localeCompare(String(a.delivery)),style:(a,b)=>String(a.style).localeCompare(String(b.style)),open:(a,b)=>(b.open_qty-a.open_qty),qty:(a,b)=>b.qty-a.qty,anom:(a,b)=>(b._an||[]).length-(a._an||[]).length};
+ window.ocPick=(k,v,view)=>{ OC[k]=v; OC.view=view||'list'; OC.page=0; LS.set('psjerp_oc',OC); rerender(); try{window.scrollTo(0,0)}catch(e){} };
+ const sewQ=r=>r.sewr&&!r.sewr.none?r.sewr.pcs:(r.prodq||0);
+ const amtOf=r=>r.amount||(r.price?r.qty*r.price:0);
+ function baseRows(all){ const q=keyN(OC.q); return all.filter(r=>(!OC.cust||r.cust===OC.cust)&&(!OC.st||r.status===OC.st)&&(!OC.chk||(r.po&&r.po.state===OC.chk))&&(!OC.ptype||r.ptype===OC.ptype)&&(!q||[r.po_no,r.style,r.my_no,r.od_no,r.cust,r.style_name].some(v=>keyN(v).includes(q)))) }
+ const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+ const delta=(a,b)=>{ if(!b)return ''; const d=(a-b)/b*100; return ` <span class="st ${d>=0?'good':'warn'}">${d>=0?'▲':'▼'} ${fmt(Math.abs(d),0)}%</span>` };
+ function keynote(rows,B,prev,R,st,f){ const K=[]; const lbl=pLabel(st.pt,R); const q=sum(rows,'qty'), a=sum(rows,amtOf), sh=sum(rows,r=>r.ship.qty), op=sum(rows,r=>Math.max(0,r.open_qty||0)), late=rows.filter(r=>r.status==='late');
+  const fl=L(FLD.find(x=>x[0]===f)[1][0],FLD.find(x=>x[0]===f)[1][1]);
+  K.push(`<b>${esc(lbl)}</b>（${esc(fl)}）：<b>${fmt(rows.length)}</b> ${L('款／PO','styles / POs')} · <b>${fmt(q)}</b> ${L('件','pcs')}${a?` · <b>${money(a)}</b>`:''}${prev?delta(q,sum(prev,'qty'))+` <span class="small muted">${L('比上一期','vs previous')}</span>`:''}`);
+  if(rows.length)K.push(`${L('這些單已出貨 ','Shipped so far ')}<b>${fmt(sh)}</b>（${pct(sh,q)}）· ${L('未交 ','open ')}<b>${fmt(op)}</b>${late.length?` · <span class="warn-t">${L('逾期 ','late ')}${late.length} ${L('款','styles')} ${fmt(sum(late,r=>Math.max(0,r.open_qty||r.qty-r.ship.qty)))} ${L('件','pcs')}</span>`:''}`);
+  if(!R.all){ const due=B.filter(r=>inRg(r.delivery,R)); if(due.length){ const done=due.filter(r=>r.ship.qty>=r.qty*0.97), ontime=done.filter(r=>r.ship.last&&r.ship.last<=r.delivery); K.push(`${L('交期在這期的 ','Due this period: ')}<b>${due.length}</b> ${L('款','styles')}（${fmt(sum(due,'qty'))} ${L('件','pcs')}）· ${L('已出完 ','fully shipped ')}${done.length}${done.length?` · ${L('準時 ','on time ')}${pct(ontime.length,done.length)}`:''}${due.length-done.length?` · <span class="warn-t">${L('還沒出完 ','not yet shipped ')}${due.length-done.length}</span>`:''}`) } }
+  const byC=new Map(); rows.forEach(r=>byC.set(r.cust||'—',(byC.get(r.cust||'—')||0)+r.qty)); const tc=[...byC.entries()].sort((x,y)=>y[1]-x[1]).slice(0,3);
+  if(tc.length>1||(!OC.cust&&tc.length))K.push(`${L('主要客戶：','Top customers: ')}${tc.map(([c,v])=>`<a href="javascript:void 0" onclick="ocPick('cust','${jsq(c)}')">${esc(c)}</a> ${pct(v,q)}`).join(' · ')}`);
+  const byT=new Map(); rows.forEach(r=>byT.set(r.ptype,(byT.get(r.ptype)||0)+r.qty)); const tt_=[...byT.entries()].sort((x,y)=>y[1]-x[1]).slice(0,3);
+  if(tt_.length>1)K.push(`${L('主要品類：','Top categories: ')}${tt_.map(([k,v])=>`<a href="javascript:void 0" onclick="ocPick('ptype','${k}')">${esc(ptName(k))}</a> ${pct(v,q)}`).join(' · ')}`);
+  const big=rows.filter(r=>r.open_qty>0&&r.status!=='closed').sort((x,y)=>y.open_qty-x.open_qty).slice(0,3);
+  if(big.length)K.push(`${L('未交最多：','Largest open: ')}${big.map(r=>`<a href="javascript:void 0" onclick="openOrder('${esc(r.id)}')" class="mono">${esc(r.style)}</a> ${fmt(r.open_qty)}`).join(' · ')}`);
+  if(window.CHAIN&&CHAIN.loaded&&!R.all&&window.chainRows){ const sw=sum(chainRows('sewing').filter(x=>inRg(x[0],R)),x=>x[5]), ct=sum(chainRows('cutting').filter(x=>inRg(x[0],R)),x=>x[5]); if(sw||ct)K.push(`${L('這期工廠生產（日報，全部客戶）：車縫 ','Factory output this period (all customers): sewn ')}<b>${fmt(sw)}</b> · ${L('裁剪 ','cut ')}<b>${fmt(ct)}</b> ${L('件','pcs')}`) }
+  const an=new Map(); rows.forEach(r=>(r._an||[]).forEach(k=>an.set(k,(an.get(k)||0)+1)));
+  if(an.size)K.push(`⚠ ${L('異常：','Exceptions: ')}${ANOM.filter(x=>an.has(x[0])).map(x=>`<a href="javascript:void 0" class="st ${x[2]==='crit'?'crit':x[2]==='info'?'info':'warn'}" onclick="ocPick('an','${x[0]}','anom')">${esc(L(x[1][0],x[1][1]))} ${an.get(x[0])}</a>`).join(' ')}`);
+  return K }
+ function charts(rows,B,R,st,f){ const sub=subOf(st.pt,R,B.reduce((m,r)=>r.order_date&&r.order_date<m?r.order_date:m,'9999'));
+  const keys=new Set(B.map(r=>ordKey(r.my_no,r.po_no))); const shipB=new Map(); const lo=sub.list.length?sub.list[0].R.from:'0', hi=sub.list.length?sub.list[sub.list.length-1].R.to:'9';
+  live(DB.shipping||[]).forEach(s=>{ const d=d10(s.ship_date); if(!d||d<lo||d>hi)return; if(!keys.has(ordKey(s.my_no,s.po_no)))return; const k=bucketKey(sub.g,d); shipB.set(k,(shipB.get(k)||0)+(+s.qty||0)) });
+  const ordB=new Map(); B.forEach(r=>{ const d=d10(r.order_date); if(!d||d<lo||d>hi)return; const k=bucketKey(sub.g,d); ordB.set(k,(ordB.get(k)||0)+r.qty) });
+  const c1=colChart(sub.list,[{name:L('接單量','Ordered'),c:'--vz1',vals:sub.list.map(b=>ordB.get(b.k)||0)},{name:L('出貨量','Shipped'),c:'--vz2',vals:sub.list.map(b=>shipB.get(b.k)||0)}],{click:b=>`pnDrill('ordercenter','${b.pt}','${b.a}')`});
+  const byC=new Map(); rows.forEach(r=>byC.set(r.cust||'—',(byC.get(r.cust||'—')||0)+r.qty)); const cs=[...byC.entries()].sort((a,b)=>b[1]-a[1]); const top=cs.slice(0,7); if(cs.length>7)top.push([L('其他','Other'),sum(cs.slice(7),x=>x[1])]);
+  const c2=hBars(top.map(([c,v])=>({l:c,v,t:fmt(v),click:c===L('其他','Other')?'':`ocPick('cust','${jsq(c)}')`})));
+  const byT=new Map(); rows.forEach(r=>byT.set(r.ptype,(byT.get(r.ptype)||0)+r.qty)); const c3=hBars([...byT.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({l:ptName(k),v,t:fmt(v),click:`ocPick('ptype','${k}')`})));
+  /* 未來 12 週要交（未結的未交量，依交期）*/
+  const td=today(); const w0=rngFor('W',td).from; const wk=[{k:'late',l:L('已逾期','Overdue'),s:L('逾期','late')}]; for(let i=0;i<12;i++){const w=addDs(w0,7*i);wk.push({k:w,l:pLabel('W',rngFor('W',w)),s:w.slice(5),pt:'W',a:w})}
+  const due=new Map(); B.filter(r=>r.status!=='closed'&&(r.open_qty||0)>0&&r.delivery).forEach(r=>{ const k=r.delivery<td?'late':rngFor('W',r.delivery).from; due.set(k,(due.get(k)||0)+r.open_qty) });
+  const c4=colChart(wk,[{name:L('未交量','Open qty'),c:'--vz1',vals:wk.map(b=>due.get(b.k)||0)}],{click:b=>b.k==='late'?`ocPick('st','late')`:`pnS('ordercenter').f='delivery';pnDrill('ordercenter','W','${b.a}')`});
+  const g=sub.g==='Y'?L('每年','by year'):sub.g==='M'?L('每月','by month'):sub.g==='W'?L('每週','by week'):L('每天','by day');
+  return `<div class="vz-grid"><div class="vz-card"><h4>📈 ${L('接單 vs 出貨','Ordered vs shipped')} <span class="small muted">${g}</span></h4>${c1}</div><div class="vz-card"><h4>👥 ${L('客戶','Customers')} <span class="small muted">${L('訂單量','order qty')}</span></h4>${c2}</div><div class="vz-card"><h4>🏷️ ${L('品類','Categories')} <span class="small muted">${L('依款名自動分','from style name')}</span></h4>${c3}</div><div class="vz-card"><h4>📅 ${L('未來 12 週要交','Due in the next 12 weeks')} <span class="small muted">${L('未結的未交量','open qty')}</span></h4>${c4}</div></div>` }
+ function grpView(rows,key,name,pick){ const G=new Map(); rows.forEach(r=>{ const k=key(r)||'—'; let a=G.get(k); if(!a){a={k,n:0,qty:0,amt:0,sew:0,fg:0,ship:0,open:0,late:0,an:0};G.set(k,a)} a.n++; a.qty+=r.qty; a.amt+=amtOf(r); a.sew+=sewQ(r); a.fg+=r.fg_qty||0; a.ship+=r.ship.qty; a.open+=Math.max(0,r.open_qty||0); if(r.status==='late')a.late++; if((r._an||[]).length)a.an++ });
+  const list=[...G.values()].sort((a,b)=>b.qty-a.qty); const tq=sum(list,'qty');
+  return tbl('oc_grp',[[name],[L('款／PO','Styles'),1],[L('訂單量','Qty'),1],['%',1],[L('金額','Amount'),1],[L('已縫','Sewn'),1],[L('入庫','FG'),1],[L('出貨','Shipped'),1],[L('出貨率','Ship %'),1],[L('未交','Open'),1],[L('逾期','Late'),1],[L('異常','Exc.'),1]],list.map(a=>{const r=[`<b>${esc(pick?pick.name(a.k):a.k)}</b>`,fmt(a.n),fmt(a.qty),pct(a.qty,tq),a.amt?money(a.amt):'—',a.sew?fmt(a.sew):'—',a.fg?fmt(a.fg):'—',fmt(a.ship),pct(a.ship,a.qty),a.open?fmt(a.open):'—',a.late?`<span class="warn-t">${a.late}</span>`:'—',a.an||'—'];r._click=`ocPick('${pick.f}','${jsq(a.k)}')`;return r}),['',fmt(sum(list,'n')),fmt(tq),'',money(sum(list,'amt')),fmt(sum(list,'sew')),fmt(sum(list,'fg')),fmt(sum(list,'ship')),pct(sum(list,'ship'),tq),fmt(sum(list,'open')),fmt(sum(list,'late')),fmt(sum(list,'an'))]) }
+ function trendView(B,R,st,f){ const sub=subOf(st.pt,R,B.reduce((m,r)=>r.order_date&&r.order_date<m?r.order_date:m,'9999'));
+  const rows=sub.list.map(b=>{ const inB=B.filter(r=>inRg(dOf(r,f),b.R)), due=f==='delivery'?inB:B.filter(r=>inRg(r.delivery,b.R)); return {b,n:inB.length,qty:sum(inB,'qty'),amt:sum(inB,amtOf),ship:sum(inB,r=>r.ship.qty),open:sum(inB,r=>Math.max(0,r.open_qty||0)),dn:due.length,dq:sum(due,'qty'),dl:due.filter(r=>r.status==='late').length} });
+  const fl=L(FLD.find(x=>x[0]===f)[1][0],FLD.find(x=>x[0]===f)[1][1]);
+  return `<p class="small muted">${L('每一列是一個期間（','Each row is a period (')}${esc(fl)}${L('）；點一列看那一段的明細。','); click a row for its detail.')}</p>`+tbl('oc_trend',[[L('期間','Period')],[L('款／PO','Styles'),1],[L('訂單量','Qty'),1],[L('金額','Amount'),1],[L('已出貨','Shipped'),1],[L('未交','Open'),1],[L('交期到期 款','Due'),1],[L('到期件數','Due qty'),1],[L('其中逾期','Late'),1]],rows.slice().reverse().map(x=>{const r=[`<span class="mono">${esc(x.b.l)}</span>`,x.n?fmt(x.n):'—',x.qty?fmt(x.qty):'—',x.amt?money(x.amt):'—',x.ship?fmt(x.ship):'—',x.open?fmt(x.open):'—',x.dn?fmt(x.dn):'—',x.dq?fmt(x.dq):'—',x.dl?`<span class="warn-t">${x.dl}</span>`:'—'];if(x.n||x.dn)r._click=`pnDrill('ordercenter','${x.b.pt}','${x.b.a}','list')`;return r}),['',fmt(sum(rows,'n')),fmt(sum(rows,'qty')),money(sum(rows,'amt')),fmt(sum(rows,'ship')),fmt(sum(rows,'open')),fmt(sum(rows,'dn')),fmt(sum(rows,'dq')),fmt(sum(rows,'dl'))]) }
+ function anomView(rows){ const out=[]; ANOM.forEach(([k,l,cls,fn,det])=>{ const hit=rows.filter(r=>(r._an||[]).includes(k)); if(!hit.length)return; hit.sort((a,b)=>String(b.order_date).localeCompare(String(a.order_date)));
+   out.push(`<details class="panel an-blk" ${OC.an===k||(!OC.an&&out.length<2)?'open':''}><summary><span class="st ${cls==='crit'?'crit':cls==='info'?'info':'warn'}">${hit.length}</span> <b>${esc(L(l[0],l[1]))}</b> <button class="btn sm" style="margin-left:8px" onclick="event.preventDefault();ocPick('an','${k}','list')">${L('只看這類','Show only these')}</button></summary>`+tbl('',[[L('客戶','Cust')],['PO'],[L('款號','Style')],[L('訂單日','Ordered')],[L('交期','Delivery')],[L('訂單量','Qty'),1],[L('說明','Detail')]],hit.slice(0,200).map(r=>{const x=[esc(r.cust),`<span class="mono">${esc(r.po_no)}</span>`,`<span class="mono">${esc(r.style)}</span>`,esc(r.order_date),esc(r.delivery||''),fmt(r.qty),`<span class="small">${det?det(r):''}</span>`];x._click=`openOrder('${esc(r.id)}')`;return x}))+(hit.length>200?`<p class="small muted">+${hit.length-200}</p>`:'')+`</details>`) });
+  return out.length?out.join(''):`<p class="note">✅ ${L('這個範圍沒有異常。','No exceptions in this range.')}</p>` }
+ const _roc=RENDER.ordercenter;
+ RENDER.ordercenter=function(){
+  const yr=OC.yr; OC.yr=''; let base; try{ base=_roc.apply(this,arguments) }finally{ OC.yr=yr }
+  const all=ocRows(); const i1=base.indexOf('<div class="panel oc-filters">'); if(!all.length||i1<0)return base;
+  const iU=base.indexOf('<div class="panel mt"><h2>🔎'); const tail=iU>0?base.slice(iU):'';
+  const K='ordercenter'; const st=pnS(K,{pt:'Y'}); const f=st.f||'order_date'; const R=rngFor(st.pt,st.anchor);
+  let h=base.slice(0,i1).replace('<button class="btn sm" onclick="loadChain(true)"',liveChipHTML()+'<button class="btn sm" onclick="loadChain(true)"');
+  const custs=[...new Set(all.map(r=>r.cust).filter(Boolean))].sort(); const types=[...new Set(all.map(r=>r.ptype))];
+  h+=`<div class="panel oc-filters"><input class="inp" id="ocq" value="${esc(OC.q)}" placeholder="${L('搜尋 PO／款號／自編單號／客戶','Search PO / style / order no / customer')}" oninput="clearTimeout(window._ocT);window._ocT=setTimeout(()=>ocSet('q',this.value.trim()),300)">
+   <select class="inp" onchange="ocSet('cust',this.value)">${opt('',L('全部客戶','All customers'),OC.cust)}${custs.map(c=>opt(c,c,OC.cust)).join('')}</select>
+   <select class="inp" onchange="ocSet('ptype',this.value)">${opt('',L('全部品類','All categories'),OC.ptype)}${PTYPE.map(p=>p[0]).concat(['OTHER']).filter(k=>types.includes(k)).map(k=>opt(k,ptName(k),OC.ptype)).join('')}</select>
+   <select class="inp" onchange="ocSet('st',this.value)">${opt('',L('全部狀態','All status'),OC.st)}${opt('open',L('未結','Open'),OC.st)}${opt('late',L('逾期','Late'),OC.st)}${opt('closed',L('已結','Closed'),OC.st)}</select>
+   <select class="inp" onchange="ocSet('chk',this.value)">${opt('',L('客戶 PO：全部','PO check: all'),OC.chk)}${opt('ok',L('相符','matches'),OC.chk)}${opt('diff',L('有差異','differs'),OC.chk)}${opt('nostyle',L('款對不上','style not matched'),OC.chk)}${opt('missing',L('缺客戶 PO 檔','no PO file'),OC.chk)}</select>
+   <select class="inp" onchange="ocSet('an',this.value)">${opt('',L('異常：全部','Exceptions: all'),OC.an)}${opt('any',L('有任何異常','any exception'),OC.an)}${ANOM.map(a=>opt(a[0],L(a[1][0],a[1][1]),OC.an)).join('')}</select>
+   <select class="inp" onchange="ocSet('sort',this.value)">${opt('delivery',L('交期 新→舊','Delivery, newest'),OC.sort)}${opt('order_date',L('訂單日 新→舊','Order date, newest'),OC.sort)}${opt('cust',L('客戶','Customer'),OC.sort)}${opt('style',L('款號','Style'),OC.sort)}${opt('open',L('未交量 多→少','Open qty, most'),OC.sort)}${opt('qty',L('訂單量 多→少','Order qty, most'),OC.sort)}${opt('anom',L('異常多→少','Most exceptions'),OC.sort)}</select>
+   ${OC.cust||OC.ptype||OC.st||OC.chk||OC.an||OC.q?`<button class="btn sm" onclick="['cust','ptype','st','chk','an','q'].forEach(k=>OC[k]='');ocSet('page',0)">✕ ${L('清除條件','Clear')}</button>`:''}</div>`;
+  const B=baseRows(all);
+  h+=pnHTML(K,{dates:B.map(r=>dOf(r,f)).filter(Boolean),fields:FLD.map(([v,l])=>[v,L(l[0],l[1])]),hint:L('只算選定期間','selected period only')});
+  let rows=B.filter(r=>inRg(dOf(r,f),R)); rows.forEach(r=>{r._an=ocAnom(r)});
+  const prev=R.all?null:(()=>{const Rp=rngFor(st.pt,addDs(R.from,-1));return B.filter(r=>inRg(dOf(r,f),Rp))})();
+  const rowsAll=rows; if(OC.an)rows=rows.filter(r=>OC.an==='any'?r._an.length:r._an.includes(OC.an));
+  rows.sort(SORTS[OC.sort]||SORTS.delivery); window.OC_LAST=rows.map(r=>r.ids[0]); window.OC_ROWS=rows;
+  /* 重點＋圖表 */
+  const kn=keynote(rowsAll,B,prev,R,st,f);
+  h+=`<details class="panel oc-kn" ${OC.kn!==false?'open':''} ontoggle="OC.kn=this.open;LS.set('psjerp_oc',OC)"><summary>💡 ${L('重點摘要與圖表','Key notes & charts')}</summary><ul class="kn-list">${kn.map(x=>`<li>${x}</li>`).join('')}</ul>${charts(rowsAll,B,R,st,f)}</details>`;
+  /* KPI */
+  const tq=sum(rows,'qty'), ts=sum(rows,r=>r.ship.qty), tf=sum(rows,'fg_qty'), to=sum(rows,r=>Math.max(0,r.open_qty||0)), tw=sum(rows,sewQ), late=rows.filter(r=>r.status==='late').length, an=rows.filter(r=>r._an.length).length;
+  h+=`<div class="kpis" style="margin:12px 0">${kpi(L('款／PO','Style / PO'),fmt(rows.length),'',late?L('逾期 ','late ')+late:'',late?'warn':'')}${kpi(L('訂單量','Order qty'),fmt(tq),'',money(sum(rows,amtOf)))}${kpi(L('已縫','Sewn'),fmt(tw),'',pct(tw,tq))}${kpi(L('已入庫','FG received'),fmt(tf),'',pct(tf,tq),tf>tq*1.1?'warn':'')}${kpi(L('已出貨','Shipped'),fmt(ts),'',pct(ts,tq))}${kpi(L('未交','Open'),fmt(to),'',to?'':L('全部出完','all shipped'),to?'warn':'good')}<button class="kpi ${an?'warn':'good'}" onclick="ocPick('an','${OC.an||''}','anom')" style="text-align:left;cursor:pointer"><div class="l">⚠ ${L('有異常','With exceptions')}</div><div class="v num">${fmt(an)}</div><div class="d">${L('點看清單','view list')}</div></button></div>`;
+  /* 檢視 */
+  const V=[['list','📋',L('清單','List')],['cust','👥',L('依客戶','By customer')],['type','🏷️',L('依品類','By category')],['trend','📅',L('日週月年報表','Period report')],['anom','⚠️',L('異常','Exceptions')+(an?` (${an})`:'')]];
+  h+=`<div class="seg oc-views" role="tablist">${V.map(([v,ic,l])=>`<button class="${OC.view===v?'on':''}" onclick="ocSet('view','${v}')">${ic} ${esc(l)}</button>`).join('')}</div>`;
+  if(OC.view==='cust')h+=grpView(rows,r=>r.cust,L('客戶','Customer'),{f:'cust',name:k=>k});
+  else if(OC.view==='type')h+=grpView(rows,r=>r.ptype,L('品類','Category'),{f:'ptype',name:k=>ptName(k)});
+  else if(OC.view==='trend')h+=trendView(B.filter(r=>!OC.an||(OC.an==='any'?ocAnom(r).length:ocAnom(r).includes(OC.an))),R,st,f);
+  else if(OC.view==='anom')h+=anomView(rowsAll);
+  else { const n0=Math.min(rows.length,80);
+   h+=rows.length?`<div class="tbl-wrap"><table class="t cards oc">${window.ocHeadHTML?ocHeadHTML():''}<tbody id="ocBody">${rows.slice(0,n0).map(r=>ocRowHTML(r)).join('')}</tbody></table></div><div id="ocMore" class="cont-more" data-n="${n0}">${rows.length>n0?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${n0} / ${fmt(rows.length)}`:`${fmt(rows.length)} ${L('列，全部顯示','rows, all shown')}`}</div>`:`<p class="note">${L('這個範圍沒有訂單。','No orders in this range.')}</p>`;
+   h+=tail; setTimeout(ocScroll,30) }
+  return h };
+ function ocScroll(){ const more=document.getElementById('ocMore'), body=document.getElementById('ocBody'); if(!more||!body)return; const rows=window.OC_ROWS||[];
+  const add=()=>{ let n=+more.dataset.n||0; if(n>=rows.length)return false; const m=Math.min(rows.length,n+80); body.insertAdjacentHTML('beforeend',rows.slice(n,m).map(r=>ocRowHTML(r)).join('')); more.dataset.n=m; more.innerHTML=m<rows.length?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${m} / ${fmt(rows.length)}`:`${fmt(rows.length)} ${L('列，全部顯示','rows, all shown')}`; return true };
+  more.onclick=add; if(window.IntersectionObserver){ const io=new IntersectionObserver(es=>{ if(!document.body.contains(more)){io.disconnect();return} if(es.some(x=>x.isIntersecting))add() },{rootMargin:'600px 0px'}); io.observe(more) } }
+ window.exportOC=function(){ const rows=window.OC_ROWS||ocRows(); const head=['客戶','品類','款號','款名','PO','自編單號','訂單編號','訂單日','交期','訂單量(ERP)','金額','客戶PO量','客戶PO核對','SMV','SMV來源','ERP訂單SMV','已裁','已縫','已入庫','已出貨','最近出貨日','未交','INVOICE件數','INVOICE金額','狀態','異常'];
+  const AN=new Map(ANOM.map(a=>[a[0],a[1][0]])); const data=rows.map(r=>[r.cust,ptName(r.ptype),r.style,r.style_name,r.po_no,r.my_no,r.od_no,r.order_date,r.delivery,r.qty,amtOf(r)||'',r.po&&r.po.qty!=null?r.po.qty:'',r.po?({ok:'相符',diff:'有差異',nostyle:'款對不上',missing:'缺客戶PO檔'})[r.po.state]||'':'',r.smv?+(+r.smv).toFixed(3):'',r.smv_src?(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src):'',r.smv_erpo||'',r.cutr&&!r.cutr.none?r.cutr.pcs:(r.cut_qty||''),sewQ(r)||'',r.fg_qty,r.ship.qty,r.ship.last,r.open_qty,r.inv?r.inv.qty:'',r.inv?r.inv.amount:'',({open:'未結',late:'逾期',closed:'已結'})[r.status]||'',(r._an||ocAnom(r)).map(k=>AN.get(k)).join('、')]);
+  const st=pnS('ordercenter'); const name='VRT_訂單中心_'+pLabel(st.pt,rngFor(st.pt,st.anchor)).replace(/[^0-9A-Za-z-]+/g,'_')+'_'+nowStamp().replace(/[-: ]/g,'').slice(0,12);
+  if(!window.XLSX){showCSV(name+'.csv',[head].concat(data));return} const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head].concat(data)),'訂單中心'); XLSX.writeFile(wb,name+'.xlsx'); toast(L('已匯出 ','Exported ')+fmt(rows.length)+L(' 列',' rows')) };
+
+ /* ══════════ N. 👕 款式頁：同一條期間列、往下捲自動載入 ══════════ */
+ const SRCN={ie_upd:['IE 週報','IE weekly'],erp:['ERP','ERP'],ie_obd:['IE OBD','IE OBD'],sew:['車縫日報','Sewing report'],day:['日報 SMV','Daily SMV'],erpo:['ERP 訂單','ERP order']};
+ const srcLbl=s=>{const x=SRCN[s];return x?L(x[0],x[1]):(s||L('缺','none'))};
+ function styCard(s,R,f,ovd){ const c=s.cur; const ie=s.ie[0]; const erpV=s.erp&&+s.erp.smv>0.01?+s.erp.smv:null; const diff=erpV&&ie&&Math.abs(erpV-ie.v)>0.05*ie.v;
+  let pp=0; if(!R.all){ if(f==='ord')pp=s.orders.ids.reduce((t,id)=>{const o=ovd.get(id);return t+(o&&inRg(o.d,R)?o.q:0)},0); else s.sew.byD.forEach((v,d)=>{if(inRg(d,R))pp+=v}) }
+  return `<div class="sty-card" onclick="openStyle('${esc(s.sk)}')">${window.styPh?styPh(s.sk):''}<div class="sty-body"><div class="sty-h"><b class="mono">${esc(s.style)}</b>${s.custs.length?`<span class="small muted">${esc(s.custs.slice(0,2).join('、'))}</span>`:''}</div><div class="small muted sty-name">${esc(s.name||'')}${s.cat?' · '+esc(s.cat):''}</div>
+   <div class="sty-smv">${c?`<b>${fmt(c.v,2)}</b> <span class="small">${esc(srcLbl(c.src))}</span>`:`<span class="st warn">${L('缺 SMV','no SMV')}</span>`}${diff?` <span class="st warn" title="ERP ${fmt(erpV,2)} / IE ${fmt(ie.v,2)}">ERP≠IE</span>`:''}</div>
+   <div class="small muted">${pp?`<b>${L('這期 ','this period ')}${fmt(pp)}</b> · `:''}${s.sew.pcs?`🪡 ${fmt(s.sew.pcs)} · ${esc(s.sew.last)}`:''}${s.orders.open?` · ${L('未交 ','open ')}${fmt(s.orders.open)}`:''}</div></div></div>` }
+ const _rs=RENDER.styles;
+ if(_rs)RENDER.styles=function(){ let h=_rs.apply(this,arguments); if(!window.SF)return h;
+  const segI=h.indexOf('<div class="seg" style="margin:10px 0">'); if(segI<0)return h; const segE=h.indexOf('</div>',segI)+6;
+  const K='styles'; const st=pnS(K,{pt:'ALL',f:'sew'}); const f=st.f||'sew'; const R=rngFor(st.pt,st.anchor);
+  const I=styleIdx(); const base=(window.STY_LAST||[]).map(sk=>I.map.get(sk)).filter(Boolean);
+  const ovd=new Map(ordersView().map(o=>[o.id,{d:d10(o.order_date),q:+o.qty||0}]));
+  const dates=[]; base.forEach(s=>{ if(f==='sew')s.sew.byD.forEach((v,d)=>dates.push(d)); else s.orders.ids.forEach(id=>{const o=ovd.get(id);if(o)dates.push(o.d)}) });
+  const inP=s=>R.all||(f==='sew'?[...s.sew.byD.keys()].some(d=>inRg(d,R)):s.orders.ids.some(id=>{const o=ovd.get(id);return o&&inRg(o.d,R)}));
+  const rows=base.filter(inP); window.STY_LAST=rows.map(s=>s.sk);
+  const nav=pnHTML(K,{dates,fields:[['sew',L('依生產日（車縫日報）','By sewing date')],['ord',L('依接單日','By order date')]],hint:R.all?'':L(`這期有 ${rows.length} 款`,`${rows.length} styles in this period`)});
+  let out=h.slice(0,segE)+nav;
+  if(SF.view==='period'){ const sub=subOf(st.pt,R,dates.reduce((m,d)=>d&&d<m?d:m,'9999'));
+   const agg=sub.list.map(b=>{ const a={b,pcs:0,min:0,sty:new Map(),newO:0,ie:0}; rows.forEach(s=>{ const sv=(s.cur&&s.cur.v)||0; s.sew.byD.forEach((v,d)=>{ if(inRg(d,b.R)){a.pcs+=v;a.min+=v*sv;a.sty.set(s.sk,(a.sty.get(s.sk)||0)+v)} }); s.orders.ids.forEach(id=>{const o=ovd.get(id);if(o&&inRg(o.d,b.R))a.newO++}); s.ie.forEach(v=>{if(v.tdate&&inRg(v.tdate,b.R))a.ie++}) }); return a });
+   out+=`<div class="vz-card" style="margin-bottom:12px"><h4>🪡 ${L('車縫件數','Pieces sewn')}</h4>${colChart(sub.list,[{name:L('件數','Pcs'),c:'--vz1',vals:agg.map(a=>a.pcs)}],{click:b=>`pnDrill('styles','${b.pt}','${b.a}','list')`})}</div>`;
+   out+=tbl('lt_styles_period',[[L('期間','Period')],[L('生產款數','Styles sewn'),1],[L('件數','Pcs'),1],[L('標準分鐘','Std minutes'),1],[L('平均 SMV','Avg SMV'),1],[L('新接單（列）','New order lines'),1],[L('IE 測款','IE tests'),1],[L('主要款式','Top styles')]],agg.slice().reverse().map(a=>{const top=[...a.sty.entries()].sort((x,y)=>y[1]-x[1]).slice(0,3);const r=[`<span class="mono">${esc(a.b.l)}</span>`,a.sty.size||'—',a.pcs?fmt(a.pcs):'—',a.min?fmt(a.min):'—',a.pcs&&a.min?fmt(a.min/a.pcs,2):'—',a.newO||'—',a.ie||'—',`<span class="small">${top.map(([k,v])=>`<a href="javascript:void 0" class="mono" onclick="event.stopPropagation();openStyle('${esc(k)}')">${esc(k)}</a> ${fmt(v)}`).join('、')}</span>`];if(a.pcs||a.newO)r._click=`pnDrill('styles','${a.b.pt}','${a.b.a}','list')`;return r}),['',' ',fmt(sum(agg,'pcs')),fmt(sum(agg,'min')),sum(agg,'pcs')?fmt(sum(agg,'min')/sum(agg,'pcs'),2):'',fmt(sum(agg,'newO')),fmt(sum(agg,'ie')),'']);
+   return out }
+  const IMG=window.STY_IMG?STY_IMG():null; const withSmv=rows.filter(s=>s.cur).length, ie=rows.filter(s=>s.cur&&s.cur.src==='ie_upd').length, img=IMG&&IMG.list?rows.filter(s=>IMG.list.has(s.sk)).length:null;
+  out+=`<div class="kpis" style="margin-bottom:12px">${kpi(L('款式','Styles'),fmt(rows.length))}${kpi(L('有 SMV','With SMV'),fmt(withSmv),'',pct(withSmv,rows.length),withSmv<rows.length?'warn':'good')}${kpi(L('用 IE 週報 SMV','IE weekly SMV'),fmt(ie))}${kpi(L('有樣衣圖','With photo'),img==null?'…':fmt(img),'',L('點款式卡上傳','upload on the style card'))}</div>`;
+  const n0=Math.min(rows.length,60); window._STY_ROWS={rows,R,f,ovd};
+  out+=`<div class="sty-grid" id="styGrid">${rows.slice(0,n0).map(s=>styCard(s,R,f,ovd)).join('')}</div><div id="styMore" class="cont-more" data-n="${n0}">${rows.length>n0?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${n0} / ${fmt(rows.length)}`:`${fmt(rows.length)} ${L('款','styles')}`}</div>`;
+  setTimeout(()=>{ const more=document.getElementById('styMore'), grid=document.getElementById('styGrid'); if(!more||!grid)return; const X=window._STY_ROWS; if(window.fillImgs)fillImgs(grid);
+   const add=()=>{ let n=+more.dataset.n; if(n>=X.rows.length)return; const m=Math.min(X.rows.length,n+60); grid.insertAdjacentHTML('beforeend',X.rows.slice(n,m).map(s=>styCard(s,X.R,X.f,X.ovd)).join('')); more.dataset.n=m; more.innerHTML=m<X.rows.length?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${m} / ${fmt(X.rows.length)}`:`${fmt(X.rows.length)} ${L('款','styles')}`; if(window.fillImgs)fillImgs(grid) };
+   more.onclick=add; if(window.IntersectionObserver){ const io=new IntersectionObserver(es=>{ if(!document.body.contains(more)){io.disconnect();return} if(es.some(x=>x.isIntersecting))add() },{rootMargin:'600px 0px'}); io.observe(more) } },40);
+  return out };
+
+ /* ══════════ O. 生產雲端即時連動：每 5 分鐘（畫面開著、有用到生產資料時）看雲端有沒有新日報，有才只拉變動的部分，畫面自動更新 ══════════ */
+ const LIVE={on:LS.get('psjerp_live',true)!==false,at:'',busy:false,last:0,chg:'',err:''};
+ const WANT={sewing:k=>/^m:/.test(k),cutting:k=>/^m:/.test(k),qc:k=>/^m:/.test(k),smv:k=>/^p:ie_(styles|updates)/.test(k)||/^m:/.test(k)};
+ const CKEY=t=>'prodcache#'+t+(t==='smv'?'#v2':'');
+ const relevant=()=>{ const dr=document.getElementById('drawer'); return ['ordercenter','styles','dashboard','orders','prodorders','costing','exceptions'].includes(CUR)||(dr&&!dr.hidden) };
+ const mf=t=>fetch(PROD_GAS+'?action=smartManifest&tool='+t+'&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()).then(m=>(m.data||m).hashes||{});
+ async function liveTick(force){ if(!force&&(!LIVE.on||document.hidden||!relevant()))return; if(LIVE.busy||isDemo()||!navigator.onLine)return; if(!window.CHAIN||!CHAIN.loaded||CHAIN.busy)return;
+  LIVE.busy=true; const ch=[];
+  try{ await Promise.all(Object.keys(WANT).map(async t=>{ const H=await mf(t); let c=null; try{c=await IDB.get(CKEY(t))}catch(e){} const hh=(c&&c.h)||{}; const want=Object.keys(H).filter(WANT[t]); if(want.some(k=>hh[k]!==H[k])||Object.keys(hh).some(k=>!H[k]))ch.push(t) }));
+   try{ const H=await mf('orders'); const c=await IDB.get('prodcache#orders'); const hh=(c&&c.hashes)||{}; if(Object.keys(H).filter(k=>/^h:/.test(k)||k==='p:headers').some(k=>hh[k]!==H[k]))ch.push('orders') }catch(e){}
+   LIVE.at=nowStamp().slice(11,16); LIVE.err='';
+   if(ch.length){ const NM={sewing:L('車縫','sewing'),cutting:L('裁剪','cutting'),qc:'QC',smv:'SMV',orders:L('客戶 PO','customer PO')}; LIVE.chg=ch.map(t=>NM[t]||t).join('、');
+    const y=window.scrollY; const dr=document.getElementById('drawer'); const open=dr&&!dr.hidden; const db=open?dr.querySelector('.od-body'):null; const top=db?db.scrollTop:0;
+    if(ch.some(t=>t!=='orders')){ GC.delete('styleidx'); await loadChain(true) }
+    if(ch.includes('orders')&&window.loadProdOrders)await loadProdOrders(true);
+    try{window.scrollTo(0,y)}catch(e){}
+    if(open&&!dr.hidden){ if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab); const d2=dr.querySelector('.od-body'); if(d2)d2.scrollTop=top }
+    toast(L('生產雲端有新資料，已自動更新：','Production cloud updated: ')+LIVE.chg) }
+  }catch(e){ LIVE.err=String(e.message||e) } finally{ LIVE.busy=false; LIVE.last=Date.now(); const el=document.getElementById('liveChip'); if(el)el.outerHTML=liveChipHTML() } }
+ const liveChipHTML=()=>`<button id="liveChip" class="live-chip ${LIVE.on?'on':''}${LIVE.err?' err':''}" onclick="liveToggle()" title="${L('每 5 分鐘自動檢查生產雲端（車縫／裁剪／QC／SMV／客戶 PO），有新資料才更新。點一下開關。','Checks the production cloud every 5 minutes and updates when there is new data. Click to toggle.')}${LIVE.err?' · '+esc(LIVE.err):''}">${LIVE.on?'🟢':'⚪'} ${L('即時連動','Live')}${LIVE.at?' · '+LIVE.at:''}</button>`;
+ window.liveChipHTML=liveChipHTML; window.liveTick=liveTick;
+ window.liveToggle=()=>{ LIVE.on=!LIVE.on; LS.set('psjerp_live',LIVE.on); toast(LIVE.on?L('即時連動已開：每 5 分鐘檢查一次','Live updates on (every 5 min)'):L('即時連動已關','Live updates off')); if(LIVE.on)liveTick(true); const el=document.getElementById('liveChip'); if(el)el.outerHTML=liveChipHTML() };
+ setInterval(()=>liveTick(false),5*60*1000);
+ document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&Date.now()-LIVE.last>2*60*1000)liveTick(false) });
+ /* 款式頁也放即時燈號 */
+ const _rs2=RENDER.styles; if(_rs2)RENDER.styles=function(){ const h=_rs2.apply(this,arguments); return h.replace(/(<button class="btn sm" onclick="loadChain&&loadChain\(true\))/,liveChipHTML()+'$1') };
+
+ /* ══════════ P. 樣式 ══════════ */
+ const st=document.createElement('style'); st.textContent=`
+ :root{--vz1:#2a78d6;--vz2:#eb6834} :root[data-dark]{--vz1:#3987e5;--vz2:#d95926}
+ div.pnav{display:flex!important;flex-direction:column;align-items:stretch}
+ .pnx{margin:10px 0 12px}.pnx .pn-p{min-width:230px}.pn-hint{font-size:13px;color:var(--ink-2)}.pn-cap{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+ .pnx .pn-f{width:auto;margin-left:auto}.pnx .pn-a{min-width:38px;height:36px}
+ .oc-views{display:flex;flex-wrap:wrap;margin:4px 0 12px}.oc-views button{padding:8px 12px}
+ .oc-kn{padding:12px 14px;margin-bottom:4px}.oc-kn>summary{cursor:pointer;font-weight:700;font-size:15px;list-style-position:inside}
+ .kn-list{margin:10px 0 4px;padding-left:20px}.kn-list li{margin:4px 0;line-height:1.6}.kn-list a{color:var(--accent)}.kn-list a.st{text-decoration:none;margin:2px 2px;display:inline-block;color:inherit}
+ .vz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:12px}
+ .vz-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}.vz-card h4{margin:0 0 10px;font-size:13.5px}
+ .vz-legend{display:flex;gap:14px;font-size:12px;color:var(--ink-2);margin-bottom:6px}.vz-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+ .vz-cols{display:flex;align-items:stretch;gap:3px;height:160px;padding-top:18px}
+ .vz-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column}.vz-col.click{cursor:pointer}.vz-col:hover .vz-bars{background:var(--accent-soft)}
+ .vz-bars{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:2px;border-bottom:1px solid var(--line-2);border-radius:4px 4px 0 0}
+ .vz-bar{flex:1;max-width:28px;border-radius:4px 4px 0 0;position:relative}
+ .vz-pk{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10.5px;color:var(--ink-2);white-space:nowrap;padding-bottom:2px;font-variant-numeric:tabular-nums}
+ .vz-x{font-size:10.5px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:clip;height:16px;line-height:16px;margin-top:3px}
+ .vz-cols.many{gap:1px}.vz-cols.many .vz-x{font-size:8.5px}
+ .vz-h{display:flex;flex-direction:column;gap:6px}
+ .vz-hr{display:grid;grid-template-columns:minmax(70px,32%) 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:2px 4px;border-radius:6px}.vz-hr.click{cursor:pointer}.vz-hr.click:hover{background:var(--accent-soft)}
+ .vz-hl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vz-ht{height:10px;background:var(--line-2);border-radius:99px;overflow:hidden}.vz-hb{display:block;height:100%;border-radius:99px;min-width:2px}
+ .vz-hv{font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap;font-size:12px}
+ .an-blk{padding:10px 14px;margin-bottom:10px}.an-blk>summary{cursor:pointer;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+ .cont-more{padding:16px;text-align:center;color:var(--muted);font-size:13px;border-top:1px dashed var(--line);margin-top:18px;cursor:pointer}
+ .cont-sec{border-top:3px solid var(--accent-soft);margin-top:26px;padding-top:6px}
+ .cont-hd{display:flex;gap:10px;align-items:center;padding:8px 10px;margin:0 0 12px;border-radius:10px;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);position:sticky;top:0;z-index:1}
+ .cont-hd .sty-th{width:48px;height:48px;flex:0 0 48px}.cont-t{flex:1;min-width:0}
+ .cont-tg.on{border-color:var(--accent);color:var(--accent)}
+ .mlink{color:var(--accent);text-decoration:none;border-bottom:1px dotted currentColor;cursor:pointer}
+ .all-sec{margin-bottom:10px}.all-h{font-size:15px;margin:18px 0 8px;padding-top:12px;border-top:1px solid var(--line)}.all-sec:first-child .all-h{border-top:0;margin-top:0;padding-top:0}
+ .mt-det{margin-top:12px}.mt-det>summary{cursor:pointer}
+ tr.hl-warn td{background:var(--warn-soft)}
+ .smv-box{margin-bottom:12px;line-height:1.6}
+ .live-chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 10px;font:600 12px/1.2 inherit;font-family:inherit;color:var(--ink-2);cursor:pointer;margin-right:6px;white-space:nowrap}.live-chip.on{border-color:var(--good);color:var(--good)}.live-chip.err{border-color:var(--warn);color:var(--warn)}
+ .d-back{margin-right:6px;white-space:nowrap}
+ @media (max-width:860px){.pnx .pn-sel{width:100%}.pnx .pn-p{min-width:0;flex:1}.pnx .pn-f{margin-left:0;flex:1 1 100%}.pn-pt{overflow-x:auto;max-width:100%;scrollbar-width:none}.pn-pt button{padding:6px 9px;white-space:nowrap}
+  .vz-grid{grid-template-columns:1fr}.vz-cols{height:130px}.oc-views{flex-wrap:nowrap;overflow-x:auto;max-width:100%}.oc-views button{white-space:nowrap}.cont-hd .sty-th{width:40px;height:40px;flex-basis:40px}}
+ .oc-filters select.inp{max-width:240px}
+ @media (max-width:860px){.oc-filters select.inp{max-width:none}.vz-cols.mid .vz-col:nth-child(even) .vz-x{visibility:hidden}.vz-cols.mid .vz-x{overflow:visible}}
+ @media print{.cont-more,.cont-tg,.live-chip,.d-back{display:none!important}}`;
  document.head.appendChild(st);
 })();
 
