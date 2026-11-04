@@ -1172,7 +1172,7 @@ function selectorsHTML(k,pt,anchor,st,cmp){
  return '';
 }
 function pnav(k,o={}){
- const st=S(k); const pts=['D','W','H','M','Q','Y','C'].concat(o.all?['ALL']:[]); if(!pts.includes(st.pt))st.pt='M';
+ const st=S(k); const pts=['D','W','M','Q','Y','C'].concat(o.all?['ALL']:[]); if(!pts.includes(st.pt))st.pt='M';
  const R=rangeOf(st); const nextStart=st.pt==='C'?addD(R.to,1):rangeFor(st.pt,shiftDate(st.pt,parseD(st.anchor)||TODAY,1)).from;
  const canNext=st.pt!=='ALL'&&nextStart<=TODAY, canPrev=st.pt!=='ALL'&&R.from>DATA_START;
  const views=o.views&&PM[k];
@@ -4296,7 +4296,7 @@ async function syncTpl(man){
   if(pt==='D')return R.from; if(pt==='W'){const w=isoW(R.from);return `${w.y}-W${pad(w.w)} · ${R.from.slice(5)}–${R.to.slice(5)}`}
   if(pt==='H')return R.from.slice(0,7)+' · '+R.from.slice(8)+'–'+R.to.slice(8);
   if(pt==='M')return R.from.slice(0,7); if(pt==='Q')return R.from.slice(0,4)+'-Q'+(Math.floor((+R.from.slice(5,7)-1)/3)+1); return R.from.slice(0,4) }
- const PTS=[['D',['每日','Daily']],['W',['每週','Weekly']],['H',['半月','Half-month']],['M',['每月','Monthly']],['Q',['每季','Quarterly']],['Y',['每年','Yearly']],['ALL',['全部','All']]];
+ const PTS=[['D',['每日','Daily']],['W',['每週','Weekly']],['M',['每月','Monthly']],['Q',['每季','Quarterly']],['Y',['每年','Yearly']],['ALL',['全部','All']]];
  const PN={}, PNOPT={}, PNC=new Map();
  function pnS(k,def){ if(!PN[k])PN[k]=Object.assign({pt:'Y',anchor:today(),f:''},def||{},LS.get('psjerp_pn_'+k,{})); return PN[k] }
  window.pnS=pnS;
@@ -4360,6 +4360,16 @@ async function syncTpl(man){
   ['nosew',['已出貨但車縫日報找不到','Shipped, not in sewing reports'],'info',r=>r.ship.qty>0&&String(r.order_date)>='2020-07'&&r.sewr&&r.sewr.none,r=>L('日報同 PO 有 ','PO in reports: ')+fmt(r.sewr.poTotal||0)],
  ];
  window.ocAnom=r=>ANOM.filter(a=>{try{return a[3](r)}catch(e){return false}}).map(a=>a[0]);
+ /* 異常備註／已處理：存在訂單本身的「備註」「標籤」（ERP 鎖住的單也能改這兩欄，會同步雲端）*/
+ const anLab=k=>{const a=ANOM.find(x=>x[0]===k);return a?a[1][0]:k};
+ const recG=r=>{ try{ return findRec('orders',r.ids?r.ids[0]:r.id) }catch(e){ return null } };
+ const anDoneSet=r=>{ const x=recG(r); return new Set(((x&&x.tags)||[]).filter(t=>/^已處理:/.test(t)).map(t=>t.slice(4))) };
+ const anNoteOf=(r,k)=>{ const x=recG(r); const lab=anLab(k); const m=String((x&&x.notes)||'').split('\n').find(l=>l.startsWith('【'+lab+'】')); return m?m.slice(lab.length+2):'' };
+ const anSave=(x,before,act)=>{ if(isLocked(x))cloudNote('orders',x); audit('orders',x.id,'EDIT',before,{notes:x.notes,tags:(x.tags||[]).join(', ')}); persist(); GC.delete('ordv'); GC.delete('ocrows'); toast(act); const y=window.scrollY; rerender(); try{window.scrollTo(0,y)}catch(e){} };
+ window.anNote=(id,k)=>{ const x=findRec('orders',id); if(!x)return; const lab=anLab(k); const lines=String(x.notes||'').split('\n').filter(Boolean); const old=lines.find(l=>l.startsWith('【'+lab+'】'));
+  const txt=prompt(L(`「${lab}」的備註（會同步雲端，每台裝置都看得到；清空＝刪除備註）：`,`Note for "${lab}" (synced; empty = delete):`),old?old.slice(lab.length+2).replace(/（\d\d-\d\d）$/,''):''); if(txt==null)return;
+  const before={notes:x.notes||''}; const keep=lines.filter(l=>!l.startsWith('【'+lab+'】')); if(txt.trim())keep.push(`【${lab}】${txt.trim()}（${today().slice(5)}）`); x.notes=keep.join('\n'); anSave(x,before,txt.trim()?L('備註已存','Note saved'):L('備註已刪除','Note removed')) };
+ window.anDone=(id,k)=>{ const x=findRec('orders',id); if(!x)return; const t='已處理:'+k; const tg=(x.tags||[]).slice(); const before={tags:tg.join(', ')}; const i=tg.indexOf(t); if(i>=0)tg.splice(i,1); else tg.push(t); x.tags=tg; anSave(x,before,i>=0?L('改回未處理','Marked open again'):L('已標為處理完成，移到「已處理」','Marked as handled')) };
 
  /* ══════════ E. 小圖表（HTML 長條；滑過看數字；配色同資料視覺規範，深色主題另一組）══════════ */
  function colChart(bk,series,o){ o=o||{}; const max=Math.max(1,...series.flatMap(s=>s.vals)); const many=bk.length>16, mid=bk.length>9;
@@ -4554,35 +4564,34 @@ async function syncTpl(man){
   h+=`<details class="mt-det"><summary><h4 style="display:inline">📤 ${L('領料明細','Issues')} (${fmt(IL.length)})</h4></summary>`+tbl('ot_iss',[[L('領料單','Issue no.')],[L('日期','Date')],[L('類別','Type')],[L('料品','Material')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單位','Unit')]],IL.slice(0,300).map(r=>[`<span class="mono">${esc(r.issue_no)}</span>`,esc(d10(r.issue_date)),esc(r.type==='main'?L('主料','main'):L('副料','trim')),mlink(r.material||'',r._k,r.color),esc(r.color||''),fmt(r.qty,2),esc(r.unit||'')]))+`</details>`;
   return h };
 
- /* ══════════ L. 連續往下捲（同 PSJHR：捲到底自動接下一張，上方標題跟著換）══════════ */
+ /* ══════════ L. 滑到底換下一張（同 PSJHR：捲到最下面再往下滑 → 直接換成下一款／下一張；最上面再往上滑 → 上一張）══════════ */
  const contOn=()=>LS.get('psjerp_cont',true)!==false;
- window.contToggle=()=>{ LS.set('psjerp_cont',!contOn()); toast(contOn()?L('已開啟：捲到底會接下一張','On: scrolling to the end opens the next one'):L('已關閉連續往下看','Continuous scrolling off')); if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab) };
- let CIO=null;
- const PH="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='16' font-size='12' text-anchor='middle'%3E👕%3C/text%3E%3C/svg%3E";
- const stc=g=>g?(g.status==='late'?['crit',L('逾期','late')]:g.status==='closed'?['good',L('已結','closed')]:['info',L('未結','open')]):['neu',''];
- function ordSec(id,list){ const C=ordCtx(id); const o=C.o; if(!o)return ''; const g=C.g; let body=''; try{ body=ordTabBody(OCUR.tab,id) }catch(e){ body=`<p class="muted">${esc(e.message||e)}</p>` } body=body.replace(/\sid="[^"]*"/g,''); const c=stc(g);
-  return `<section class="cont-sec" data-id="${esc(id)}"><div class="cont-hd" onclick="openOrder('${esc(id)}')">${window.styPh?styPh(ks(o.style),'sty-th'):''}<div class="cont-t"><b class="mono">${esc(o.po_no||o.od_no||o.my_no)} · ${esc(o.style)}</b> ${stChip(c[0],c[1])}<div class="small muted">${esc(o.cust)} · ${fmt(g?g.qty:o.qty)} ${L('件','pcs')}${o.style_name?' · '+esc(o.style_name):''}</div></div><span class="small muted">${list.indexOf(id)+1}/${fmt(list.length)}</span></div>${body}</section>` }
- function stySec(sk,list){ const s=styleIdx().map.get(sk); if(!s)return ''; let body=''; try{ body=styTabBody(STY.tab,sk) }catch(e){ body=`<p class="muted">${esc(e.message||e)}</p>` } body=body.replace(/\sid="[^"]*"/g,''); const c=s.cur;
-  return `<section class="cont-sec" data-id="${esc(sk)}"><div class="cont-hd" onclick="openStyle('${esc(sk)}')">${window.styPh?styPh(sk,'sty-th'):''}<div class="cont-t"><b class="mono">${esc(s.style)}</b> ${c?`<b>${fmt(c.v,2)}</b> <span class="small">SMV</span>`:''}<div class="small muted">${esc(s.custs.join('、'))} · ${esc(s.name||'')}</div></div><span class="small muted">${list.indexOf(sk)+1}/${fmt(list.length)}</span></div>${body}</section>` }
- function setCur(kind,cur,list){ const dr=document.getElementById('drawer'); if(!dr)return; const pos=dr.querySelector('.od-nav .small'); const img=dr.querySelector('.sty-head img.sty-hd');
-  const swapImg=sk=>{ if(img&&img.dataset.sk!==sk){ img.dataset.sk=sk; delete img.dataset.done; img.classList.remove('has'); img.src=PH; if(window.fillImgs)fillImgs(dr) } };
-  if(kind==='ord'){ if(OCUR.id===cur)return; const C=ordCtx(cur); const o=C.o; if(!o)return; OCUR.id=cur; const h2=dr.querySelector('.od-title h2'); if(h2)h2.innerHTML=`<span class="mono">${esc(o.po_no||o.od_no||o.my_no)}</span> · <span class="mono">${esc(o.style)}</span>`; const sm=dr.querySelectorAll('.od-title > .small'); if(sm[1])sm[1].textContent=`${fmt(C.g?C.g.qty:o.qty)} ${L('件','pcs')}${o.style_name?' · '+o.style_name:''}`; if(sm[0]){const c=stc(C.g);sm[0].innerHTML=`🧾 ${esc(o.cust)} · <span class="mono">${esc(o.my_no)}</span> ${stChip(c[0],c[1])}`} swapImg(ks(o.style)); const b=dr.querySelector('.to-sty'); if(b)b.setAttribute('onclick',`goStyle('${jsq(ks(o.style))}')`) }
-  else { if(STY.sk===cur)return; const s=styleIdx().map.get(cur); if(!s)return; STY.sk=cur; const h2=dr.querySelector('.sty-dh h2'); if(h2)h2.textContent=s.style; swapImg(cur) }
-  if(pos)pos.textContent=(list.indexOf(cur)+1)+'/'+fmt(list.length) }
- function contAttach(kind){ const dr=document.getElementById('drawer'); const db=dr&&dr.querySelector('.od-body'); if(!db||db.dataset.cont)return; db.dataset.cont='1'; if(CIO){CIO.disconnect();CIO=null}
-  const acts=db.querySelector('.od-acts'); if(acts&&!acts.querySelector('.cont-tg'))acts.insertAdjacentHTML('beforeend',`<button class="btn sm cont-tg ${contOn()?'on':''}" onclick="contToggle()" title="${L('捲到底自動接下一張（同 HR 員工資料）','Scroll to the end to open the next one')}">⬇ ${L('連續往下看：','Keep scrolling: ')}${contOn()?L('開','on'):L('關','off')}</button>`);
-  if(!contOn())return;
-  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let first;
-  if(kind==='ord'){ const C=ordCtx(OCUR.id); first=C.g?C.g.ids[0]:OCUR.id; if(!list.includes(first)){ const j=list.findIndex(x=>C.g&&C.g.ids.includes(x)); if(j<0)return; first=list[j] } }
-  else { first=STY.sk; if(!list.includes(first))return }
-  let last=first; const more=document.createElement('div'); more.className='cont-more'; db.appendChild(more);
-  const nextOf=x=>list[list.indexOf(x)+1];
-  const nameOf=id=>{ if(kind==='sty'){const s=styleIdx().map.get(id);return s?s.style:id} const C=ordCtx(id); return C.o?(C.o.po_no||C.o.my_no)+' · '+C.o.style:id };
-  const label=()=>{ const nx=nextOf(last); more.innerHTML=nx?`⬇ ${L('繼續往下捲：下一張','Keep scrolling — next:')} <b>${esc(nameOf(nx))}</b>`:L('已經是最後一張','That was the last one') };
-  const add=()=>{ const nx=nextOf(last); if(!nx)return false; more.insertAdjacentHTML('beforebegin',kind==='ord'?ordSec(nx,list):stySec(nx,list)); last=nx; label(); if(window.fillImgs)fillImgs(db); return true };
-  label(); more.onclick=()=>add();
-  if(window.IntersectionObserver){ CIO=new IntersectionObserver(es=>{ if(!document.body.contains(more)){CIO&&CIO.disconnect();return} if(es.some(x=>x.isIntersecting)){ let g=0; while(g++<2&&more.getBoundingClientRect().top<db.getBoundingClientRect().bottom+300&&add()); } },{root:db,rootMargin:'0px 0px 400px 0px'}); CIO.observe(more) }
-  let tk=0; db.addEventListener('scroll',()=>{ if(tk)return; tk=setTimeout(()=>{ tk=0; if(!document.body.contains(db))return; const top=db.getBoundingClientRect().top; let cur=first; for(const s2 of db.querySelectorAll('.cont-sec')){ if(s2.getBoundingClientRect().top<=top+80)cur=s2.dataset.id; else break } setCur(kind,cur,list) },100) },{passive:true}) }
+ window.contToggle=()=>{ LS.set('psjerp_cont',!contOn()); toast(contOn()?L('已開啟：捲到底再往下滑就換下一張','On: scroll past the end to open the next one'):L('已關閉滑到底換下一張','Off')); if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab) };
+ const PULL={busy:0,acc:0,accT:0,ty:null,tb:false,tt:false,kind:null};
+ const scroller=()=>{ const dr=document.getElementById('drawer'); if(!dr)return null; const db=dr.querySelector('.od-body'); for(const el of [db,dr]){ if(el&&el.scrollHeight>el.clientHeight+2){ const oy=getComputedStyle(el).overflowY; if(oy==='auto'||oy==='scroll')return el } } return db||dr };
+ const atBottom=()=>{ const sc=scroller(); return !sc||sc.scrollTop+sc.clientHeight>=sc.scrollHeight-4 };
+ const atTop=()=>{ const sc=scroller(); return !sc||sc.scrollTop<=2 };
+ function pullGo(d){ if(PULL.busy||!contOn())return; const dr=document.getElementById('drawer'); if(!dr||dr.hidden)return; const kind=PULL.kind; if(!kind)return;
+  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let cur; if(kind==='ord'){const C=ordCtx(OCUR.id);cur=C.g?C.g.ids[0]:OCUR.id;if(!list.includes(cur)&&C.g)cur=list.find(x=>C.g.ids.includes(x))}else cur=STY.sk; const i=list.indexOf(cur); if(i<0||!list[i+d])return;
+  PULL.busy=1; PULL.acc=0; const bar=dr.querySelector('.pull-bar'); if(bar)bar.classList.add('go');
+  setTimeout(()=>{ if(kind==='ord')ordGo(d); else styGo(d); setTimeout(()=>{PULL.busy=0},700) },120) }
+ document.addEventListener('wheel',e=>{ const dr=document.getElementById('drawer'); if(!PULL.kind||!dr||dr.hidden||!e.target.closest||!e.target.closest('#drawer'))return; if(e.target.closest('.tbl-wrap')&&e.target.closest('.tbl-wrap').scrollWidth>e.target.closest('.tbl-wrap').clientWidth&&Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+  const now=Date.now(); if(now-PULL.accT>700)PULL.acc=0; PULL.accT=now;
+  if(e.deltaY>0&&atBottom()){ PULL.acc+=e.deltaY; pullHint(Math.min(1,PULL.acc/300)); if(PULL.acc>300)pullGo(1) }
+  else if(e.deltaY<0&&atTop()){ PULL.acc+=e.deltaY; if(PULL.acc<-300)pullGo(-1) }
+  else { PULL.acc=0; pullHint(0) } },{passive:true});
+ document.addEventListener('touchstart',e=>{ if(!PULL.kind||!e.target.closest||!e.target.closest('#drawer'))return; PULL.ty=e.touches[0].clientY; PULL.tb=atBottom(); PULL.tt=atTop() },{passive:true});
+ document.addEventListener('touchmove',e=>{ if(PULL.ty==null)return; const dy=PULL.ty-e.touches[0].clientY; if(PULL.tb&&dy>0)pullHint(Math.min(1,dy/110)); },{passive:true});
+ document.addEventListener('touchend',e=>{ if(PULL.ty==null)return; const dy=PULL.ty-e.changedTouches[0].clientY; const b=PULL.tb, t2=PULL.tt; PULL.ty=null; if(b&&dy>110&&atBottom())pullGo(1); else if(t2&&dy<-160&&atTop())pullGo(-1); else pullHint(0) },{passive:true});
+ function pullHint(f){ const b=document.querySelector('#drawer .pull-bar'); if(!b)return; b.style.setProperty('--p',String(f)); b.classList.toggle('hot',f>0.05) }
+ function contAttach(kind){ PULL.kind=kind; PULL.acc=0; const dr=document.getElementById('drawer'); const db=dr&&dr.querySelector('.od-body'); if(!db)return;
+  const acts=db.querySelector('.od-acts'); if(acts&&!acts.querySelector('.cont-tg'))acts.insertAdjacentHTML('beforeend',`<button class="btn sm cont-tg ${contOn()?'on':''}" onclick="contToggle()" title="${L('捲到底再往下滑換下一張（同 HR 員工資料）','Scroll past the end to open the next one')}">⇅ ${L('滑到底換下一張：','Scroll to next: ')}${contOn()?L('開','on'):L('關','off')}</button>`);
+  if(!contOn()||db.querySelector('.pull-bar'))return;
+  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let cur;
+  if(kind==='ord'){ const C=ordCtx(OCUR.id); cur=C.g?C.g.ids[0]:OCUR.id; if(!list.includes(cur)&&C.g)cur=list.find(x=>C.g.ids.includes(x)) } else cur=STY.sk;
+  const i=list.indexOf(cur); const nx=i>=0?list[i+1]:null;
+  const nm=id=>{ if(kind==='sty'){const s=styleIdx().map.get(id);return s?s.style+(s.name?' · '+s.name:''):id} const C=ordCtx(id); return C.o?(C.o.po_no||C.o.my_no)+' · '+C.o.style:id };
+  db.insertAdjacentHTML('beforeend',`<div class="pull-bar" onclick="${nx?(kind==='ord'?'ordGo(1)':'styGo(1)'):''}"><div class="pull-fill"></div><span>${nx?`⬇ ${L('到底了，再往下滑換下一','End — keep scrolling for the next ')}${kind==='ord'?L('張','order'):L('款','style')}：<b>${esc(nm(nx))}</b> <span class="small muted">(${i+2}/${fmt(list.length)})</span>`:L('已經是最後一張','This is the last one')}</span></div>`) }
  /* 訂單卡：每次畫完 → SMV 註記、返回鍵、款式鍵改成可返回、連續往下捲 */
  function smvNote(){ if(!OCUR.id)return; const ov=ordersView(); const C=ordCtx(OCUR.id); const o=ov.find(x=>x.id===C.o.id)||C.o; const dt=[...document.querySelectorAll('#odTab .kv dt')].find(d=>d.textContent.trim()==='SMV'); if(!dt)return; const dd=dt.nextElementSibling; if(!dd||dd.querySelector('.smv-n'))return;
   const isNew=String(o.order_date||'')>=SMV_NEW; let x='';
@@ -4624,8 +4633,8 @@ async function syncTpl(man){
   const big=rows.filter(r=>r.open_qty>0&&r.status!=='closed').sort((x,y)=>y.open_qty-x.open_qty).slice(0,3);
   if(big.length)K.push(`${L('未交最多：','Largest open: ')}${big.map(r=>`<a href="javascript:void 0" onclick="openOrder('${esc(r.id)}')" class="mono">${esc(r.style)}</a> ${fmt(r.open_qty)}`).join(' · ')}`);
   if(window.CHAIN&&CHAIN.loaded&&!R.all&&window.chainRows){ const sw=sum(chainRows('sewing').filter(x=>inRg(x[0],R)),x=>x[5]); if(sw)K.push(`${L('這期工廠車縫（車縫日報，全部客戶）：','Factory sewing output this period (all customers): ')}<b>${fmt(sw)}</b> ${L('件','pcs')}`) }
-  const an=new Map(); rows.forEach(r=>(r._an||[]).forEach(k=>an.set(k,(an.get(k)||0)+1)));
-  if(an.size)K.push(`⚠ ${L('異常：','Exceptions: ')}${ANOM.filter(x=>an.has(x[0])).map(x=>`<a href="javascript:void 0" class="st ${x[2]==='crit'?'crit':x[2]==='info'?'info':'warn'}" onclick="ocPick('an','${x[0]}','anom')">${esc(L(x[1][0],x[1][1]))} ${an.get(x[0])}</a>`).join(' ')}`);
+  const an=new Map(); let hd=0; rows.forEach(r=>{(r._ano||[]).forEach(k=>an.set(k,(an.get(k)||0)+1)); hd+=(r._an||[]).length-(r._ano||[]).length});
+  if(an.size||hd)K.push(`⚠ ${L('異常待處理：','Open exceptions: ')}${an.size?'':L('沒有','none')}${ANOM.filter(x=>an.has(x[0])).map(x=>`<a href="javascript:void 0" class="st ${x[2]==='crit'?'crit':x[2]==='info'?'info':'warn'}" onclick="ocPick('an','${x[0]}','anom')">${esc(L(x[1][0],x[1][1]))} ${an.get(x[0])}</a>`).join(' ')}${hd?` <span class="small muted">· ${L('已處理 ','handled ')}${hd}</span>`:''}`);
   return K }
  function charts(rows,B,R,st,f){ const sub=subOf(st.pt,R,B.reduce((m,r)=>r.order_date&&r.order_date<m?r.order_date:m,'9999'));
   const keys=new Set(B.map(r=>ordKey(r.my_no,r.po_no))); const shipB=new Map(); const lo=sub.list.length?sub.list[0].R.from:'0', hi=sub.list.length?sub.list[sub.list.length-1].R.to:'9';
@@ -4641,7 +4650,7 @@ async function syncTpl(man){
   const c4=colChart(wk,[{name:L('未交量','Open qty'),c:'--vz1',vals:wk.map(b=>due.get(b.k)||0)}],{click:b=>b.k==='late'?`ocPick('st','late')`:`pnS('ordercenter').f='delivery';pnDrill('ordercenter','W','${b.a}')`});
   const g=sub.g==='Y'?L('每年','by year'):sub.g==='M'?L('每月','by month'):sub.g==='W'?L('每週','by week'):L('每天','by day');
   return `<div class="vz-grid"><div class="vz-card"><h4>📈 ${L('接單 vs 出貨','Ordered vs shipped')} <span class="small muted">${g}</span></h4>${c1}</div><div class="vz-card"><h4>👥 ${L('客戶','Customers')} <span class="small muted">${L('訂單量','order qty')}</span></h4>${c2}</div><div class="vz-card"><h4>🏷️ ${L('品類','Categories')} <span class="small muted">${L('依款名自動分','from style name')}</span></h4>${c3}</div><div class="vz-card"><h4>📅 ${L('未來 12 週要交','Due in the next 12 weeks')} <span class="small muted">${L('未結的未交量','open qty')}</span></h4>${c4}</div></div>` }
- function grpView(rows,key,name,pick){ const G=new Map(); rows.forEach(r=>{ const k=key(r)||'—'; let a=G.get(k); if(!a){a={k,n:0,qty:0,amt:0,sew:0,fg:0,ship:0,open:0,late:0,an:0};G.set(k,a)} a.n++; a.qty+=r.qty; a.amt+=amtOf(r); a.sew+=sewQ(r); a.fg+=r.fg_qty||0; a.ship+=r.ship.qty; a.open+=Math.max(0,r.open_qty||0); if(r.status==='late')a.late++; if((r._an||[]).length)a.an++ });
+ function grpView(rows,key,name,pick){ const G=new Map(); rows.forEach(r=>{ const k=key(r)||'—'; let a=G.get(k); if(!a){a={k,n:0,qty:0,amt:0,sew:0,fg:0,ship:0,open:0,late:0,an:0};G.set(k,a)} a.n++; a.qty+=r.qty; a.amt+=amtOf(r); a.sew+=sewQ(r); a.fg+=r.fg_qty||0; a.ship+=r.ship.qty; a.open+=Math.max(0,r.open_qty||0); if(r.status==='late')a.late++; if((r._ano||[]).length)a.an++ });
   const list=[...G.values()].sort((a,b)=>b.qty-a.qty); const tq=sum(list,'qty');
   return tbl('oc_grp',[[name],[L('款／PO','Styles'),1],[L('訂單量','Qty'),1],['%',1],[L('金額','Amount'),1],[L('已縫','Sewn'),1],[L('入庫','FG'),1],[L('出貨','Shipped'),1],[L('出貨率','Ship %'),1],[L('未交','Open'),1],[L('逾期','Late'),1],[L('異常','Exc.'),1]],list.map(a=>{const r=[`<b>${esc(pick?pick.name(a.k):a.k)}</b>`,fmt(a.n),fmt(a.qty),pct(a.qty,tq),a.amt?money(a.amt):'—',a.sew?fmt(a.sew):'—',a.fg?fmt(a.fg):'—',fmt(a.ship),pct(a.ship,a.qty),a.open?fmt(a.open):'—',a.late?`<span class="warn-t">${a.late}</span>`:'—',a.an||'—'];r._click=`ocPick('${pick.f}','${jsq(a.k)}')`;return r}),['',fmt(sum(list,'n')),fmt(tq),'',money(sum(list,'amt')),fmt(sum(list,'sew')),fmt(sum(list,'fg')),fmt(sum(list,'ship')),pct(sum(list,'ship'),tq),fmt(sum(list,'open')),fmt(sum(list,'late')),fmt(sum(list,'an'))]) }
  function trendView(B,R,st,f){ const sub=subOf(st.pt,R,B.reduce((m,r)=>r.order_date&&r.order_date<m?r.order_date:m,'9999'));
@@ -4649,36 +4658,38 @@ async function syncTpl(man){
   const fl=L(FLD.find(x=>x[0]===f)[1][0],FLD.find(x=>x[0]===f)[1][1]);
   return `<p class="small muted">${L('每一列是一個期間（','Each row is a period (')}${esc(fl)}${L('）；點一列看那一段的明細。','); click a row for its detail.')}</p>`+tbl('oc_trend',[[L('期間','Period')],[L('款／PO','Styles'),1],[L('訂單量','Qty'),1],[L('金額','Amount'),1],[L('已出貨','Shipped'),1],[L('未交','Open'),1],[L('交期到期 款','Due'),1],[L('到期件數','Due qty'),1],[L('其中逾期','Late'),1]],rows.slice().reverse().map(x=>{const r=[`<span class="mono">${esc(x.b.l)}</span>`,x.n?fmt(x.n):'—',x.qty?fmt(x.qty):'—',x.amt?money(x.amt):'—',x.ship?fmt(x.ship):'—',x.open?fmt(x.open):'—',x.dn?fmt(x.dn):'—',x.dq?fmt(x.dq):'—',x.dl?`<span class="warn-t">${x.dl}</span>`:'—'];if(x.n||x.dn)r._click=`pnDrill('ordercenter','${x.b.pt}','${x.b.a}','list')`;return r}),['',fmt(sum(rows,'n')),fmt(sum(rows,'qty')),money(sum(rows,'amt')),fmt(sum(rows,'ship')),fmt(sum(rows,'open')),fmt(sum(rows,'dn')),fmt(sum(rows,'dq')),fmt(sum(rows,'dl'))]) }
  function anomView(rows){ const out=[]; ANOM.forEach(([k,l,cls,fn,det])=>{ const hit=rows.filter(r=>(r._an||[]).includes(k)); if(!hit.length)return; hit.sort((a,b)=>String(b.order_date).localeCompare(String(a.order_date)));
-   out.push(`<details class="panel an-blk" ${OC.an===k||(!OC.an&&out.length<2)?'open':''}><summary><span class="st ${cls==='crit'?'crit':cls==='info'?'info':'warn'}">${hit.length}</span> <b>${esc(L(l[0],l[1]))}</b> <button class="btn sm" style="margin-left:8px" onclick="event.preventDefault();ocPick('an','${k}','list')">${L('只看這類','Show only these')}</button></summary>`+tbl('',[[L('客戶','Cust')],['PO'],[L('款號','Style')],[L('訂單日','Ordered')],[L('交期','Delivery')],[L('訂單量','Qty'),1],[L('說明','Detail')]],hit.slice(0,200).map(r=>{const x=[esc(r.cust),`<span class="mono">${esc(r.po_no)}</span>`,`<span class="mono">${esc(r.style)}</span>`,esc(r.order_date),esc(r.delivery||''),fmt(r.qty),`<span class="small">${det?det(r):''}</span>`];x._click=`openOrder('${esc(r.id)}')`;return x}))+(hit.length>200?`<p class="small muted">+${hit.length-200}</p>`:'')+`</details>`) });
-  return out.length?out.join(''):`<p class="note">✅ ${L('這個範圍沒有異常。','No exceptions in this range.')}</p>` }
+   const open=hit.filter(r=>(r._ano||[]).includes(k)), done=hit.filter(r=>!(r._ano||[]).includes(k));
+   const tb=list=>tbl('',[[L('客戶','Cust')],['PO'],[L('款號','Style')],[L('訂單日','Ordered')],[L('交期','Delivery')],[L('訂單量','Qty'),1],[L('說明','Detail')],[L('備註','Note')],['']],list.slice(0,300).map(r=>{const nt=anNoteOf(r,k);const id=esc(r.ids[0]);const isD=!(r._ano||[]).includes(k);const x=[esc(r.cust),`<span class="mono">${esc(r.po_no)}</span>`,`<span class="mono">${esc(r.style)}</span>`,esc(r.order_date),esc(r.delivery||''),fmt(r.qty),`<span class="small">${det?det(r):''}</span>`,nt?`<span class="small an-note">📝 ${esc(nt)}</span>`:'',`<span class="an-acts"><button class="btn sm" onclick="event.stopPropagation();anNote('${id}','${k}')">📝 ${nt?L('改備註','Edit'):L('備註','Note')}</button><button class="btn sm ${isD?'':'pri'}" onclick="event.stopPropagation();anDone('${id}','${k}')">${isD?'↩ '+L('改回','Reopen'):'✔ '+L('處理完成','Done')}</button></span>`];x._click=`openOrder('${id}')`;return x}))+(list.length>300?`<p class="small muted">+${list.length-300} · ${L('請用上面篩選縮小範圍或匯出','narrow with filters or export')}</p>`:'');
+   out.push(`<details class="panel an-blk" ${OC.an===k||(!OC.an&&out.length<2&&open.length)?'open':''}><summary><span class="st ${open.length?(cls==='crit'?'crit':cls==='info'?'info':'warn'):'good'}">${open.length}</span> <b>${esc(L(l[0],l[1]))}</b>${done.length?` <span class="small muted">${L('已處理 ','handled ')}${done.length}</span>`:''} <button class="btn sm" style="margin-left:8px" onclick="event.preventDefault();ocPick('an','${k}','list')">${L('在清單只看這類','Show only these in list')}</button></summary>`+(open.length?tb(open):`<p class="small muted">✅ ${L('這類都處理完了','All handled')}</p>`)+(done.length?`<details class="mt-det"><summary class="small">✔ ${L('已處理','Handled')} (${done.length})</summary>${tb(done)}</details>`:'')+`</details>`) });
+  return out.length?`<p class="small muted">${L('每張單每類異常只列一次。「📝 備註」寫原因或處理方式，「✔ 處理完成」移到已處理；都存在訂單的備註／標籤，會同步雲端。','Each order appears once per exception type. Notes and “done” are stored in the order notes/tags and synced.')}</p>`+out.join(''):`<p class="note">✅ ${L('這個範圍沒有異常。','No exceptions in this range.')}</p>` }
  const _roc=RENDER.ordercenter;
  RENDER.ordercenter=function(){
   const yr=OC.yr; OC.yr=''; let base; try{ base=_roc.apply(this,arguments) }finally{ OC.yr=yr }
   const all=ocRows(); const i1=base.indexOf('<div class="panel oc-filters">'); if(!all.length||i1<0)return base;
   const iU=base.indexOf('<div class="panel mt"><h2>🔎'); const tail=iU>0?base.slice(iU):'';
   const K='ordercenter'; const st=pnS(K,{pt:'Y'}); const f=st.f||'order_date'; const R=rngFor(st.pt,st.anchor);
-  let h=base.slice(0,i1).replace('<button class="btn sm" onclick="loadChain(true)"',liveChipHTML()+'<button class="btn sm" onclick="loadChain(true)"');
+  let h=base.slice(0,i1).replace('<button class="btn sm" onclick="loadChain(true)"',liveChipHTML()+'<button class="btn sm" onclick="loadChain(true)"').replace('<button class="btn sm" onclick="exportOC()">','<a class="btn sm" href="#smart-import">📥 '+L('匯入 ERP 檔','Import ERP file')+'</a><button class="btn sm" onclick="exportOC()">⬇ ');
   const custs=[...new Set(all.map(r=>r.cust).filter(Boolean))].sort(); const types=[...new Set(all.map(r=>r.ptype))];
   h+=`<div class="panel oc-filters"><input class="inp" id="ocq" value="${esc(OC.q)}" placeholder="${L('搜尋 PO／款號／自編單號／客戶','Search PO / style / order no / customer')}" oninput="clearTimeout(window._ocT);window._ocT=setTimeout(()=>ocSet('q',this.value.trim()),300)">
    <select class="inp" onchange="ocSet('cust',this.value)">${opt('',L('全部客戶','All customers'),OC.cust)}${custs.map(c=>opt(c,c,OC.cust)).join('')}</select>
    <select class="inp" onchange="ocSet('ptype',this.value)">${opt('',L('全部品類','All categories'),OC.ptype)}${PTYPE.map(p=>p[0]).concat(['OTHER']).filter(k=>types.includes(k)).map(k=>opt(k,ptName(k),OC.ptype)).join('')}</select>
    <select class="inp" onchange="ocSet('st',this.value)">${opt('',L('全部狀態','All status'),OC.st)}${opt('open',L('未結','Open'),OC.st)}${opt('late',L('逾期','Late'),OC.st)}${opt('closed',L('已結','Closed'),OC.st)}</select>
    <select class="inp" onchange="ocSet('chk',this.value)">${opt('',L('客戶 PO：全部','PO check: all'),OC.chk)}${opt('ok',L('相符','matches'),OC.chk)}${opt('diff',L('有差異','differs'),OC.chk)}${opt('nostyle',L('款對不上','style not matched'),OC.chk)}${opt('missing',L('缺客戶 PO 檔','no PO file'),OC.chk)}</select>
-   <select class="inp" onchange="ocSet('an',this.value)">${opt('',L('異常：全部','Exceptions: all'),OC.an)}${opt('any',L('有任何異常','any exception'),OC.an)}${ANOM.map(a=>opt(a[0],L(a[1][0],a[1][1]),OC.an)).join('')}</select>
+   <select class="inp" onchange="ocSet('an',this.value)">${opt('',L('異常：全部','Exceptions: all'),OC.an)}${opt('any',L('有任何待處理異常','any open exception'),OC.an)}${ANOM.map(a=>opt(a[0],L(a[1][0],a[1][1]),OC.an)).join('')}</select>
    <select class="inp" onchange="ocSet('sort',this.value)">${opt('delivery',L('交期 新→舊','Delivery, newest'),OC.sort)}${opt('order_date',L('訂單日 新→舊','Order date, newest'),OC.sort)}${opt('cust',L('客戶','Customer'),OC.sort)}${opt('style',L('款號','Style'),OC.sort)}${opt('open',L('未交量 多→少','Open qty, most'),OC.sort)}${opt('qty',L('訂單量 多→少','Order qty, most'),OC.sort)}${opt('anom',L('異常多→少','Most exceptions'),OC.sort)}</select>
    ${OC.cust||OC.ptype||OC.st||OC.chk||OC.an||OC.q?`<button class="btn sm" onclick="['cust','ptype','st','chk','an','q'].forEach(k=>OC[k]='');ocSet('page',0)">✕ ${L('清除條件','Clear')}</button>`:''}</div>`;
   const B=baseRows(all);
   h+=pnHTML(K,{dates:B.map(r=>dOf(r,f)).filter(Boolean),fields:FLD.map(([v,l])=>[v,L(l[0],l[1])]),hint:L('只算選定期間','selected period only')});
-  let rows=B.filter(r=>inRg(dOf(r,f),R)); rows.forEach(r=>{r._an=ocAnom(r)});
+  let rows=B.filter(r=>inRg(dOf(r,f),R)); rows.forEach(r=>{r._an=ocAnom(r); if(r._an.length){const d=anDoneSet(r); r._ano=r._an.filter(k=>!d.has(k))} else r._ano=r._an});
   const prev=R.all?null:(()=>{const Rp=Object.assign({},rngFor(st.pt,addDs(R.from,-1))); const td=today(); if(td>=R.from&&td<=R.to){ const days=Math.round((D_(td)-D_(R.from))/864e5); const lim=addDs(Rp.from,days); if(lim<Rp.to)Rp.to=lim; Rp.ytd=1 } window._ocPrevYtd=!!Rp.ytd; return B.filter(r=>inRg(dOf(r,f),Rp))})();
-  const rowsAll=rows; if(OC.an)rows=rows.filter(r=>OC.an==='any'?r._an.length:r._an.includes(OC.an));
+  const rowsAll=rows; if(OC.an)rows=rows.filter(r=>OC.an==='any'?r._ano.length:r._ano.includes(OC.an));
   rows.sort(SORTS[OC.sort]||SORTS.delivery); window.OC_LAST=rows.map(r=>r.ids[0]); window.OC_ROWS=rows;
   /* 重點＋圖表 */
   const kn=keynote(rowsAll,B,prev,R,st,f);
   h+=`<details class="panel oc-kn" ${OC.kn!==false?'open':''} ontoggle="OC.kn=this.open;LS.set('psjerp_oc',OC)"><summary>💡 ${L('重點摘要與圖表','Key notes & charts')}</summary><ul class="kn-list">${kn.map(x=>`<li>${x}</li>`).join('')}</ul>${charts(rowsAll,B,R,st,f)}</details>`;
   /* KPI */
-  const tq=sum(rows,'qty'), ts=sum(rows,r=>r.ship.qty), tf=sum(rows,'fg_qty'), to=sum(rows,r=>Math.max(0,r.open_qty||0)), tw=sum(rows,sewQ), late=rows.filter(r=>r.status==='late').length, an=rows.filter(r=>r._an.length).length;
-  h+=`<div class="kpis" style="margin:12px 0">${kpi(L('款／PO','Style / PO'),fmt(rows.length),'',late?L('逾期 ','late ')+late:'',late?'warn':'')}${kpi(L('訂單量','Order qty'),fmt(tq),'',money(sum(rows,amtOf)))}${kpi(L('已縫','Sewn'),fmt(tw),'',pct(tw,tq))}${kpi(L('已入庫','FG received'),fmt(tf),'',pct(tf,tq),tf>tq*1.1?'warn':'')}${kpi(L('已出貨','Shipped'),fmt(ts),'',pct(ts,tq))}${kpi(L('未交','Open'),fmt(to),'',to?'':L('全部出完','all shipped'),to?'warn':'good')}<button class="kpi ${an?'warn':'good'}" onclick="ocPick('an','${OC.an||''}','anom')" style="text-align:left;cursor:pointer"><div class="l">⚠ ${L('有異常','With exceptions')}</div><div class="v num">${fmt(an)}</div><div class="d">${L('點看清單','view list')}</div></button></div>`;
+  const tq=sum(rows,'qty'), ts=sum(rows,r=>r.ship.qty), tf=sum(rows,'fg_qty'), to=sum(rows,r=>Math.max(0,r.open_qty||0)), tw=sum(rows,sewQ), late=rows.filter(r=>r.status==='late').length, an=rows.filter(r=>r._ano.length).length;
+  h+=`<div class="kpis" style="margin:12px 0">${kpi(L('款／PO','Style / PO'),fmt(rows.length),'',late?L('逾期 ','late ')+late:'',late?'warn':'')}${kpi(L('訂單量','Order qty'),fmt(tq),'',money(sum(rows,amtOf)))}${kpi(L('已縫','Sewn'),fmt(tw),'',pct(tw,tq))}${kpi(L('已入庫','FG received'),fmt(tf),'',pct(tf,tq),tf>tq*1.1?'warn':'')}${kpi(L('已出貨','Shipped'),fmt(ts),'',pct(ts,tq))}${kpi(L('未交','Open'),fmt(to),'',to?'':L('全部出完','all shipped'),to?'warn':'good')}<button class="kpi ${an?'warn':'good'}" onclick="ocPick('an','${OC.an||''}','anom')" style="text-align:left;cursor:pointer"><div class="l">⚠ ${L('異常待處理','Open exceptions')}</div><div class="v num">${fmt(an)}</div><div class="d">${L('點看清單','view list')}</div></button></div>`;
   /* 檢視 */
   const V=[['list','📋',L('清單','List')],['cust','👥',L('依客戶','By customer')],['type','🏷️',L('依品類','By category')],['trend','📅',L('日週月年報表','Period report')],['anom','⚠️',L('異常','Exceptions')+(an?` (${an})`:'')]];
   h+=`<div class="seg oc-views" role="tablist">${V.map(([v,ic,l])=>`<button class="${OC.view===v?'on':''}" onclick="ocSet('view','${v}')">${ic} ${esc(l)}</button>`).join('')}</div>`;
@@ -4693,8 +4704,8 @@ async function syncTpl(man){
  function ocScroll(){ const more=document.getElementById('ocMore'), body=document.getElementById('ocBody'); if(!more||!body)return; const rows=window.OC_ROWS||[];
   const add=()=>{ let n=+more.dataset.n||0; if(n>=rows.length)return false; const m=Math.min(rows.length,n+80); body.insertAdjacentHTML('beforeend',rows.slice(n,m).map(r=>ocRowHTML(r)).join('')); more.dataset.n=m; more.innerHTML=m<rows.length?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${m} / ${fmt(rows.length)}`:`${fmt(rows.length)} ${L('列，全部顯示','rows, all shown')}`; return true };
   more.onclick=add; if(window.IntersectionObserver){ const io=new IntersectionObserver(es=>{ if(!document.body.contains(more)){io.disconnect();return} if(es.some(x=>x.isIntersecting))add() },{rootMargin:'600px 0px'}); io.observe(more) } }
- window.exportOC=function(){ const rows=window.OC_ROWS||ocRows(); const head=['客戶','品類','款號','款名','PO','自編單號','訂單編號','訂單日','交期','訂單量(ERP)','金額','客戶PO量','客戶PO核對','SMV','SMV來源','ERP訂單SMV','已裁','已縫','已入庫','已出貨','最近出貨日','未交','INVOICE件數','INVOICE金額','狀態','異常'];
-  const AN=new Map(ANOM.map(a=>[a[0],a[1][0]])); const data=rows.map(r=>[r.cust,ptName(r.ptype),r.style,r.style_name,r.po_no,r.my_no,r.od_no,r.order_date,r.delivery,r.qty,amtOf(r)||'',r.po&&r.po.qty!=null?r.po.qty:'',r.po?({ok:'相符',diff:'有差異',nostyle:'款對不上',missing:'缺客戶PO檔'})[r.po.state]||'':'',r.smv?+(+r.smv).toFixed(3):'',r.smv_src?(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src):'',r.smv_erpo||'',r.cutr&&!r.cutr.none?r.cutr.pcs:(r.cut_qty||''),sewQ(r)||'',r.fg_qty,r.ship.qty,r.ship.last,r.open_qty,r.inv?r.inv.qty:'',r.inv?r.inv.amount:'',({open:'未結',late:'逾期',closed:'已結'})[r.status]||'',(r._an||ocAnom(r)).map(k=>AN.get(k)).join('、')]);
+ window.exportOC=function(){ const rows=window.OC_ROWS||ocRows(); const head=['客戶','品類','款號','款名','PO','自編單號','訂單編號','訂單日','交期','訂單量(ERP)','金額','客戶PO量','客戶PO核對','SMV','SMV來源','ERP訂單SMV','已裁','已縫','已入庫','已出貨','最近出貨日','未交','INVOICE件數','INVOICE金額','狀態','異常','備註'];
+  const AN=new Map(ANOM.map(a=>[a[0],a[1][0]])); const data=rows.map(r=>[r.cust,ptName(r.ptype),r.style,r.style_name,r.po_no,r.my_no,r.od_no,r.order_date,r.delivery,r.qty,amtOf(r)||'',r.po&&r.po.qty!=null?r.po.qty:'',r.po?({ok:'相符',diff:'有差異',nostyle:'款對不上',missing:'缺客戶PO檔'})[r.po.state]||'':'',r.smv?+(+r.smv).toFixed(3):'',r.smv_src?(window.smvSrcName?smvSrcName(r.smv_src):r.smv_src):'',r.smv_erpo||'',r.cutr&&!r.cutr.none?r.cutr.pcs:(r.cut_qty||''),sewQ(r)||'',r.fg_qty,r.ship.qty,r.ship.last,r.open_qty,r.inv?r.inv.qty:'',r.inv?r.inv.amount:'',({open:'未結',late:'逾期',closed:'已結'})[r.status]||'',(r._an||ocAnom(r)).map(k=>AN.get(k)+(anDoneSet(r).has(k)?'(已處理)':'')).join('、'),String((recG(r)||{}).notes||'')]);
   const st=pnS('ordercenter'); const name='VRT_訂單中心_'+pLabel(st.pt,rngFor(st.pt,st.anchor)).replace(/[^0-9A-Za-z-]+/g,'_')+'_'+nowStamp().replace(/[-: ]/g,'').slice(0,12);
   if(!window.XLSX){showCSV(name+'.csv',[head].concat(data));return} const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head].concat(data)),'訂單中心'); XLSX.writeFile(wb,name+'.xlsx'); toast(L('已匯出 ','Exported ')+fmt(rows.length)+L(' 列',' rows')) };
 
@@ -4797,6 +4808,25 @@ async function syncTpl(man){
  @media (max-width:860px){.pnx .pn-sel{width:100%}.pnx .pn-p{min-width:0;flex:1}.pnx .pn-f{margin-left:0;flex:1 1 100%}.pn-pt{overflow-x:auto;max-width:100%;scrollbar-width:none}.pn-pt button{padding:6px 9px;white-space:nowrap}
   .vz-grid{grid-template-columns:1fr}.vz-cols{height:130px}.oc-views{flex-wrap:nowrap;overflow-x:auto;max-width:100%}.oc-views button{white-space:nowrap}.cont-hd .sty-th{width:40px;height:40px;flex-basis:40px}}
  .oc-filters select.inp{max-width:240px}
+ .pull-bar{position:relative;overflow:hidden;margin:22px 0 4px;padding:16px 12px;border:1px dashed var(--line-2);border-radius:12px;text-align:center;font-size:13px;color:var(--ink-2);cursor:pointer;--p:0}
+ .pull-bar .pull-fill{position:absolute;left:0;bottom:0;height:4px;width:calc(var(--p)*100%);background:var(--accent);transition:width .08s}
+ .pull-bar.hot{border-color:var(--accent);color:var(--accent)}.pull-bar.go{background:var(--accent-soft)}
+ .an-acts{display:inline-flex;gap:4px;flex-wrap:wrap;white-space:nowrap}.an-note{color:var(--ink)}
+ @media (max-width:860px){
+  #drawer.od .od-h{flex-wrap:wrap;gap:6px 10px;padding:10px 12px 8px}
+  #drawer.od .od-nav{order:-1;width:100%;justify-content:flex-end;gap:6px}
+  #drawer.od .od-nav>.small{margin-right:auto}
+  #drawer.od .od-nav .icon-btn{min-width:40px;height:38px}
+  #drawer.od .sty-head{width:100%;gap:10px;align-items:center}
+  #drawer.od .sty-hd{width:58px;height:58px;flex:0 0 58px}
+  #drawer.od .od-title{flex:1;min-width:0}
+  #drawer.od .od-title h2{font-size:17px;overflow-wrap:break-word;word-break:normal;margin:1px 0}
+  #drawer.od .od-title>.small,#drawer.od .od-title>div.small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #drawer.od .sty-big-smv{font-size:18px}
+  #drawer.od .od-tabs button{padding:9px 10px;font-size:13px}
+  #drawer.od .od-body{padding:12px}
+  .an-acts .btn{padding:4px 8px}
+ }
  @media (max-width:860px){.oc-filters select.inp{max-width:none}.vz-cols.mid .vz-col:nth-child(even) .vz-x{visibility:hidden}.vz-cols.mid .vz-x{overflow:visible}}
  @media print{.cont-more,.cont-tg,.live-chip,.d-back{display:none!important}}`;
  document.head.appendChild(st);
