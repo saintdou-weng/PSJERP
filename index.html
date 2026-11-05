@@ -2385,7 +2385,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.2.0';
+const APP_VER='1.3.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -4013,7 +4013,7 @@ async function syncTpl(man){
   styles:['款式 SMV','Styles & SMV','ម៉ូដ និង SMV'],
   sub_styles:['每一款一張資料卡：樣衣圖、現行 SMV（IE 週報核准 → ERP → IE OBD → 車縫日報）、SMV 歷程、工序、訂單、產量（日／週／月／年）。','One card per style: sample photo, current SMV, SMV history, operations, orders and output by day / week / month / year.'],
   hub_inbox:['收件匣・匯入','Inbox & import','ប្រអប់ទទួល'], hub_bom:['BOM','BOM','BOM'], hub_purchase:['採購與進貨','Purchasing','ការទិញ'], hub_materials:['料品・領料・進耗存','Items & issues','សម្ភារៈ'],
-  hub_fabric:['布料與輔料庫存','Fabric & trims stock','ស្តុកក្រណាត់'], hub_plan:['排單與裁剪計劃','Planning','ផែនការ'], hub_sew:['車縫・在製・總覽','Sewing & WIP','ដេរ និង WIP'],
+  hub_fabric:['布料與輔料庫存','Fabric & trims stock','ស្តុកក្រណាត់'], hub_plan:['排單・裁剪','Planning & cutting','ផែនការ និងការកាត់'], hub_sew:['車縫・在製・總覽','Sewing & WIP','ដេរ និង WIP'],
   hub_fg:['成品','Finished goods','ផលិតផល'], hub_ship:['出貨','Shipping','ដឹកជញ្ជូន'], hub_ap:['應付','Payables','ត្រូវបង់'], hub_sync:['同步・比對・異常','Sync & checks','សមកាលកម្ម'],
  });
  const HUBS=[
@@ -4026,8 +4026,7 @@ async function syncTpl(man){
   ['purchase','🛒','g_matl','prod','hub_purchase',['purchase','pprice','receiving']],
   ['materials','🗂️','g_matl','prod','hub_materials',['materials','issues','stockmove']],
   ['fabric','🧶','g_matl','prod','hub_fabric',['fabric','accessories','p-fabstock','p-greige']],
-  ['p-prodplan','📅','g_make','prod','hub_plan',['p-prodplan','p-cutplan']],
-  ['p-cutting','✂️','g_make','prod',null,['p-cutting']],
+  ['p-prodplan','📅','g_make','prod','hub_plan',['p-prodplan','p-cutplan','p-cutting']],
   ['p-sewing','🪡','g_make','prod','hub_sew',['p-sewing','production','wip','p-overview']],
   ['p-qc','✅','g_make','prod',null,['p-qc']],
   ['p-spare','🔧','g_make','prod',null,['p-spare']],
@@ -4051,34 +4050,68 @@ async function syncTpl(man){
  renderNav=function(){ _rn(); const cur=HUB_OF[CUR]||CUR;
   document.querySelectorAll('#nav a[data-k]').forEach(a=>{ const h=HUB[a.dataset.k]; if(!h)return; if(h[4]){const sp=a.children[1]; if(sp)sp.textContent=t(h[4])} if(h[5].length>1){const c=a.querySelector('.ct'); if(c)c.innerHTML=`<i class="ptag">${h[5].length}</i>`} a.classList.toggle('on',a.dataset.k===cur) });
   const tt_=document.getElementById('topTitle'); if(tt_)tt_.textContent=(SEC[SECTION].ic+' '+t(SEC[SECTION].k)+' · '+t(CUR)) };
- const hubTabs=k=>{ const h=HUB[HUB_OF[k]]; if(!h||h[5].length<2)return ''; return `<div class="hub-tabs">${h[5].map(m=>`<a href="#${m}" class="${m===k?'on':''}">${icoOf[m]||(m==='styles'?'👕':'')} ${esc(t(m))}${FRAMES[m]?` <i class="ptag">${esc(t('platform_tag'))}</i>`:''}</a>`).join('')}</div>` };
+ const hubTabs=k=>{ const h=HUB[HUB_OF[k]]; if(!h||h[5].length<2)return ''; return `<div class="hub-tabs">${h[5].map(m=>`<a href="#${m}" class="${m===k?'on':''}">${icoOf[m]||(m==='styles'?'👕':'')} ${esc(t(m))}${FRAMES[m]?` <i class="ptag" title="${esc(tt('生產平台頁面，來源：','Production-platform page, source: ','ទំព័រវេទិកា: ')+({erp:'ERP',email:'Email',tg:'Telegram',manual:tt('手動','Manual','ដោយដៃ'),mixed:'Email + Telegram'}[FRAMES[m][1]]||''))}">${({erp:'🔵',email:'🟠',tg:'🟢',manual:'⚪',mixed:'🟠🟢'}[FRAMES[m][1]]||'')} ${esc(t('platform_tag'))}</i>`:''}</a>`).join('')}</div>` };
  const _rr=rerender;
  rerender=function(){ _rr.apply(this,arguments); const ht=hubTabs(CUR); if(ht){ const pg=$('#page'); pg.insertAdjacentHTML('afterbegin',ht); const on=pg.querySelector('.hub-tabs .on'); if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'}) } };
  /* 舊網址仍可用；被併掉的頁面仍屬於同一入口 */
  const _secOf=k=>{const h=HUB[HUB_OF[k]];return h?h[3]:'both'};
  const _route=route; route=function(){ let h=decodeURIComponent((location.hash||'#dashboard').slice(1)); if(h.startsWith('solo-'))h=h.slice(5); const s=_secOf(h); if(s!=='both'&&s!==SECTION){SECTION=s;LS.set('psjerp_section',s)} return _route.apply(this,arguments) };
 
- /* ══════════ B. 樣衣圖（雲端硬碟 PSJERP_STYLE_IMG，本機快取）══════════ */
- const IMG={list:null,busy:null,mem:new Map()};
- const IK=sk=>'styleimg#'+sk;
+ /* ══════════ B. 樣衣圖（雲端硬碟 PSJERP_STYLE_IMG，本機快取 IndexedDB）
+    v1.3.0：雲端還沒授權／這台沒有同步密碼時，照樣存在這台裝置（標「待上傳」），畫面照樣看得到；雲端通了自動補上傳。══════════ */
+ const IMG={list:null,busy:null,mem:new Map(),local:new Set(),err:'',flushing:false};
+ const IK=sk=>'styleimg#'+sk, IDX='styleimg#__idx';
+ let idxDone=false; async function idxLoad(){ if(idxDone||!IDB._db)return false; idxDone=true; try{ const a=await IDB.get(IDX); if(Array.isArray(a)&&a.length){ a.forEach(k=>IMG.local.add(k)); return true } }catch(e){} return false }
+ /* img_list 只試一次、20 秒逾時（雲端沒授權時不要讓畫面等 3 次重試） */
+ async function imgPost(body,ms){ const ac=window.AbortController?new AbortController():null; const tm=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},ms||20000);
+  try{ const r=await fetch(cloudUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({api:'psjerp',k:cloudKey()},body)),signal:ac?ac.signal:undefined}); const j=await r.json(); if(!j.ok)throw new Error(j.msg||j.error||'error'); return j } finally{ clearTimeout(tm) } }
+ const idxSave=()=>{ try{ IDB.set(IDX,[...IMG.local]) }catch(e){} };
+ const hasImg=sk=>!!sk&&((IMG.list&&IMG.list.has(sk))||IMG.local.has(sk)); window.hasImg=hasImg;
  window.imgList=async function(force){ if(IMG.list&&!force)return IMG.list; if(IMG.busy)return IMG.busy;
-  IMG.busy=(async()=>{ try{ const j=await cpost({action:'img_list'}); IMG.list=new Map((j.rows||[]).map(r=>[r.k,r])) }catch(e){ IMG.list=IMG.list||new Map(); IMG.err=String(e.message||e) } IMG.busy=null; return IMG.list })(); return IMG.busy };
- function shrink(src,max,q){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ const r=Math.min(1,max/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*r); c.height=Math.round(im.height*r); const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',q)) }; im.onerror=rej; im.src=src }) }
+  IMG.busy=(async()=>{ if(await idxLoad()&&CUR==='styles')setTimeout(rerender,0);
+   if(isDemo()||!cloudReady()){ IMG.list=IMG.list||new Map(); IMG.err='nokey'; IMG.busy=null; return IMG.list }
+   try{ const j=await imgPost({action:'img_list'}); IMG.list=new Map((j.rows||[]).map(r=>[r.k,r])); IMG.err=''; setTimeout(imgFlush,800) }
+   catch(e){ IMG.list=IMG.list||new Map(); IMG.err=String(e.message||e)||'error' }
+   IMG.busy=null; return IMG.list })(); return IMG.busy };
+ window.imgErrHTML=function(){ if(!IMG.err)return ''; const nk=IMG.err==='nokey'; const n=IMG.local.size;
+  return `<div class="note warn small img-err">📷 ${nk?tt('這台裝置沒有同步密碼，樣衣圖只存在這台裝置（其他裝置看不到）。','No sync key on this device — sample photos are kept on this device only.','ឧបករណ៍នេះគ្មានលេខសម្ងាត់សមកាលកម្ម — រូបគំរូរក្សាទុកតែលើឧបករណ៍នេះ។')
+   :tt('樣衣圖雲端尚未授權：請在 Apps Script 編輯器執行一次 AUTHORIZE_STYLE_IMG 並按「允許」。在那之前上傳的圖先存在這台裝置，看得到；授權後打開款式頁會自動補上傳。','Sample-photo cloud is not authorised yet: run AUTHORIZE_STYLE_IMG once in the Apps Script editor and click Allow. Until then photos are kept on this device (still visible) and upload automatically afterwards.','រូបគំរូនៅលើ Cloud មិនទាន់បានអនុញ្ញាតទេ៖ ត្រូវដំណើរការ AUTHORIZE_STYLE_IMG ម្តងក្នុង Apps Script។ មុននោះ រូបភាពរក្សាទុកលើឧបករណ៍នេះសិន។')}${n?` · ${tt('這台裝置有 ','On this device: ','លើឧបករណ៍នេះ: ')}${fmt(n)}${tt(' 款',' styles',' ម៉ូដ')}`:''}${nk?'':` <span class="muted mono">(${esc(String(IMG.err).slice(0,80))})</span>`} <button class="btn sm" onclick="imgList(true).then(()=>rerender())">↻ ${tt('再試一次','Retry','ព្យាយាមម្តងទៀត')}</button></div>` };
+ function shrink(src,max,q){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ const r=Math.min(1,max/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(im.width*r)); c.height=Math.max(1,Math.round(im.height*r)); const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',q)) }; im.onerror=()=>rej(new Error('image')); im.src=src }) }
+ window.imgShrink=shrink;
  window.imgGet=async function(sk,full){ if(!sk)return null; const mem=IMG.mem.get(sk); if(mem&&(!full||mem.data))return full?mem.data:mem.thumb;
-  let c=null; try{c=await IDB.get(IK(sk))}catch(e){} const L_=await imgList(); const cl=L_.get(sk);
-  if(c&&(!cl||c.at===cl.at)){ IMG.mem.set(sk,c); return full?c.data:c.thumb }
+  let c=null; try{c=await IDB.get(IK(sk))}catch(e){}
+  if(c&&c.data){ const cl0=IMG.list&&IMG.list.get(sk); if(!IMG.list||c.pend||!cl0||c.at===cl0.at){ IMG.mem.set(sk,c); if(!IMG.local.has(sk)){IMG.local.add(sk);idxSave()} return full?c.data:c.thumb } }   /* 本機有就先用，不等雲端 */
+  const L_=await imgList(); const cl=L_.get(sk);
   if(!cl)return null;
-  try{ const j=await cpost({action:'img_get',sk}); if(!j.data)return null; const thumb=await shrink(j.data,220,.75); c={at:cl.at,data:j.data,thumb}; IMG.mem.set(sk,c); try{await IDB.set(IK(sk),c)}catch(e){} return full?c.data:c.thumb }catch(e){ return null } };
- window.imgPut=async function(sk,file){ if(!file)return; if(!cloudReady||!cloudReady()){toast(L('這台裝置沒有同步密碼，不能上傳圖片','This device has no sync key — cannot upload'));return}
-  toast(L('處理圖片…','Processing image…'));
-  const raw=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file)});
-  const data=await shrink(raw,1000,.82), thumb=await shrink(raw,220,.75);
-  try{ await cpost({action:'img_put',sk,data}); const at=nowStamp(); const c={at,data,thumb}; IMG.mem.set(sk,c); try{await IDB.set(IK(sk),c)}catch(e){} await imgList(true); const r=IMG.list.get(sk); if(r){c.at=r.at;try{await IDB.set(IK(sk),c)}catch(e){}}
-   toast(L('樣衣圖已上傳雲端','Sample photo uploaded')); if(STY.sk===sk)renderStyle(sk); if(CUR==='styles')rerender() }catch(e){ toast(L('上傳失敗：','Upload failed: ')+(e.message||e)) } };
- window.imgDel=async function(sk){ if(!confirm(L('確定刪除這款的樣衣圖？','Delete this sample photo?')))return; try{ await cpost({action:'img_del',sk}); IMG.mem.delete(sk); try{await IDB.del?IDB.del(IK(sk)):IDB.set(IK(sk),null)}catch(e){} await imgList(true); renderStyle(sk) }catch(e){toast(String(e.message||e))} };
- const fillImgs=async root=>{ const els=[...(root||document).querySelectorAll('img[data-sk]:not([data-done])')]; const L_=await imgList();
-  const todo=els.filter(e=>L_.has(e.dataset.sk)); els.forEach(e=>{ if(!L_.has(e.dataset.sk)){e.dataset.done=1} });
-  for(let i=0;i<todo.length;i+=3)await Promise.all(todo.slice(i,i+3).map(async e=>{ const u=await imgGet(e.dataset.sk,e.dataset.full==='1'); e.dataset.done=1; if(u){e.src=u;e.classList.add('has')} })) };
+  try{ const j=await cpost({action:'img_get',sk}); if(!j.data)return null; const thumb=await shrink(j.data,220,.75); c={at:cl.at,data:j.data,thumb}; IMG.mem.set(sk,c); try{await IDB.set(IK(sk),c); IMG.local.add(sk); idxSave()}catch(e){} return full?c.data:c.thumb }catch(e){ return c&&c.data?(full?c.data:c.thumb):null } };
+ /* 存一張（data URL 已縮好）：先存本機，再上雲；雲端不通就留「待上傳」 */
+ async function imgStore(sk,data,thumb){ thumb=thumb||await shrink(data,220,.75); const c={at:nowStamp(),data,thumb,pend:true};
+  IMG.mem.set(sk,c); IMG.local.add(sk); try{await IDB.set(IK(sk),c)}catch(e){} idxSave();
+  if(isDemo()||!cloudReady())return {ok:false,local:true,msg:'nokey'};
+  if(IMG.err)return {ok:false,local:true,msg:IMG.err};   /* 雲端已知不通：先存本機，通了 imgFlush 會補上傳 */
+  try{ await cpost({action:'img_put',sk,data}); c.pend=false; try{ await imgList(true); const r=IMG.list.get(sk); if(r)c.at=r.at }catch(e){} try{await IDB.set(IK(sk),c)}catch(e){} return {ok:true} }
+  catch(e){ const m=String(e.message||e); if(!IMG.err)IMG.err=m; return {ok:false,local:true,msg:m} } }
+ window.imgStore=imgStore;
+ async function imgFlush(){ if(IMG.flushing||IMG.err||!cloudReady())return; IMG.flushing=true; let n=0;
+  try{ for(const sk of [...IMG.local]){ let c=null; try{c=await IDB.get(IK(sk))}catch(e){} if(!c||!c.pend||!c.data)continue;
+    try{ await cpost({action:'img_put',sk,data:c.data}); c.pend=false; await IDB.set(IK(sk),c); n++ }catch(e){ break } } }
+  finally{ IMG.flushing=false } if(n){ await imgList(true); toast(tt('已補上傳樣衣圖 ','Uploaded pending photos: ','បានផ្ទុកឡើង ')+n) } }
+ window.imgFlush=imgFlush;
+ window.imgPut=async function(sk,file){ if(!file)return; toast(tt('處理圖片…','Processing image…','កំពុងដំណើរការរូបភាព…'));
+  try{ const raw=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(file)});
+   const data=await shrink(raw,1000,.82), thumb=await shrink(raw,220,.75); const r=await imgStore(sk,data,thumb);
+   toast(r.ok?tt('樣衣圖已上傳雲端','Sample photo uploaded','បានផ្ទុករូបគំរូ'):tt('雲端還不能用，已先存在這台裝置（待上傳）','Cloud not available — saved on this device (pending upload)','រក្សាទុកលើឧបករណ៍នេះ (រង់ចាំផ្ទុកឡើង)'));
+   if(STY.sk===sk)renderStyle(sk); if(CUR==='styles')rerender() }catch(e){ toast(tt('圖片讀不到：','Cannot read image: ','មិនអាចអានរូបភាព: ')+(e.message||e)) } };
+ window.imgDel=async function(sk){ if(!confirm(tt('確定刪除這款的樣衣圖？','Delete this sample photo?','លុបរូបគំរូនេះ?')))return; let err='';
+  if(cloudReady()&&IMG.list&&IMG.list.has(sk)){ try{ await cpost({action:'img_del',sk}) }catch(e){ err=String(e.message||e) } }
+  if(err){ toast(err); return } IMG.mem.delete(sk); IMG.local.delete(sk); idxSave(); try{await IDB.set(IK(sk),null)}catch(e){} try{ await imgList(true) }catch(e){} renderStyle(sk); if(CUR==='styles')rerender() };
+ /* 看得到才載入（清單一頁 60 張不會一次全抓） */
+ const IMQ=[]; let imRun=0;
+ const imPump=()=>{ while(imRun<3&&IMQ.length){ const e=IMQ.shift(); imRun++; imgGet(e.dataset.sk,e.dataset.full==='1').then(u=>{ if(u){e.src=u;e.classList.add('has')} e.dataset.done=1 }).catch(()=>{}).finally(()=>{imRun--;imPump()}) } };
+ const lazyIO=window.IntersectionObserver?new IntersectionObserver(es=>es.forEach(x=>{ if(x.isIntersecting){ lazyIO.unobserve(x.target); IMQ.push(x.target); imPump() } }),{rootMargin:'300px'}):null;
+ const fillImgs=async root=>{ await idxLoad(); const known=!!IMG.list; if(!known)imgList().then(()=>fillImgs(root));
+  const els=[...(root||document).querySelectorAll('img[data-sk]:not([data-done])')]; if(!els.length)return;
+  els.forEach(e=>{ if(!hasImg(e.dataset.sk)){ if(known)e.dataset.done=1; return } e.dataset.done='q'; if(lazyIO)lazyIO.observe(e); else { IMQ.push(e); imPump() } }) };
  window.fillImgs=fillImgs;
  const ph=(sk,cls,full)=>`<img class="${cls||'sty-th'}" data-sk="${esc(sk)}" ${full?'data-full="1"':''} alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='16' font-size='12' text-anchor='middle'%3E👕%3C/text%3E%3C/svg%3E">`;
 
@@ -4104,7 +4137,7 @@ async function syncTpl(man){
 
  /* ══════════ D. 款式清單頁 ══════════ */
  const SF_DEF={q:'',cust:'',cat:'',src:'',st:'',sort:'last',page:0,view:'list',g:'M',anchor:''};
- const SF=Object.assign({},SF_DEF,LS.get('psjerp_sf',{})); window.SF=SF;
+ const SF=Object.assign({},SF_DEF,LS.get('psjerp_sf',{})); window.SF=SF; if(SF.st==='noimg'){SF.st='';SF.img='none'} if(SF.img===undefined)SF.img='';
  window.sfSet=function(k,v){SF[k]=v;if(k!=='page')SF.page=0;LS.set('psjerp_sf',SF);rerender()};
  const SRCN={ie_upd:['IE 週報','IE weekly'],erp:['ERP','ERP'],ie_obd:['IE OBD','IE OBD'],sew:['車縫日報','Sewing report'],day:['日報 SMV','Daily SMV'],erpo:['ERP 訂單','ERP order']};
  const srcLbl=s=>{const x=SRCN[s];return x?L(x[0],x[1]):(s?String(s):L('缺','none'))};
@@ -4123,25 +4156,26 @@ async function syncTpl(man){
  const shiftAnchor=(g,a,dir)=>{ const d=new Date((a||ymd(TODAY))+'T00:00:00'); if(g==='D')d.setMonth(d.getMonth()+dir); else d.setFullYear(d.getFullYear()+dir); return ymd(d) };
  window.sfShift=dir=>sfSet('anchor',shiftAnchor(SF.g,SF.anchor,dir));
  function filtered(){ const I=styleIdx(); const q=ks(SF.q);
-  let r=I.list.filter(s=>(!SF.cust||s.custs.includes(SF.cust))&&(!SF.cat||s.cat===SF.cat)&&(!SF.src||(SF.src==='none'?!s.cur:(s.cur&&s.cur.src===SF.src)))&&(!SF.st||(SF.st==='open'?s.orders.open>0:SF.st==='sew90'?s.sew.last>=ymd(new Date(TODAY.getTime()-90*864e5)):SF.st==='diff'?(s.erp&&s.ie[0]&&Math.abs((+s.erp.smv||0)-s.ie[0].v)>0.05*s.ie[0].v):SF.st==='noimg'?!(IMG.list&&IMG.list.has(s.sk)):true))&&(!q||s.sk.includes(q)||ks(s.name).includes(q)||s.custs.some(c=>ks(c).includes(q))));
+  let r=I.list.filter(s=>(!SF.cust||s.custs.includes(SF.cust))&&(!SF.cat||s.cat===SF.cat)&&(!SF.src||(SF.src==='none'?!s.cur:(s.cur&&s.cur.src===SF.src)))&&(!SF.st||(SF.st==='open'?s.orders.open>0:SF.st==='sew90'?s.sew.last>=ymd(new Date(TODAY.getTime()-90*864e5)):SF.st==='diff'?(s.erp&&s.ie[0]&&Math.abs((+s.erp.smv||0)-s.ie[0].v)>0.05*s.ie[0].v):true))&&(!SF.img||(SF.img==='has'?hasImg(s.sk):!hasImg(s.sk)))&&(!q||s.sk.includes(q)||ks(s.name).includes(q)||s.custs.some(c=>ks(c).includes(q))));
   const so={last:(a,b)=>String(b.sew.last||b.orders.last).localeCompare(String(a.sew.last||a.orders.last)),style:(a,b)=>a.sk.localeCompare(b.sk),pcs:(a,b)=>b.sew.pcs-a.sew.pcs,open:(a,b)=>b.orders.open-a.orders.open,smv:(a,b)=>((b.cur&&b.cur.v)||0)-((a.cur&&a.cur.v)||0)};
   r.sort(so[SF.sort]||so.last); window.STY_LAST=r.map(s=>s.sk); return r }
  function renderStyles(){
   const k='styles'; let h=pageHead(k,`<button class="btn sm" onclick="loadChain&&loadChain(true);imgList(true).then(()=>rerender())">↻ ${L('重新讀取','Reload')}</button><button class="btn sm" onclick="exportStyles()">${esc(t('export'))}</button>`);
   if(!window.CHAIN||!CHAIN.loaded){ h+=`<div class="note">⏳ ${L('讀取 IE／車縫日報… ','Loading IE / sewing reports… ')}<span id="chainProg">${window.CHAIN?CHAIN.prog.done+'/'+CHAIN.prog.total:''}</span>${L('（第一次約 3–4 分鐘，之後秒開）',' (first time 3–4 min)')}</div>`; if(window.loadChain&&!CHAIN.busy)setTimeout(()=>loadChain(false).then(()=>{GC.delete('styleidx');if(CUR==='styles')rerender()}),50); }
-  if(!IMG.list&&!IMG.busy)imgList().then(()=>{if(CUR==='styles')rerender()});
+  if(!IMG.list&&!IMG.busy)imgList().then(()=>{if(CUR==='styles')rerender()}); else h+=imgErrHTML();
   const I=styleIdx(); const all=I.list;
   const custs=[...new Set(all.flatMap(s=>s.custs))].sort(), cats=[...new Set(all.map(s=>s.cat).filter(Boolean))].sort();
   h+=`<div class="panel oc-filters"><input class="inp" id="sfq" value="${esc(SF.q)}" placeholder="${L('搜尋款號／款名／客戶','Search style / name / customer')}" oninput="clearTimeout(window._sfT);window._sfT=setTimeout(()=>sfSet('q',this.value.trim()),250)">
    <select class="inp" onchange="sfSet('cust',this.value)">${opt('',L('全部客戶','All customers'),SF.cust)}${custs.map(c=>opt(c,c,SF.cust)).join('')}</select>
    <select class="inp" onchange="sfSet('cat',this.value)">${opt('',L('全部類別','All categories'),SF.cat)}${cats.map(c=>opt(c,c,SF.cat)).join('')}</select>
    <select class="inp" onchange="sfSet('src',this.value)">${opt('',L('SMV 來源：全部','SMV source: all'),SF.src)}${['ie_upd','erp','ie_obd','sew','day'].map(s=>opt(s,srcLbl(s),SF.src)).join('')}${opt('none',L('缺 SMV','no SMV'),SF.src)}</select>
-   <select class="inp" onchange="sfSet('st',this.value)">${opt('',L('全部款式','All styles'),SF.st)}${opt('open',L('有未結訂單','open orders'),SF.st)}${opt('sew90',L('近 90 天有生產','sewn in last 90 days'),SF.st)}${opt('diff',L('ERP 與 IE SMV 不同','ERP ≠ IE SMV'),SF.st)}${opt('noimg',L('還沒有樣衣圖','no photo yet'),SF.st)}</select>
+   <select class="inp" onchange="sfSet('st',this.value)">${opt('',L('全部款式','All styles'),SF.st)}${opt('open',L('有未結訂單','open orders'),SF.st)}${opt('sew90',L('近 90 天有生產','sewn in last 90 days'),SF.st)}${opt('diff',L('ERP 與 IE SMV 不同','ERP ≠ IE SMV'),SF.st)}</select>
+   <select class="inp" onchange="sfSet('img',this.value)">${opt('',tt('樣衣圖：全部','Photo: all','រូបគំរូ: ទាំងអស់'),SF.img)}${opt('has',tt('📷 有樣衣圖','📷 With photo','📷 មានរូប'),SF.img)}${opt('none',tt('無樣衣圖','No photo','គ្មានរូប'),SF.img)}</select>
    <select class="inp" onchange="sfSet('sort',this.value)">${opt('last',L('最近生產／接單','Latest activity'),SF.sort)}${opt('style',L('款號','Style'),SF.sort)}${opt('pcs',L('累計產量','Total output'),SF.sort)}${opt('open',L('未交量','Open qty'),SF.sort)}${opt('smv',L('SMV 高→低','SMV high→low'),SF.sort)}</select></div>`;
   h+=`<div class="seg" style="margin:10px 0">${[['list',L('款式清單','Style list')],['period',L('日週月年產量','Output by period')]].map(([v,l])=>`<button class="${SF.view===v?'on':''}" onclick="sfSet('view','${v}')">${esc(l)}</button>`).join('')}</div>`;
   const rows=filtered();
   if(SF.view==='period'){ h+=periodView(rows); return h }
-  const withSmv=rows.filter(s=>s.cur).length, ie=rows.filter(s=>s.cur&&s.cur.src==='ie_upd').length, img=IMG.list?rows.filter(s=>IMG.list.has(s.sk)).length:null;
+  const withSmv=rows.filter(s=>s.cur).length, ie=rows.filter(s=>s.cur&&s.cur.src==='ie_upd').length, img=IMG.list?rows.filter(s=>hasImg(s.sk)).length:null;
   h+=`<div class="kpis" style="margin-bottom:12px">${kpi(L('款式','Styles'),fmt(rows.length))}${kpi(L('有 SMV','With SMV'),fmt(withSmv),'',rows.length?Math.round(withSmv/rows.length*100)+'%':'',withSmv<rows.length?'warn':'good')}${kpi(L('用 IE 週報 SMV','IE weekly SMV'),fmt(ie))}${kpi(L('有樣衣圖','With photo'),img==null?'…':fmt(img),'',L('點款式卡上傳','upload on the style card'))}</div>`;
   const per=40,pages=Math.max(1,Math.ceil(rows.length/per)); if(SF.page>=pages)SF.page=pages-1; const pg=rows.slice(SF.page*per,(SF.page+1)*per);
   h+=`<div class="sty-grid">${pg.map(s=>{ const c=s.cur; const ie=s.ie[0]; const erpV=s.erp&&+s.erp.smv>0.01?+s.erp.smv:null; const diff=erpV&&ie&&Math.abs(erpV-ie.v)>0.05*ie.v;
@@ -4165,7 +4199,7 @@ async function syncTpl(man){
   return h }
  RENDER.styles=renderStyles;
  window.exportStyles=function(){ const rows=filtered(); const head=['款號','款名','客戶','類別','現行 SMV','SMV 來源','IE 週報 SMV','IE 日期','ERP SMV','車縫日報 SMV','工序數','訂單數','訂單量','未交','累計生產件數','最近生產','有樣衣圖'];
-  const data=rows.map(s=>{const ie=s.ie.find(v=>v.kind==='upd');return [s.style,s.name,s.custs.join('、'),s.cat,s.cur?+s.cur.v.toFixed(3):'',s.cur?srcLbl(s.cur.src):'',ie?+ie.v.toFixed(3):'',ie?ie.d:'',s.erp&&+s.erp.smv>0.01?+s.erp.smv:'',s.sew.smv?+s.sew.smv.v.toFixed(3):'',s.opCount||'',s.orders.n,s.orders.qty,s.orders.open,s.sew.pcs,s.sew.last,IMG.list&&IMG.list.has(s.sk)?'有':'']});
+  const data=rows.map(s=>{const ie=s.ie.find(v=>v.kind==='upd');return [s.style,s.name,s.custs.join('、'),s.cat,s.cur?+s.cur.v.toFixed(3):'',s.cur?srcLbl(s.cur.src):'',ie?+ie.v.toFixed(3):'',ie?ie.d:'',s.erp&&+s.erp.smv>0.01?+s.erp.smv:'',s.sew.smv?+s.sew.smv.v.toFixed(3):'',s.opCount||'',s.orders.n,s.orders.qty,s.orders.open,s.sew.pcs,s.sew.last,hasImg(s.sk)?'有':'']});
   const name='VRT_款式SMV_'+nowStamp().replace(/[-: ]/g,'').slice(0,12); if(!window.XLSX){showCSV(name+'.csv',[head].concat(data));return}
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head].concat(data)),'款式SMV'); XLSX.writeFile(wb,name+'.xlsx'); toast(L('已匯出 ','Exported ')+fmt(rows.length)) };
 
@@ -4214,8 +4248,8 @@ async function syncTpl(man){
   if(tab==='out'){ const g=STY.g; const m=new Map(); s.sew.byD.forEach((v,d)=>{const p=pkey(d,g);m.set(p,(m.get(p)||0)+v)}); const ps=[...m.keys()].sort().reverse(); const sv=c?c.v:0;
    return `<div class="seg" style="margin-bottom:10px">${[['D',L('日','Day')],['W',L('週','Week')],['M',L('月','Month')],['Y',L('年','Year')]].map(([v,l])=>`<button class="${g===v?'on':''}" onclick="styG('${v}')">${l}</button>`).join('')}</div>`
     +tbl('st_out',[[L('期間','Period')],[L('件數','Pcs'),1],[L('標準分鐘','Std min'),1]],ps.slice(0,400).map(p=>[`<span class="mono">${esc(plabel(p,g))}</span>`,fmt(m.get(p)),sv?fmt(m.get(p)*sv):'—']),ps.length?['',fmt(s.sew.pcs),sv?fmt(s.sew.pcs*sv):'']:null) }
-  if(tab==='img'){ const has=IMG.list&&IMG.list.has(s.sk); const r=has?IMG.list.get(s.sk):null;
-   return `<div class="sty-imgbox">${ph(s.sk,'sty-big',true)}</div><div class="od-acts" style="margin-top:10px"><label class="btn pri">📷 ${has?L('換一張','Replace'):L('上傳樣衣圖','Upload photo')}<input type="file" accept="image/*" capture="environment" hidden onchange="imgPut('${esc(s.sk)}',this.files[0])"></label>${has?`<button class="btn dng" onclick="imgDel('${esc(s.sk)}')">${L('刪除','Delete')}</button>`:''}</div><p class="small muted">${has?L('雲端更新 ','Updated ')+esc(r.at):L('手機可直接拍照；會自動縮小到 1000 像素存雲端，每台裝置看得到。','On a phone you can take a photo; it is resized to 1000 px and stored in the cloud for every device.')}</p>` }
+  if(tab==='img'){ const has=hasImg(s.sk); const r=IMG.list&&IMG.list.get(s.sk); const lc=IMG.mem.get(s.sk);
+   return `<div class="sty-imgbox">${ph(s.sk,'sty-big',true)}</div><div class="od-acts" style="margin-top:10px"><label class="btn pri">📷 ${has?L('換一張','Replace'):L('上傳樣衣圖','Upload photo')}<input type="file" accept="image/*" capture="environment" hidden onchange="imgPut('${esc(s.sk)}',this.files[0])"></label>${has?`<button class="btn dng" onclick="imgDel('${esc(s.sk)}')">${L('刪除','Delete')}</button>`:''}</div><p class="small muted">${r?tt('雲端更新 ','Updated ','បានធ្វើបច្ចុប្បន្នភាព ')+esc(r.at):lc&&lc.pend?'⏳ '+tt('只存在這台裝置，等雲端授權後自動上傳','Kept on this device — uploads when the cloud is authorised','រក្សាទុកលើឧបករណ៍នេះ'):has?tt('這台裝置的本機副本','Local copy on this device','ច្បាប់ចម្លងលើឧបករណ៍នេះ'):tt('手機可直接拍照；會自動縮小到 1000 像素存雲端，每台裝置看得到。也可以把一整批圖（檔名＝款號）或 IE OBD Excel 丟到「智慧匯入」。','On a phone you can take a photo; it is resized to 1000 px and stored in the cloud for every device. You can also drop a batch of photos (file name = style) or IE OBD workbooks into Smart Import.','អាចថតរូបដោយទូរស័ព្ទ ឬទម្លាក់រូបជាច្រើនទៅ Smart Import។')}</p>${imgErrHTML()}` }
   return '' }
  function renderStyle(sk){
   const I=styleIdx(); const s=I.map.get(sk); if(!s){toast(L('找不到這款','Style not found'));return} STY.sk=sk;
@@ -4241,6 +4275,7 @@ async function syncTpl(man){
   const wrap=document.createElement('div'); wrap.className='sty-head'; t.parentNode.insertBefore(wrap,t); wrap.innerHTML=ph(sk,'sty-hd',true); wrap.appendChild(t); wrap.firstChild.onclick=()=>openStyle(sk); wrap.firstChild.style.cursor='pointer';
   const a=document.querySelector('#drawer .od-acts'); if(a&&!a.querySelector('.to-sty'))a.insertAdjacentHTML('afterbegin',`<button class="btn sm to-sty" onclick="openStyle('${esc(sk)}')">👕 ${L('款式資料','Style card')}</button>`);
   fillImgs(document.getElementById('drawer')) }
+ window.decorateOrder=decorateOrder;
  const _oo=openOrder; openOrder=async function(){ const r=await _oo.apply(this,arguments); try{decorateOrder()}catch(e){} return r };
  const _ot=window.ordTab; if(_ot)window.ordTab=function(){ const r=_ot.apply(this,arguments); try{decorateOrder()}catch(e){} return r };
 
@@ -4260,6 +4295,7 @@ async function syncTpl(man){
  .sty-body{min-width:0;flex:1}.sty-h{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}.sty-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sty-smv{margin:3px 0}.sty-smv b{font-size:17px}
  .sty-head{display:flex;gap:12px;align-items:flex-start;min-width:0}.sty-hd{width:96px;height:96px;border-radius:10px;object-fit:cover;background:var(--surface-2);border:1px solid var(--line-2);flex:0 0 96px}
  .sty-big-smv{font-size:24px;font-weight:700;color:var(--accent)}
+ .ph-badge{font-size:12px;line-height:1;padding:2px 4px;border-radius:6px;background:var(--good-soft);border:1px solid var(--line-2)}.sty-th.has,.sty-hd.has{background:#fff}
  .sty-imgbox{text-align:center}.sty-big{max-width:100%;max-height:70vh;border-radius:10px;background:var(--surface-2);min-width:200px;min-height:200px;object-fit:contain}
  @media (max-width:860px){.sty-grid{grid-template-columns:1fr}.sty-hd{width:72px;height:72px;flex-basis:72px}.sty-big-smv{font-size:20px}}`;
  document.head.appendChild(st);
@@ -4564,34 +4600,49 @@ async function syncTpl(man){
   h+=`<details class="mt-det"><summary><h4 style="display:inline">📤 ${L('領料明細','Issues')} (${fmt(IL.length)})</h4></summary>`+tbl('ot_iss',[[L('領料單','Issue no.')],[L('日期','Date')],[L('類別','Type')],[L('料品','Material')],[L('顏色','Colour')],[L('數量','Qty'),1],[L('單位','Unit')]],IL.slice(0,300).map(r=>[`<span class="mono">${esc(r.issue_no)}</span>`,esc(d10(r.issue_date)),esc(r.type==='main'?L('主料','main'):L('副料','trim')),mlink(r.material||'',r._k,r.color),esc(r.color||''),fmt(r.qty,2),esc(r.unit||'')]))+`</details>`;
   return h };
 
- /* ══════════ L. 滑到底換下一張（同 PSJHR：捲到最下面再往下滑 → 直接換成下一款／下一張；最上面再往上滑 → 上一張）══════════ */
+ /* ══════════ L. 連續往下看（v1.3.0，照 PSJHR 員工資料 contInit／contSetCur）：捲到快底（剩 400px）就把下一款／下一張的整張卡接在下面；
+    捲到哪一張，上面的標頭（◀ n/總數 ▶）和分頁就換成那一張；最後有「⬇ 繼續往下捲：下一款 …」。◀ ▶、鍵盤左右鍵照舊。══════════ */
  const contOn=()=>LS.get('psjerp_cont',true)!==false;
- window.contToggle=()=>{ LS.set('psjerp_cont',!contOn()); toast(contOn()?L('已開啟：捲到底再往下滑就換下一張','On: scroll past the end to open the next one'):L('已關閉滑到底換下一張','Off')); if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab) };
- const PULL={busy:0,acc:0,accT:0,ty:null,tb:false,tt:false,kind:null};
- const scroller=()=>{ const dr=document.getElementById('drawer'); if(!dr)return null; const db=dr.querySelector('.od-body'); for(const el of [db,dr]){ if(el&&el.scrollHeight>el.clientHeight+2){ const oy=getComputedStyle(el).overflowY; if(oy==='auto'||oy==='scroll')return el } } return db||dr };
- const atBottom=()=>{ const sc=scroller(); return !sc||sc.scrollTop+sc.clientHeight>=sc.scrollHeight-4 };
- const atTop=()=>{ const sc=scroller(); return !sc||sc.scrollTop<=2 };
- function pullGo(d){ if(PULL.busy||!contOn())return; const dr=document.getElementById('drawer'); if(!dr||dr.hidden)return; const kind=PULL.kind; if(!kind)return;
-  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let cur; if(kind==='ord'){const C=ordCtx(OCUR.id);cur=C.g?C.g.ids[0]:OCUR.id;if(!list.includes(cur)&&C.g)cur=list.find(x=>C.g.ids.includes(x))}else cur=STY.sk; const i=list.indexOf(cur); if(i<0||!list[i+d])return;
-  PULL.busy=1; PULL.acc=0; const bar=dr.querySelector('.pull-bar'); if(bar)bar.classList.add('go');
-  setTimeout(()=>{ if(kind==='ord')ordGo(d); else styGo(d); setTimeout(()=>{PULL.busy=0},700) },120) }
- document.addEventListener('wheel',e=>{ const dr=document.getElementById('drawer'); if(!PULL.kind||!dr||dr.hidden||!e.target.closest||!e.target.closest('#drawer'))return; if(e.target.closest('.tbl-wrap')&&e.target.closest('.tbl-wrap').scrollWidth>e.target.closest('.tbl-wrap').clientWidth&&Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
-  const now=Date.now(); if(now-PULL.accT>700)PULL.acc=0; PULL.accT=now;
-  if(e.deltaY>0&&atBottom()){ PULL.acc+=e.deltaY; pullHint(Math.min(1,PULL.acc/300)); if(PULL.acc>300)pullGo(1) }
-  else if(e.deltaY<0&&atTop()){ PULL.acc+=e.deltaY; if(PULL.acc<-300)pullGo(-1) }
-  else { PULL.acc=0; pullHint(0) } },{passive:true});
- document.addEventListener('touchstart',e=>{ if(!PULL.kind||!e.target.closest||!e.target.closest('#drawer'))return; PULL.ty=e.touches[0].clientY; PULL.tb=atBottom(); PULL.tt=atTop() },{passive:true});
- document.addEventListener('touchmove',e=>{ if(PULL.ty==null)return; const dy=PULL.ty-e.touches[0].clientY; if(PULL.tb&&dy>0)pullHint(Math.min(1,dy/110)); },{passive:true});
- document.addEventListener('touchend',e=>{ if(PULL.ty==null)return; const dy=PULL.ty-e.changedTouches[0].clientY; const b=PULL.tb, t2=PULL.tt; PULL.ty=null; if(b&&dy>110&&atBottom())pullGo(1); else if(t2&&dy<-160&&atTop())pullGo(-1); else pullHint(0) },{passive:true});
- function pullHint(f){ const b=document.querySelector('#drawer .pull-bar'); if(!b)return; b.style.setProperty('--p',String(f)); b.classList.toggle('hot',f>0.05) }
- function contAttach(kind){ PULL.kind=kind; PULL.acc=0; const dr=document.getElementById('drawer'); const db=dr&&dr.querySelector('.od-body'); if(!db)return;
-  const acts=db.querySelector('.od-acts'); if(acts&&!acts.querySelector('.cont-tg'))acts.insertAdjacentHTML('beforeend',`<button class="btn sm cont-tg ${contOn()?'on':''}" onclick="contToggle()" title="${L('捲到底再往下滑換下一張（同 HR 員工資料）','Scroll past the end to open the next one')}">⇅ ${L('滑到底換下一張：','Scroll to next: ')}${contOn()?L('開','on'):L('關','off')}</button>`);
-  if(!contOn()||db.querySelector('.pull-bar'))return;
-  const list=kind==='ord'?(window.OC_LAST||[]):(window.STY_LAST||[]); let cur;
-  if(kind==='ord'){ const C=ordCtx(OCUR.id); cur=C.g?C.g.ids[0]:OCUR.id; if(!list.includes(cur)&&C.g)cur=list.find(x=>C.g.ids.includes(x)) } else cur=STY.sk;
-  const i=list.indexOf(cur); const nx=i>=0?list[i+1]:null;
+ window.contToggle=()=>{ LS.set('psjerp_cont',!contOn()); toast(contOn()?tt('已開啟連續往下看：捲到底會接下一張','Continuous scrolling on','បើកការរំកិលបន្ត'):tt('已關閉連續往下看','Continuous scrolling off','បិទការរំកិលបន្ត')); if(window.OCUR&&OCUR.id)ordTab(OCUR.tab); else if(window.STY&&STY.sk)styTab(STY.tab) };
+ let CIO=null;
+ const listOf=kind=>kind==='ord'?(window.OC_LAST&&OC_LAST.length?OC_LAST:(window.ocRows?ocRows().map(r=>r.ids[0]):[])):(window.STY_LAST&&STY_LAST.length?STY_LAST:styleIdx().list.map(x=>x.sk));
+ const curOf=kind=>{ if(kind!=='ord')return STY.sk; const C=ordCtx(OCUR.id); let cur=C.g?C.g.ids[0]:OCUR.id; const list=listOf('ord'); if(!list.includes(cur)&&C.g)cur=list.find(x=>C.g.ids.includes(x))||cur; return cur };
+ /* 不動畫面，借用原本的畫卡函式拿到某一張的 HTML（同 PSJHR profRender） */
+ function capture(kind,id){ const od=openDrawer, s0=STY.sk, o0=OCUR.id; let H=''; openDrawer=h=>{H=h};
+  try{ if(kind==='ord')ordRender(id); else renderStyle(id) }catch(e){ console.error('cont capture',e) } finally{ openDrawer=od; STY.sk=s0; OCUR.id=o0 }
+  const d=document.createElement('div'); d.innerHTML=H; return d }
+ function secHead(kind,id,list){ const n=`<span class="small muted cont-n">${list.indexOf(id)+1}/${fmt(list.length)}</span>`;
+  if(kind==='sty'){ const s=styleIdx().map.get(id); if(!s)return ''; const c=s.cur;
+   return `<div class="cont-hd" onclick="openStyle('${esc(jsq(id))}')" title="${esc(tt('點這裡改看這一款','Open this style','បើកម៉ូដនេះ'))}">${window.styPh?styPh(id,'sty-th'):''}<div class="cont-t"><b class="mono">${esc(s.style)}</b> ${c?`<b>${fmt(c.v,2)}</b> <span class="small">SMV</span>`:`<span class="st warn">${tt('缺 SMV','no SMV','គ្មាន SMV')}</span>`}<div class="small muted">${esc(s.custs.join('、')||'—')}${s.name?' · '+esc(s.name):''}</div></div>${n}</div>` }
+  const C=ordCtx(id); const o=C.o; if(!o)return ''; const g=C.g; const stc=g?(g.status==='late'?['crit',tt('逾期','late','យឺត')]:g.status==='closed'?['good',tt('已結','closed','បិទ')]:['info',tt('未結','open','បើក')]):['neu',''];
+  return `<div class="cont-hd" onclick="openOrder('${esc(jsq(id))}')" title="${esc(tt('點這裡改看這一張','Open this order','បើកការបញ្ជានេះ'))}">${window.styPh?styPh(ks(o.style),'sty-th'):''}<div class="cont-t"><b class="mono">${esc(o.po_no||o.od_no||o.my_no)} · ${esc(o.style)}</b> ${stChip(stc[0],stc[1])}<div class="small muted">${esc(o.cust)} · ${fmt(g?g.qty:o.qty)} ${tt('件','pcs','ដុំ')}${o.style_name?' · '+esc(o.style_name):''}</div></div>${n}</div>` }
+ function secHTML(kind,id,list){ const d=capture(kind,id); const db=d.querySelector('.od-body'); if(!db)return '';
+  db.querySelectorAll('.od-acts,.cont-more,.cont-sec').forEach(x=>x.remove());
+  const dr=document.getElementById('drawer'); db.querySelectorAll('[id]').forEach(x=>{ try{ if(dr.querySelector('#'+CSS.escape(x.id)))x.removeAttribute('id') }catch(e){ x.removeAttribute('id') } });
+  return `<section class="cont-sec" data-id="${esc(id)}">${secHead(kind,id,list)}${db.innerHTML}</section>` }
+ function contSetCur(kind,id){ const dr=document.getElementById('drawer'); if(!dr||dr.hidden||!id)return; if(String(id)===String(curOf(kind)))return;
+  const d=capture(kind,id); if(kind==='ord'){ const C=ordCtx(id); if(!C.o)return; OCUR.id=id } else STY.sk=id;
+  [['.dh'],['.od-tabs'],['#dfoot']].forEach(([q])=>{ const n=d.querySelector(q), o=dr.querySelector(q); if(n&&o)o.replaceWith(n) });
+  try{ addBack() }catch(e){}
+  if(kind==='ord'){ try{ window.decorateOrder&&decorateOrder() }catch(e){} const C=ordCtx(id); const b=dr.querySelector('.to-sty'); if(b&&C.o)b.setAttribute('onclick',`goStyle('${jsq(ks(C.o.style))}')`) }
+  if(window.fillImgs)fillImgs(dr.querySelector('.dh')||dr) }
+ function contAttach(kind){ const dr=document.getElementById('drawer'); const db=dr&&dr.querySelector('.od-body'); if(CIO){CIO.disconnect();CIO=null} if(!db)return;
+  const acts=db.querySelector('.od-acts'); if(acts&&!acts.querySelector('.cont-tg'))acts.insertAdjacentHTML('beforeend',`<button class="btn sm cont-tg ${contOn()?'on':''}" onclick="contToggle()" title="${esc(tt('捲到底自動接下一張（同 HR 員工資料）','Scroll down to keep reading the next one','រំកិលចុះដើម្បីមើលបន្ទាប់'))}">⬇ ${tt('連續往下看：','Keep scrolling: ','រំកិលបន្ត: ')}${contOn()?tt('開','on','បើក'):tt('關','off','បិទ')}</button>`);
+  if(!contOn())return; const list=listOf(kind); const first=curOf(kind); if(!first||!list.includes(first))return;
+  if(db.dataset.cont===String(first)&&db.querySelector(':scope > .cont-more'))return; db.dataset.cont=first;
+  db.querySelectorAll(':scope > .cont-more,:scope > .cont-sec').forEach(x=>x.remove());
+  let last=first; db.insertAdjacentHTML('beforeend','<div class="cont-more"></div>'); const more=db.querySelector(':scope > .cont-more');
+  const nextOf=x=>list[list.indexOf(x)+1];
   const nm=id=>{ if(kind==='sty'){const s=styleIdx().map.get(id);return s?s.style+(s.name?' · '+s.name:''):id} const C=ordCtx(id); return C.o?(C.o.po_no||C.o.my_no)+' · '+C.o.style:id };
-  db.insertAdjacentHTML('beforeend',`<div class="pull-bar" onclick="${nx?(kind==='ord'?'ordGo(1)':'styGo(1)'):''}"><div class="pull-fill"></div><span>${nx?`⬇ ${L('到底了，再往下滑換下一','End — keep scrolling for the next ')}${kind==='ord'?L('張','order'):L('款','style')}：<b>${esc(nm(nx))}</b> <span class="small muted">(${i+2}/${fmt(list.length)})</span>`:L('已經是最後一張','This is the last one')}</span></div>`) }
+  const label=()=>{ const nx=nextOf(last); more.innerHTML=nx?`⬇ ${kind==='sty'?tt('繼續往下捲：下一款','Keep scrolling — next style:','បន្តរំកិល — ម៉ូដបន្ទាប់:'):tt('繼續往下捲：下一張','Keep scrolling — next order:','បន្តរំកិល — បន្ទាប់:')} <b>${esc(nm(nx))}</b> <span class="small muted">(${list.indexOf(nx)+1}/${fmt(list.length)})</span>`:tt('已經是最後一張','That was the last one','នេះជាចុងក្រោយ') };
+  const add=()=>{ const nx=nextOf(last); if(!nx)return false; more.insertAdjacentHTML('beforebegin',secHTML(kind,nx,list)); last=nx; label(); if(window.fillImgs)fillImgs(db); return true };
+  label(); more.onclick=()=>add();
+  const near=()=>more.getBoundingClientRect().top<db.getBoundingClientRect().bottom+400;
+  const fill=()=>{ let g=0; while(document.body.contains(more)&&near()&&g++<3&&add()); };
+  if(window.IntersectionObserver){ CIO=new IntersectionObserver(es=>{ if(!document.body.contains(more)){CIO&&CIO.disconnect();return} if(es.some(x=>x.isIntersecting))fill() },{root:db,rootMargin:'0px 0px 400px 0px'}); CIO.observe(more) }
+  let tk=0; db.addEventListener('scroll',()=>{ if(tk)return; tk=setTimeout(()=>{ tk=0; if(!document.body.contains(db))return; fill(); const top=db.getBoundingClientRect().top; let cur=first;
+   for(const s2 of db.querySelectorAll(':scope > .cont-sec')){ if(s2.getBoundingClientRect().top<=top+60)cur=s2.dataset.id; else break } contSetCur(kind,cur) },80) },{passive:true}) }
+ window.contSetCur=contSetCur;
  /* 訂單卡：每次畫完 → SMV 註記、返回鍵、款式鍵改成可返回、連續往下捲 */
  function smvNote(){ if(!OCUR.id)return; const ov=ordersView(); const C=ordCtx(OCUR.id); const o=ov.find(x=>x.id===C.o.id)||C.o; const dt=[...document.querySelectorAll('#odTab .kv dt')].find(d=>d.textContent.trim()==='SMV'); if(!dt)return; const dd=dt.nextElementSibling; if(!dd||dd.querySelector('.smv-n'))return;
   const isNew=String(o.order_date||'')>=SMV_NEW; let x='';
@@ -4714,7 +4765,7 @@ async function syncTpl(man){
  const srcLbl=s=>{const x=SRCN[s];return x?L(x[0],x[1]):(s||L('缺','none'))};
  function styCard(s,R,f,ovd){ const c=s.cur; const ie=s.ie[0]; const erpV=s.erp&&+s.erp.smv>0.01?+s.erp.smv:null; const diff=erpV&&ie&&Math.abs(erpV-ie.v)>0.05*ie.v;
   let pp=0; if(!R.all){ if(f==='ord')pp=s.orders.ids.reduce((t,id)=>{const o=ovd.get(id);return t+(o&&inRg(o.d,R)?o.q:0)},0); else s.sew.byD.forEach((v,d)=>{if(inRg(d,R))pp+=v}) }
-  return `<div class="sty-card" onclick="openStyle('${esc(s.sk)}')">${window.styPh?styPh(s.sk):''}<div class="sty-body"><div class="sty-h"><b class="mono">${esc(s.style)}</b>${s.custs.length?`<span class="small muted">${esc(s.custs.slice(0,2).join('、'))}</span>`:''}</div><div class="small muted sty-name">${esc(s.name||'')}${s.cat?' · '+esc(s.cat):''}</div>
+  return `<div class="sty-card" onclick="openStyle('${esc(s.sk)}')">${window.styPh?styPh(s.sk):''}<div class="sty-body"><div class="sty-h"><b class="mono">${esc(s.style)}</b>${window.hasImg&&hasImg(s.sk)?`<span class="ph-badge" title="${esc(tt('有樣衣圖','Has sample photo','មានរូបគំរូ'))}">📷</span>`:''}${s.custs.length?`<span class="small muted">${esc(s.custs.slice(0,2).join('、'))}</span>`:''}</div><div class="small muted sty-name">${esc(s.name||'')}${s.cat?' · '+esc(s.cat):''}</div>
    <div class="sty-smv">${c?`<b>${fmt(c.v,2)}</b> <span class="small">${esc(srcLbl(c.src))}</span>`:`<span class="st warn">${L('缺 SMV','no SMV')}</span>`}${diff?` <span class="st warn" title="ERP ${fmt(erpV,2)} / IE ${fmt(ie.v,2)}">ERP≠IE</span>`:''}</div>
    <div class="small muted">${pp?`<b>${L('這期 ','this period ')}${fmt(pp)}</b> · `:''}${s.sew.pcs?`🪡 ${fmt(s.sew.pcs)} · ${esc(s.sew.last)}`:''}${s.orders.open?` · ${L('未交 ','open ')}${fmt(s.orders.open)}`:''}</div></div></div>` }
  const _rs=RENDER.styles;
@@ -4733,8 +4784,8 @@ async function syncTpl(man){
    out+=`<div class="vz-card" style="margin-bottom:12px"><h4>🪡 ${L('車縫件數','Pieces sewn')}</h4>${colChart(sub.list,[{name:L('件數','Pcs'),c:'--vz1',vals:agg.map(a=>a.pcs)}],{click:b=>`pnDrill('styles','${b.pt}','${b.a}','list')`})}</div>`;
    out+=tbl('lt_styles_period',[[L('期間','Period')],[L('生產款數','Styles sewn'),1],[L('件數','Pcs'),1],[L('標準分鐘','Std minutes'),1],[L('平均 SMV','Avg SMV'),1],[L('新接單（列）','New order lines'),1],[L('IE 測款','IE tests'),1],[L('主要款式','Top styles')]],agg.slice().reverse().map(a=>{const top=[...a.sty.entries()].sort((x,y)=>y[1]-x[1]).slice(0,3);const r=[`<span class="mono">${esc(a.b.l)}</span>`,a.sty.size||'—',a.pcs?fmt(a.pcs):'—',a.min?fmt(a.min):'—',a.pcs&&a.min?fmt(a.min/a.pcs,2):'—',a.newO||'—',a.ie||'—',`<span class="small">${top.map(([k,v])=>`<a href="javascript:void 0" class="mono" onclick="event.stopPropagation();openStyle('${esc(k)}')">${esc(k)}</a> ${fmt(v)}`).join('、')}</span>`];if(a.pcs||a.newO)r._click=`pnDrill('styles','${a.b.pt}','${a.b.a}','list')`;return r}),['',' ',fmt(sum(agg,'pcs')),fmt(sum(agg,'min')),sum(agg,'pcs')?fmt(sum(agg,'min')/sum(agg,'pcs'),2):'',fmt(sum(agg,'newO')),fmt(sum(agg,'ie')),'']);
    return out }
-  const IMG=window.STY_IMG?STY_IMG():null; const withSmv=rows.filter(s=>s.cur).length, ie=rows.filter(s=>s.cur&&s.cur.src==='ie_upd').length, img=IMG&&IMG.list?rows.filter(s=>IMG.list.has(s.sk)).length:null;
-  out+=`<div class="kpis" style="margin-bottom:12px">${kpi(L('款式','Styles'),fmt(rows.length))}${kpi(L('有 SMV','With SMV'),fmt(withSmv),'',pct(withSmv,rows.length),withSmv<rows.length?'warn':'good')}${kpi(L('用 IE 週報 SMV','IE weekly SMV'),fmt(ie))}${kpi(L('有樣衣圖','With photo'),img==null?'…':fmt(img),'',L('點款式卡上傳','upload on the style card'))}</div>`;
+  const IMG=window.STY_IMG?STY_IMG():null; const withSmv=rows.filter(s=>s.cur).length, ie=rows.filter(s=>s.cur&&s.cur.src==='ie_upd').length, img=IMG&&IMG.list?rows.filter(s=>hasImg(s.sk)).length:null;
+  out+=`<div class="kpis" style="margin-bottom:12px">${kpi(L('款式','Styles'),fmt(rows.length))}${kpi(L('有 SMV','With SMV'),fmt(withSmv),'',pct(withSmv,rows.length),withSmv<rows.length?'warn':'good')}${kpi(L('用 IE 週報 SMV','IE weekly SMV'),fmt(ie))}${kpi(L('有樣衣圖','With photo'),img==null?'…':fmt(img),'',tt('點款式卡上傳，或整批丟「智慧匯入」','upload on the card, or drop a batch into Smart Import','ផ្ទុកឡើងលើកាត ឬទម្លាក់ទៅ Smart Import'))}</div>`;
   const n0=Math.min(rows.length,60); window._STY_ROWS={rows,R,f,ovd};
   out+=`<div class="sty-grid" id="styGrid">${rows.slice(0,n0).map(s=>styCard(s,R,f,ovd)).join('')}</div><div id="styMore" class="cont-more" data-n="${n0}">${rows.length>n0?`⬇ ${L('往下捲自動載入更多','Scroll for more')} · ${n0} / ${fmt(rows.length)}`:`${fmt(rows.length)} ${L('款','styles')}`}</div>`;
   setTimeout(()=>{ const more=document.getElementById('styMore'), grid=document.getElementById('styGrid'); if(!more||!grid)return; const X=window._STY_ROWS; if(window.fillImgs)fillImgs(grid);
@@ -4795,7 +4846,7 @@ async function syncTpl(man){
  .an-blk{padding:10px 14px;margin-bottom:10px}.an-blk>summary{cursor:pointer;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
  .cont-more{padding:16px;text-align:center;color:var(--muted);font-size:13px;border-top:1px dashed var(--line);margin-top:18px;cursor:pointer}
  .cont-sec{border-top:3px solid var(--accent-soft);margin-top:26px;padding-top:6px}
- .cont-hd{display:flex;gap:10px;align-items:center;padding:8px 10px;margin:0 0 12px;border-radius:10px;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);position:sticky;top:0;z-index:1}
+ .cont-hd{display:flex;gap:10px;align-items:center;padding:8px 10px;margin:0 0 12px;border-radius:10px;cursor:pointer;background:var(--surface-2);border:1px solid var(--line)}.cont-hd:hover b{text-decoration:underline}
  .cont-hd .sty-th{width:48px;height:48px;flex:0 0 48px}.cont-t{flex:1;min-width:0}
  .cont-tg.on{border-color:var(--accent);color:var(--accent)}
  .mlink{color:var(--accent);text-decoration:none;border-bottom:1px dotted currentColor;cursor:pointer}
@@ -4808,9 +4859,6 @@ async function syncTpl(man){
  @media (max-width:860px){.pnx .pn-sel{width:100%}.pnx .pn-p{min-width:0;flex:1}.pnx .pn-f{margin-left:0;flex:1 1 100%}.pn-pt{overflow-x:auto;max-width:100%;scrollbar-width:none}.pn-pt button{padding:6px 9px;white-space:nowrap}
   .vz-grid{grid-template-columns:1fr}.vz-cols{height:130px}.oc-views{flex-wrap:nowrap;overflow-x:auto;max-width:100%}.oc-views button{white-space:nowrap}.cont-hd .sty-th{width:40px;height:40px;flex-basis:40px}}
  .oc-filters select.inp{max-width:240px}
- .pull-bar{position:relative;overflow:hidden;margin:22px 0 4px;padding:16px 12px;border:1px dashed var(--line-2);border-radius:12px;text-align:center;font-size:13px;color:var(--ink-2);cursor:pointer;--p:0}
- .pull-bar .pull-fill{position:absolute;left:0;bottom:0;height:4px;width:calc(var(--p)*100%);background:var(--accent);transition:width .08s}
- .pull-bar.hot{border-color:var(--accent);color:var(--accent)}.pull-bar.go{background:var(--accent-soft)}
  .an-acts{display:inline-flex;gap:4px;flex-wrap:wrap;white-space:nowrap}.an-note{color:var(--ink)}
  @media (max-width:860px){
   #drawer.od .od-h{flex-wrap:wrap;gap:6px 10px;padding:10px 12px 8px}
@@ -4829,6 +4877,231 @@ async function syncTpl(man){
  }
  @media (max-width:860px){.oc-filters select.inp{max-width:none}.vz-cols.mid .vz-col:nth-child(even) .vz-x{visibility:hidden}.vz-cols.mid .vz-x{overflow:visible}}
  @media print{.cont-more,.cont-tg,.live-chip,.d-back{display:none!important}}`;
+ document.head.appendChild(st);
+})();
+
+/* ══════════ v1.3.0（2026-11-05）：📷 樣衣圖整批匯入 —— 智慧匯入收 .jpg/.png/.webp、整包 .zip、IE OBD Excel（Ref. Picture 頁的圖）
+   檔名＝款號（A0953.jpg）或 OBD 表上的 Style: 自動對到款式；先預覽（縮圖、對到哪一款／❌ 對不到），按「上傳」才存（走 img_put，雲端不通先存本機）。══════════ */
+(function(){
+ const ks=s=>keyN(s).replace(/[^A-Z0-9]+/g,'');
+ const core=x=>String(x||'').replace(/^(HA|NU|DI|A|O|K|RES)/,'').replace(/[A-Z]+$/,'');
+ const IMG_RE=/\.(jpe?g|png|webp|gif|bmp)$/i, XL_RE=/\.(xlsx|xlsm|xls)$/i;
+ window.PHQ=window.PHQ||[];
+ const base=n=>String(n||'').split(/[\\/]/).pop();
+ const u8of=f=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(new Uint8Array(fr.result));fr.onerror=rej;fr.readAsArrayBuffer(f)});
+ const blobURL=(u8,type)=>URL.createObjectURL(new Blob([u8],{type}));
+ const loadImg=src=>new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('image'));im.src=src});
+ async function toData(src){ const big=await imgShrink(src,1000,.82), thumb=await imgShrink(src,220,.75); return {big,thumb} }
+ /* ── 款號比對：先看 OBD 表上的 Style:，再看檔名；同 PSJERP 款號鍵（大寫、只留英數）；A0953BS ↔ A0953、IE 寫法帶顏色字尾也對得到 ── */
+ function guessFromName(n){ let b=base(n).replace(/\.[^.]+$/,''); b=b.replace(/[_\s-]*\(\d+\)$/,'').replace(/[_\s-]+(\d{1,2}|copy|副本)$/i,'');
+  const m=b.match(/OBD[\s_-]*([A-Za-z]*\d[A-Za-z0-9-]*)/i); return m?m[1]:b.replace(/^(pending|final|new)[\s_-]*/i,'') }
+ function matchStyle(cands){ const I=styleIdx(); const keys=[...I.map.keys()];
+  for(const raw of cands){ const c=ks(raw); if(!c||c.length<3)continue; if(I.map.has(c))return c;
+   if(c.length>=4){ const pre=keys.filter(k=>k.length>=4&&c.startsWith(k)).sort((a,b)=>b.length-a.length); if(pre.length)return pre[0];
+    const sup=keys.filter(k=>k.startsWith(c)).sort((a,b)=>a.length-b.length); if(sup.length===1||(sup.length&&sup[0].length-c.length<=3))return sup[0];
+    const cc=core(c); if(cc.length>=4){ const hit=keys.filter(k=>core(k)===cc); if(hit.length===1)return hit[0] } } }
+  return null }
+ /* ── DIB（BMP 沒有檔頭）→ canvas ── */
+ function dibCanvas(bmi,bits){ const dv=new DataView(bmi.buffer,bmi.byteOffset,bmi.byteLength); const hs=dv.getUint32(0,true), w=dv.getInt32(4,true), h0=dv.getInt32(8,true), bpp=dv.getUint16(14,true), comp=dv.getUint32(16,true);
+  if(w<=0||!h0||w>8000||Math.abs(h0)>8000||![1,4,8,24,32].includes(bpp)||(comp!==0&&comp!==3))return null; const h=Math.abs(h0), up=h0>0, stride=((w*bpp+31)>>5)*4;
+  const ncol=bpp<=8?((hs>=36?dv.getUint32(32,true):0)||(1<<bpp)):0; const po=hs+(comp===3&&hs===40?12:0); const pal=[]; for(let i=0;i<ncol;i++){const o=po+i*4; pal.push([bmi[o+2],bmi[o+1],bmi[o]])}
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d'); const id=g.createImageData(w,h); const D=id.data;
+  for(let y=0;y<h;y++){ const r0=(up?h-1-y:y)*stride; if(r0+stride>bits.length+stride)break; for(let x=0;x<w;x++){ let r,gg,b; if(bpp===32||bpp===24){const o=r0+x*(bpp>>3);b=bits[o];gg=bits[o+1];r=bits[o+2]} else { const bitPos=x*bpp, byte=bits[r0+(bitPos>>3)]||0; const idx=bpp===8?byte:bpp===4?((bitPos&7)?byte&15:byte>>4):((byte>>(7-(bitPos&7)))&1); const p=pal[idx]||[0,0,0]; r=p[0];gg=p[1];b=p[2] }
+   const q=(y*w+x)*4; D[q]=r;D[q+1]=gg;D[q+2]=b;D[q+3]=255 } }
+  g.putImageData(id,0,0); return cv }
+ function packedDib(dib){ const dv=new DataView(dib.buffer,dib.byteOffset,dib.byteLength); const hs=dv.getUint32(0,true), bpp=dv.getUint16(14,true), comp=dv.getUint32(16,true); const clr=hs>=36?dv.getUint32(32,true):0; const n=clr||(bpp<=8?1<<bpp:0); const off=hs+(comp===3&&hs===40?12:0)+n*4; return dibCanvas(dib.subarray(0,off),dib.subarray(off)) }
+ async function inflate(u8){ if(!window.DecompressionStream)throw new Error('no DecompressionStream'); const s=new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate')); return new Uint8Array(await new Response(s).arrayBuffer()) }
+ function sigImages(b){ const out=[]; for(let i=0;i<b.length-3;i++){ if(b[i]===0xFF&&b[i+1]===0xD8&&b[i+2]===0xFF){ for(let j=b.length-2;j>i;j--){ if(b[j]===0xFF&&b[j+1]===0xD9){out.push({u8:b.subarray(i,j+2),type:'image/jpeg'});break} } break }
+   if(b[i]===0x89&&b[i+1]===0x50&&b[i+2]===0x4E&&b[i+3]===0x47){ out.push({u8:b.subarray(i),type:'image/png'}); break } } return out }
+ function emfCanvases(e){ const dv=new DataView(e.buffer,e.byteOffset,e.byteLength); const out=[]; let j=0;
+  while(j+8<=e.length){ const rt=dv.getUint32(j,true), rs=dv.getUint32(j+4,true); let o=0;
+   if(rt===81||rt===80)o=48; else if(rt===76||rt===77)o=84;
+   if(o&&j+o+16<=e.length){ const offB=dv.getUint32(j+o,true), cbB=dv.getUint32(j+o+4,true), offBits=dv.getUint32(j+o+8,true), cbBits=dv.getUint32(j+o+12,true); if(offB&&cbB&&cbBits){ try{ const cv=dibCanvas(e.subarray(j+offB,j+offB+cbB),e.subarray(j+offBits,j+offBits+cbBits)); if(cv)out.push(cv) }catch(x){} } }
+   if(rs<8)break; j+=rs } return out }
+ function wmfCanvases(w){ const dv=new DataView(w.buffer,w.byteOffset,w.byteLength); const out=[]; let j=(w[0]===0xD7&&w[1]===0xCD)?40:18;
+  while(j+6<=w.length){ const size=dv.getUint32(j,true), fn=dv.getUint16(j+4,true); if(size<3)break; const skip=fn===0x0F43?28:fn===0x0B41?26:fn===0x0940?22:0; if(skip){ try{ const cv=packedDib(w.subarray(j+skip,j+size*2)); if(cv)out.push(cv) }catch(x){} } j+=size*2 } return out }
+ const area=x=>x.width*x.height;
+ /* 一張 BLIP（OfficeArt）→ 圖片來源（canvas 或 blob） */
+ async function blipSrc(rt,inst,d){
+  if(rt===0xF01A||rt===0xF01B||rt===0xF01C){ const h=[0x3D5,0x217,0x543].includes(inst)?32:16; const dv=new DataView(d.buffer,d.byteOffset,d.byteLength); const cs=dv.getUint32(h+28,true), comp=d[h+32]; let raw=d.subarray(h+34,h+34+cs);
+   if(comp===0)raw=await inflate(raw); const cvs=rt===0xF01A?emfCanvases(raw):rt===0xF01B?wmfCanvases(raw):[]; if(cvs.length)return cvs.sort((a,b)=>area(b)-area(a))[0];
+   const s=sigImages(raw); return s.length?s[0]:null }
+  const two=[0x46B,0x6E3,0x6E1,0x7A9,0x6E5,0x6E9].includes(inst); const body=d.subarray((two?32:16)+1);
+  if(rt===0xF01F)return packedDib(body); const s=sigImages(body); return s.length?s[0]:{u8:body,type:rt===0xF01E?'image/png':'image/jpeg'} }
+ const srcURL=s=>s instanceof HTMLCanvasElement?s.toDataURL('image/png'):blobURL(s.u8,s.type);
+ /* ── .xls（BIFF8）：MSODRAWINGGROUP 裡的圖庫 ＋ Ref. Picture 頁的 MSODRAWING 指到哪幾張、放在哪 ── */
+ async function xlsPics(u8){ const C=XLSX.CFB; const cfb=C.read(u8,{type:'array'}); const ent=C.find(cfb,'Workbook')||C.find(cfb,'Book'); if(!ent)return {sheet:'',pics:[]};
+  const d=ent.content instanceof Uint8Array?ent.content:Uint8Array.from(ent.content); const dv=new DataView(d.buffer,d.byteOffset,d.byteLength);
+  const recs=function*(off){ let i=off; while(i+4<=d.length){ const t=dv.getUint16(i,true), l=dv.getUint16(i+2,true); yield [i,t,d.subarray(i+4,i+4+l)]; i+=4+l } };
+  const cat=parts=>{ const n=parts.reduce((s,p)=>s+p.length,0); const o=new Uint8Array(n); let k=0; parts.forEach(p=>{o.set(p,k);k+=p.length}); return o };
+  const sheets=[]; let gp=[], prev=null;
+  for(const [pos,t,b] of recs(0)){ if(t===0x85){ const bd=new DataView(b.buffer,b.byteOffset,b.byteLength); const off=bd.getUint32(0,true), cch=b[6], fl=b[7]; let nm=''; if(fl&1){ for(let i=0;i<cch;i++)nm+=String.fromCharCode(bd.getUint16(8+i*2,true)) } else { for(let i=0;i<cch;i++)nm+=String.fromCharCode(b[8+i]) } sheets.push([nm,off]) }
+   if(t===0xEB){gp.push(b);prev=0xEB} else if(t===0x3C&&prev===0xEB)gp.push(b); else if(t!==0x3C)prev=t; if(t===0x0A)break }
+  const g=cat(gp); const gv=new DataView(g.buffer,g.byteOffset,g.byteLength); const blips=[];
+  const walk=(b,bv,o,end,cb,dep)=>{ while(o+8<=end){ const vi=bv.getUint16(o,true), ty=bv.getUint16(o+2,true), ln=bv.getUint32(o+4,true); const ver=vi&15, inst=vi>>4; const e=Math.min(end,o+8+ln); cb(ty,ver,inst,o+8,e); if(ver===15&&dep<12)walk(b,bv,o+8,e,cb,dep+1); o+=8+ln } };
+  walk(g,gv,0,g.length,(ty,ver,inst,s,e)=>{ if(ty===0xF007){ const q=s+36+g[s+33]; if(q+8<=e){ const bi=gv.getUint16(q,true), bt=gv.getUint16(q+2,true), ln=gv.getUint32(q+4,true); blips.push([bt,bi>>4,g.subarray(q+8,q+8+ln)]) } else blips.push(null) } },0);
+  const use=sheets.find(s=>/ref\.?\s*pic/i.test(s[0]));
+  let refs=[];
+  if(use){ const dp=[]; let pv=null; for(const [pos,t,b] of recs(use[1])){ if(t===0xEC){dp.push(b);pv=0xEC} else if(t===0x3C&&pv===0xEC)dp.push(b); else if(t!==0x3C)pv=t; if(t===0x0A)break }
+   const dg=cat(dp); const dgv=new DataView(dg.buffer,dg.byteOffset,dg.byteLength); let cur=null;
+   walk(dg,dgv,0,dg.length,(ty,ver,inst,s,e)=>{ if(ty===0xF004){cur={};refs.push(cur)} else if(ty===0xF00B&&cur){ for(let k=0;k<inst;k++){ if(s+k*6+6>e)break; const pid=dgv.getUint16(s+k*6,true), val=dgv.getUint32(s+k*6+2,true); if((pid&0x3FFF)===0x104)cur.pib=val } } else if(ty===0xF010&&cur&&e-s>=18){ cur.at=[dgv.getUint16(s+6,true),dgv.getUint16(s+2,true)] } },0);
+   refs=refs.filter(r=>r.pib).sort((a,b)=>((a.at||[9999,9999])[0]-(b.at||[9999,9999])[0])||((a.at||[0,9999])[1]-(b.at||[0,9999])[1])) }
+  const list=refs.length?refs.map(r=>blips[r.pib-1]).filter(Boolean):blips.filter(Boolean);
+  const pics=[]; for(const bl of list){ try{ const s=await blipSrc(bl[0],bl[1],bl[2]); if(s)pics.push(s) }catch(e){ console.warn('obd blip',e) } }
+  return {sheet:use?use[0]:'',pics} }
+ /* ── .xlsx：工作表 → drawing → xl/media（照位置排，左上第一張） ── */
+ async function xlsxPics(u8){ const C=XLSX.CFB; const z=C.read(u8,{type:'array'}); const get=p=>{ const e=C.find(z,'/'+p.replace(/^\//,'')); return e&&e.content?(e.content instanceof Uint8Array?e.content:Uint8Array.from(e.content)):null };
+  const txt=p=>{ const b=get(p); return b?new TextDecoder().decode(b):'' }; const xml=p=>{ const t=txt(p); return t?new DOMParser().parseFromString(t,'application/xml'):null };
+  const rels=part=>{ const i=part.lastIndexOf('/'); const dir=part.slice(0,i), f=part.slice(i+1); const x=xml(dir+'/_rels/'+f+'.rels'); const m={}; if(!x)return m;
+   [...x.getElementsByTagName('Relationship')].forEach(r=>{ let tg=r.getAttribute('Target')||''; if(tg.startsWith('/'))tg=tg.slice(1); else { const st=dir.split('/'); tg.split('/').forEach(s=>{ if(s==='..')st.pop(); else if(s&&s!=='.')st.push(s) }); tg=st.join('/') } m[r.getAttribute('Id')]=tg }); return m };
+  let sheet='', found=[];
+  try{ const wb=xml('xl/workbook.xml'), wr=rels('xl/workbook.xml'); const sh=[...wb.getElementsByTagName('sheet')].map(s=>[s.getAttribute('name'),wr[s.getAttribute('r:id')||s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')]]);
+   const use=sh.find(s=>/ref\.?\s*pic/i.test(s[0]||'')); if(use&&use[1]){ sheet=use[0]; const sx=xml(use[1]), sr=rels(use[1]);
+    [...sx.getElementsByTagName('drawing')].forEach(dr=>{ const dp=sr[dr.getAttribute('r:id')||dr.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')]; if(!dp)return; const dx=xml(dp), drl=rels(dp); if(!dx)return;
+     [...dx.documentElement.children].forEach(an=>{ const fr=an.getElementsByTagName('xdr:from')[0]; const at=fr?[+(fr.getElementsByTagName('xdr:row')[0]||{}).textContent||0,+(fr.getElementsByTagName('xdr:col')[0]||{}).textContent||0]:[9999,9999];
+      [...an.getElementsByTagName('a:blip')].forEach(bl=>{ const ip=drl[bl.getAttribute('r:embed')]; if(ip)found.push([at,ip]) }) }) }) } }catch(e){ console.warn('xlsx rels',e) }
+  if(!found.length)z.FullPaths.forEach(p=>{ const m=p.match(/xl\/media\/[^/]+$/i); if(m)found.push([[9999,9999],m[0]]) });
+  found.sort((a,b)=>(a[0][0]-b[0][0])||(a[0][1]-b[0][1]));
+  const pics=[]; for(const [,ip] of found){ const b=get(ip); if(!b)continue; if(b[0]===1&&b[1]===0&&b[2]===0&&b[3]===0){ const c=emfCanvases(b); if(c.length){pics.push(c.sort((x,y)=>area(y)-area(x))[0]);continue} }
+   if(b[0]===0xD7&&b[1]===0xCD){ const c=wmfCanvases(b); if(c.length){pics.push(c[0]);continue} }
+   pics.push({u8:b,type:/\.png$/i.test(ip)?'image/png':/\.gif$/i.test(ip)?'image/gif':'image/jpeg'}) }
+  return {sheet,pics} }
+ const labelVal=(aoa,re)=>{ for(const r of aoa){ for(let i=0;i<r.length;i++){ const s=String(r[i]==null?'':r[i]).trim(); if(re.test(s)){ const rest=s.replace(re,'').replace(/^\s*:?\s*/,'').trim(); if(rest)return rest; for(let j=i+1;j<r.length;j++){ const w=String(r[j]==null?'':r[j]).trim(); if(w)return w } } } } return '' };
+ async function obdExtract(u8){ let style='',pic='',sheet='';
+  try{ const wb=XLSX.read(u8,{type:'array'}); const sn=wb.SheetNames.find(n=>/ref\.?\s*pic/i.test(n)); if(sn){ sheet=sn; const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''}).slice(0,40); style=labelVal(aoa,/^style\b/i); pic=labelVal(aoa,/^pi\w*ture\b/i) } }catch(e){}
+  const isZip=u8[0]===0x50&&u8[1]===0x4B; const r=isZip?await xlsxPics(u8):await xlsPics(u8); return {style,pic,sheet:sheet||r.sheet,src:r.pics[0]||null,n:r.pics.length} }
+ window.obdExtract=obdExtract;
+ async function isOBD(f){ if(/obd/i.test(f.name))return true; if(f.size>8e6)return false; try{ const u8=await u8of(f); const wb=XLSX.read(u8,{type:'array',bookSheets:true}); return wb.SheetNames.some(n=>/ref\.?\s*pic/i.test(n)) }catch(e){ return false } }
+ /* ── 加進佇列 ── */
+ function addRow(r){ r.cands=r.cands||[]; r.guess=ks(r.cands[0]||'')||''; r.sk=matchStyle(r.cands); r.skip=!r.sk||!!r.err;
+  if(r.sk&&PHQ.some(x=>!x.done&&!x.skip&&x.sk===r.sk)){ r.skip=true; r.dup=true }
+  PHQ.push(r) }
+ async function ingestImage(name,src,from){ try{ const d=await toData(src); addRow({file:name,from,data:d.big,thumb:d.thumb,cands:[guessFromName(name)]}) }catch(e){ PHQ.push({file:name,from,err:tt('圖片讀不到','Cannot read image','មិនអាចអានរូបភាព'),skip:true}) } }
+ async function ingestOBD(name,u8,from){ try{ const x=await obdExtract(u8); if(!x.src){ PHQ.push({file:name,from,err:tt('OBD 裡找不到 Ref. Picture 圖片','No Ref. Picture image in this OBD','រកមិនឃើញរូបភាព'),skip:true,obd:x}); return }
+   const url=srcURL(x.src); const d=await toData(url); if(!(x.src instanceof HTMLCanvasElement))URL.revokeObjectURL(url);
+   addRow({file:name,from,obd:x,data:d.big,thumb:d.thumb,cands:[x.style,guessFromName(name)].filter(Boolean)}) }catch(e){ console.error('obd',e); PHQ.push({file:name,from,err:'OBD: '+(e.message||e),skip:true}) } }
+ async function ingest(items){ await (window.imgList?imgList():null);
+  for(const [kind,f] of items){
+   if(kind==='img'){ const u=URL.createObjectURL(f); await ingestImage(f.name,u,''); URL.revokeObjectURL(u) }
+   else if(kind==='obd'){ await ingestOBD(f.name,await u8of(f),'OBD') }
+   else if(kind==='zip'){ try{ const z=XLSX.CFB.read(await u8of(f),{type:'array'}); const ents=[]; z.FileIndex.forEach((e,i)=>{ const p=z.FullPaths[i]; if(e.type===2&&e.content&&e.content.length&&!/__MACOSX|\/\._/.test(p))ents.push([p,e.content instanceof Uint8Array?e.content:Uint8Array.from(e.content)]) });
+     ents.sort((a,b)=>a[0].localeCompare(b[0])); let n=0;
+     for(const [p,b] of ents){ const nm=base(p); if(IMG_RE.test(nm)){ const u=blobURL(b,/\.png$/i.test(nm)?'image/png':/\.webp$/i.test(nm)?'image/webp':'image/jpeg'); await ingestImage(nm,u,f.name); URL.revokeObjectURL(u); n++ } else if(XL_RE.test(nm)&&!/^~\$/.test(nm)){ await ingestOBD(nm,b,f.name); n++ } }
+     if(!n)PHQ.push({file:f.name,err:tt('壓縮檔裡沒有圖片或 OBD Excel','No images or OBD workbooks in this zip','គ្មានរូបភាពក្នុង zip'),skip:true}) }catch(e){ PHQ.push({file:f.name,err:'ZIP: '+(e.message||e),skip:true}) } } } }
+ const _hf=handleFiles;
+ handleFiles=async function(list){ const files=[...(list||[])]; const rest=[], ph=[];
+  for(const f of files){ const n=f.name||''; if(IMG_RE.test(n)||/^image\//.test(f.type||''))ph.push(['img',f]); else if(/\.zip$/i.test(n))ph.push(['zip',f]); else if(XL_RE.test(n)&&await isOBD(f))ph.push(['obd',f]); else rest.push(f) }
+  if(ph.length){ toast(tt('讀取樣衣圖… ','Reading photos… ','កំពុងអានរូបភាព… ')+ph.length); await ingest(ph) }
+  if(rest.length)return _hf(rest);
+  if(ph.length){ if(CUR!=='smart-import')go('smart-import'); else rerender(); setTimeout(()=>{const el=document.getElementById('phq');if(el&&el.scrollIntoView)el.scrollIntoView({block:'start'})},60) } };
+ try{ const fi=document.getElementById('fileIn'); if(fi)fi.setAttribute('accept',fi.getAttribute('accept')+',.zip,.jpg,.jpeg,.png,.webp,image/*') }catch(e){}
+ /* ── 預覽表 ── */
+ window.phqSet=function(i,k,v){ const r=PHQ[i]; if(!r)return; if(k==='sk'){ const m=matchStyle([v]); r.sk=m; r.typed=v; r.force=!m&&ks(v).length>=3?ks(v):''; r.skip=!(m||r.force) } else r[k]=v; rerender() };
+ window.phqClear=function(all){ for(let i=PHQ.length-1;i>=0;i--)if(all||PHQ[i].done)PHQ.splice(i,1); rerender() };
+ window.phqUpload=async function(){ const todo=PHQ.filter(r=>!r.done&&!r.skip&&!r.err&&(r.sk||r.force)); if(!todo.length){toast(tt('沒有勾選要上傳的圖','Nothing selected','មិនបានជ្រើស'));return}
+  let ok=0, loc=0; const btn=document.getElementById('phqGo'); if(btn)btn.disabled=true;
+  for(const r of todo){ const sk=r.sk||r.force; const res=await imgStore(sk,r.data,r.thumb); r.done=res.ok?'cloud':'local'; res.ok?ok++:loc++; if(btn)btn.textContent=`⏳ ${ok+loc} / ${todo.length}` }
+  try{ audit('styleimg','batch','IMPORT',null,{cloud:ok,local:loc,files:todo.map(r=>r.file).slice(0,50)}); persist() }catch(e){}
+  try{ GC.delete('styleidx') }catch(e){}
+  toast(loc?tt(`已存 ${ok+loc} 張：雲端 ${ok}、只在這台裝置 ${loc}（雲端尚未授權）`,`Saved ${ok+loc}: cloud ${ok}, this device only ${loc}`,`បានរក្សាទុក ${ok+loc}`):tt(`已上傳 ${ok} 張樣衣圖`,`Uploaded ${ok} sample photos`,`បានផ្ទុកឡើង ${ok}`)); rerender() };
+ function phqHTML(){ if(!PHQ.length)return ''; const I=styleIdx(); const sel=PHQ.filter(r=>!r.done&&!r.skip&&!r.err&&(r.sk||r.force)).length, done=PHQ.filter(r=>r.done).length;
+  let h=`<div class="panel mt" id="phq"><h2>📷 ${tt('樣衣圖匯入','Sample-photo import','នាំចូលរូបគំរូ')} · ${fmt(PHQ.length)} ${tt('張','files','ឯកសារ')}</h2><p class="hint">${tt('檔名＝款號（例 A0953.jpg）或 IE OBD Excel（Ref. Picture 頁的 Style:）。對到款式的自動打勾；對不到可以在右邊打款號。按「上傳」才會存，會取代那一款原本的樣衣圖。','File name = style (e.g. A0953.jpg) or IE OBD workbook (Style: on the Ref. Picture sheet). Matched rows are ticked; type a style for unmatched rows. Nothing is saved until you press Upload; it replaces the style\'s current photo.','ឈ្មោះឯកសារ = លេខម៉ូដ ឬ OBD Excel។ ចុច “ផ្ទុកឡើង” ដើម្បីរក្សាទុក។')}</p>${window.imgErrHTML?imgErrHTML():''}
+  <div class="tbl-wrap"><table class="t cards phq-t"><thead><tr><th></th><th>${tt('圖','Photo','រូប')}</th><th>${tt('檔案','File','ឯកសារ')}</th><th>${tt('讀到的款號','Read as','អានជា')}</th><th>${tt('對到款式','Matched style','ម៉ូដ')}</th><th>${esc(t('status'))}</th></tr></thead><tbody>`;
+  PHQ.forEach((r,i)=>{ const s=r.sk?I.map.get(r.sk):null; const has=(r.sk||r.force)&&window.hasImg&&hasImg(r.sk||r.force);
+   const st=r.err?stChip('crit',r.err):r.done==='cloud'?stChip('good',tt('已上傳雲端','Uploaded','បានផ្ទុកឡើង')):r.done==='local'?stChip('warn',tt('只存這台裝置','This device only','លើឧបករណ៍នេះ')):r.dup?stChip('neu',tt('同款重複，略過','Duplicate style — skipped','ស្ទួន')):(r.sk||r.force)?(has?stChip('warn',tt('會取代現有的圖','Replaces current photo','ជំនួសរូបចាស់')):stChip('info',tt('新圖','New','ថ្មី'))):stChip('crit','❌ '+tt('對不到款式','No matching style','រកមិនឃើញម៉ូដ'));
+   h+=`<tr class="${r.done?'muted':''}"><td data-l="">${r.done||r.err?'':`<input type="checkbox" ${r.skip?'':'checked'} ${(r.sk||r.force)?'':'disabled'} onchange="phqSet(${i},'skip',!this.checked)" aria-label="${esc(tt('上傳','Upload','ផ្ទុកឡើង'))}">`}</td>
+    <td data-l="">${r.thumb?`<img class="phq-th" src="${r.thumb}" alt="">`:'<span class="phq-th none">—</span>'}</td>
+    <td class="lead mono small wrap" data-l="${esc(tt('檔案','File','ឯកសារ'))}">${esc(r.file)}${r.from?`<div class="muted">↳ ${esc(r.from)}</div>`:''}${r.obd&&r.obd.pic?`<div class="muted">${esc(r.obd.pic)}</div>`:''}</td>
+    <td class="mono" data-l="${esc(tt('讀到的款號','Read as','អានជា'))}">${esc(r.obd&&r.obd.style?r.obd.style:r.guess||'—')}</td>
+    <td data-l="${esc(tt('對到款式','Matched','ម៉ូដ'))}">${r.err||r.done?(s?`<a href="javascript:void 0" onclick="openStyle('${esc(r.sk)}')" class="mono">${esc(s.style)}</a>`:esc(r.force||'')):`${s?`✅ <a href="javascript:void 0" onclick="openStyle('${esc(r.sk)}')" class="mono"><b>${esc(s.style)}</b></a> <span class="small muted">${esc((s.name||'').slice(0,40))}</span><br>`:r.force?`⚠ <span class="small">${tt('照打的款號存：','Save as typed: ','រក្សាទុកជា: ')}<b class="mono">${esc(r.force)}</b></span><br>`:'❌ '}<input class="inp phq-in" value="${esc(r.typed||(s?s.style:r.guess)||'')}" placeholder="${esc(tt('打款號','Type style','វាយលេខម៉ូដ'))}" onchange="phqSet(${i},'sk',this.value)">`}</td>
+    <td data-l="${esc(t('status'))}">${st}</td></tr>` });
+  h+=`</tbody></table></div><div class="od-acts" style="margin-top:10px"><button class="btn pri" id="phqGo" ${sel?'':'disabled'} onclick="phqUpload()">⬆ ${tt('上傳勾選的','Upload selected','ផ្ទុកឡើងដែលបានជ្រើស')} ${fmt(sel)} ${tt('張','','')}</button>${done?`<button class="btn" onclick="phqClear(false)">${tt('清掉已完成','Clear finished','សម្អាតដែលរួចរាល់')}</button>`:''}<button class="btn" onclick="phqClear(true)">✕ ${tt('全部清除','Clear all','សម្អាតទាំងអស់')}</button><a class="btn" href="#styles">👕 ${tt('款式 SMV','Styles & SMV','ម៉ូដ')}</a></div></div>`;
+  return h }
+ window.phqHTML=phqHTML;
+ const _ri=RENDER['smart-import'];
+ RENDER['smart-import']=function(){ let h=_ri.apply(this,arguments);
+  h=h.replace('.xlsx · .xls · .csv · .txt',`.xlsx · .xls · .csv · .txt · 📷 .jpg .png .zip ${tt('樣衣圖（檔名＝款號）／IE OBD','sample photos (file name = style) / IE OBD','រូបគំរូ')}`);
+  const i=h.indexOf('id="drop"'); if(i>=0){ const j=h.indexOf('</div>',i); if(j>0)return h.slice(0,j+6)+phqHTML()+h.slice(j+6) } return h+phqHTML() };
+ const st=document.createElement('style'); st.textContent=`
+ .phq-th{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line-2);background:#fff;display:inline-block;vertical-align:middle}.phq-th.none{background:var(--surface-2);text-align:center;line-height:56px;color:var(--muted)}
+ .phq-in{max-width:170px;padding:4px 8px;margin-top:4px}.phq-t td{vertical-align:middle}
+ .img-err{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}`;
+ document.head.appendChild(st);
+})();
+
+/* ══════════ v1.3.0（2026-11-05）：嵌入的生產平台頁面換成 PSJERP 的外觀 ——
+   同網域（saintdou-weng.github.io）→ iframe 載入後塞一份樣式：顏色／字型／圓角對到 PSJERP 目前的淡色或深色主題，
+   深藍大標頭改成淺色小條（標題 PSJERP 已經有；手機把統計數字也收起來），生產平台自己的按鈕、匯入、雲端都照舊。不改 vrt-prod 檔案。══════════ */
+(function(){
+ const VARS=['bg','surface','surface-2','sunk','ink','ink-2','muted','line','line-2','accent','accent-2','accent-soft','on-accent','good','good-soft','warn','warn-soft','crit','crit-soft'];
+ const hex2=c=>{ c=String(c||'').trim(); let m=c.match(/^#([0-9a-f]{3,8})$/i); if(m){ let h=m[1]; if(h.length<6)h=h.split('').map(x=>x+x).join(''); return [0,2,4].map(i=>parseInt(h.substr(i,2),16)/255) }
+  m=c.match(/rgba?\(([^)]+)\)/i); if(m){ const p=m[1].split(/[ ,\/]+/).filter(Boolean).map(parseFloat); return [p[0]/255,p[1]/255,p[2]/255] } return null };
+ const toHex=a=>'#'+a.map(x=>Math.round(Math.max(0,Math.min(1,x))*255).toString(16).padStart(2,'0')).join('');
+ /* 深色主題：iframe 套 invert(1) hue-rotate(180deg)；要讓畫出來是 T，原色 S = 1 − M⁻¹·T（M＝hue-rotate 180° 矩陣） */
+ const M=[[-0.574,1.43,0.144],[0.426,0.43,0.144],[0.426,1.43,-0.856]];
+ const inv3=m=>{ const [a,b,c]=m[0],[d,e,f]=m[1],[g,h,i]=m[2]; const A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g; const det=a*A+b*B+c*C; return [[A/det,-(b*i-c*h)/det,(b*f-c*e)/det],[B/det,(a*i-c*g)/det,-(a*f-c*d)/det],[C/det,-(a*h-b*g)/det,(a*e-b*d)/det]] };
+ const MI=inv3(M);
+ const pre=c=>{ const t=hex2(c); if(!t)return c; const u=MI.map(r=>r[0]*t[0]+r[1]*t[1]+r[2]*t[2]); return toHex(u.map(x=>1-x)) };
+ const isDark=()=>!!document.documentElement.dataset.dark;
+ function tokens(){ const cs=getComputedStyle(document.documentElement); const o={}; VARS.forEach(v=>{ const x=cs.getPropertyValue('--'+v).trim(); o[v]=isDark()?pre(x):x });
+  o.font=cs.getPropertyValue('--f-ui').trim()||'system-ui,sans-serif'; o.mono=cs.getPropertyValue('--f-mono').trim()||'monospace'; o.r=cs.getPropertyValue('--r').trim()||'8px'; return o }
+ const ALIAS={bg:['bg','paper','page','background'],surface:['card','panel','s1','sur','white','surface','paper2'],'surface-2':['panel2','s2','soft','sur2','surface2','acc-l'],sunk:['s3'],
+  ink:['ink','t1','tx','text','fg'],'ink-2':['sub','ink2','t2','tx2'],muted:['muted','ink3','mu','tx3'],line:['line','bd','bor','border'],'line-2':['line2','bd2','bor2'],
+  accent:['brand','acc','vrt','navy','primary','accent'],'accent-2':['brand2','acc-d','vrt2','navy2','accent2'],'accent-soft':['brand-soft','accent-soft','blue-soft']};
+ function css(o){ const vars=Object.entries(ALIAS).map(([k,arr])=>arr.map(a=>`--${a}:${o[k]}!important;`).join('')).join('')+VARS.map(v=>`--psj-${v}:${o[v]};`).join('')+`--psj-font:${o.font};--psj-r:${o.r};--radius:${o.r}!important;--r:${o.r}!important;--radius-sm:6px!important;--r-sm:6px!important;--ui:${o.font}!important;--sans:${o.font}!important;`;
+  const H='.psj-hdr';
+  return `html:root{${vars}}
+html,body{background:var(--psj-bg)!important}
+body{color:var(--psj-ink);font-family:var(--psj-font)!important;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit}
+select,input[type=text],input[type=search],input[type=date],input[type=month],input[type=week],input[type=number],textarea{border-radius:var(--psj-r)!important}
+${H}{background:var(--psj-surface)!important;background-image:none!important;color:var(--psj-ink)!important;border-bottom:1px solid var(--psj-line)!important;box-shadow:none!important;padding:6px 12px!important;min-height:0!important;height:auto!important;gap:8px!important;flex-wrap:wrap!important;align-items:center!important}
+${H} *{color:inherit!important;text-shadow:none!important}
+${H} .logo,${H} .htitle,${H} .h-title,${H} .brand,${H} .hdr-name h1,${H} .topbar-inner>.brand{display:none!important}
+${H} .hsub,${H} .h-sub,${H} .sub,${H} .brand-sub,${H} .hdr-name p{font-size:11.5px!important;opacity:.75;margin:0!important;letter-spacing:0!important}
+${H} .hstat,${H} .hstats>div{padding:2px 8px!important;background:transparent!important;border:0!important;min-width:0!important}
+${H} .hstat b,${H} .hstat-v,${H} .hsv,${H} .hstats b{font-size:15px!important;font-family:var(--psj-font)!important;color:var(--psj-accent)!important}
+${H} .hstat span,${H} .hstat-l,${H} .hstats span{font-size:10.5px!important;opacity:.7}
+${H} button,${H} .hbtn,${H} .header-btn,${H} .tool-btn,${H} .ic,${H} a.btn,${H} .langs button{background:var(--psj-surface-2)!important;border:1px solid var(--psj-line)!important;color:var(--psj-ink)!important;border-radius:var(--psj-r)!important;box-shadow:none!important;padding:5px 10px!important;font-size:12.5px!important;min-height:0!important}
+${H} .langs button.on,${H} button.on,${H} .hbtn.on{background:var(--psj-accent)!important;color:var(--psj-on-accent)!important;border-color:var(--psj-accent)!important}
+${H} input{background:var(--psj-surface-2)!important;border:1px solid var(--psj-line)!important;color:var(--psj-ink)!important}
+${H} .psj-floats{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.psj-float{position:static!important;inset:auto!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;margin:0!important;box-shadow:none!important;z-index:auto!important}
+${H} .psj-float,${H} .psj-float *{font-size:11.5px!important}${H} .psj-float{background:var(--psj-surface-2)!important;border:1px solid var(--psj-line)!important;border-radius:var(--psj-r)!important;padding:2px 6px!important;text-decoration:none!important}
+.tabs .tab.on,.tabs .tab.active,.tab-btn.on,.tab-btn.active,nav.tabs .on{color:var(--psj-accent)!important;border-bottom-color:var(--psj-accent)!important}
+@media (max-width:760px){${H}{padding:4px 8px!important;gap:4px!important}${H} .hstats,${H} .h-stats,${H} .hstat,${H} .hdr-r .hstat,${H} .hsub,${H} .h-sub,${H} .sub,${H} .brand-sub,${H} .hdr-name{display:none!important}${H} button,${H} .hbtn,${H} .header-btn{padding:4px 8px!important;font-size:12px!important}}
+${isDark()?'img,video,picture{filter:invert(1) hue-rotate(180deg)}':''}`; }
+ const lum=c=>{ const a=hex2(c); return a?0.2126*a[0]+0.7152*a[1]+0.0722*a[2]:1 };
+ function markHeaders(doc){ const w=doc.defaultView; if(!w||!doc.body)return 0; let n=0;
+  const cand=[...doc.querySelectorAll('body > .header, body > .hdr, body > header, body > .topbar, body > .app-header, body > header.topbar, body > .top')];
+  [...doc.body.children].slice(0,4).forEach(e=>{ if(!cand.includes(e))cand.push(e) });
+  cand.forEach(e=>{ if(e.classList.contains('psj-hdr')){n++;return} const cs=w.getComputedStyle(e); if(cs.display==='none'||cs.position==='fixed'&&e.offsetHeight<60)return; const r=e.getBoundingClientRect(); if(r.top>140||r.height>320||r.height<24)return;
+   const bg=cs.backgroundColor; const img=cs.backgroundImage; const dark=(bg&&!/rgba\(0, 0, 0, 0\)|transparent/.test(bg)&&lum(bg)<0.42)||(img&&img!=='none'&&/gradient/.test(img)&&lum((img.match(/rgba?\([^)]+\)|#[0-9a-f]{3,8}/i)||['#fff'])[0])<0.42);
+   if(dark){ e.classList.add('psj-hdr'); n++ } });
+  /* 生產平台浮在最上面的小鈕（語言、智慧匯入、VRT ERP、版本）：標頭變矮後會蓋住按鈕 → 搬進標頭右邊，照樣能按 */
+  const hd=doc.querySelector('.psj-hdr');
+  if(hd){ let box=hd.querySelector(':scope > .psj-floats'); [...doc.body.children].forEach(e=>{ if(e===hd||e.classList.contains('psj-float'))return; const cs=w.getComputedStyle(e); if(cs.position!=='fixed')return; const r=e.getBoundingClientRect(); if(r.top>12||r.height>48||r.width>320||r.width<10)return;
+    if(!box){ box=doc.createElement('div'); box.className='psj-floats'; hd.appendChild(box) } e.classList.add('psj-float'); box.appendChild(e) }) }
+  return n }
+ function themeFrame(fr){ let doc=null; try{ doc=fr.contentDocument }catch(e){ doc=null } if(!doc||!doc.head||!doc.body){ fr.classList.remove('psj-themed'); return false }
+  try{ let st=doc.getElementById('psj-theme'); if(!st){ st=doc.createElement('style'); st.id='psj-theme' } st.textContent=css(tokens()); doc.head.appendChild(st);
+   if(!doc.getElementById('psj-font')){ const lk=document.querySelector('link[href*="fonts.googleapis.com/css2"]'); if(lk){ const l2=doc.createElement('link'); l2.id='psj-font'; l2.rel='stylesheet'; l2.href=lk.href; doc.head.appendChild(l2) } }
+   markHeaders(doc); fr.classList.add('psj-themed'); fr.classList.toggle('psj-dark',isDark());
+   [700,2500,6000].forEach(ms=>setTimeout(()=>{ try{ if(fr.contentDocument===doc){ markHeaders(doc); if(!doc.getElementById('psj-theme'))doc.head.appendChild(st) } }catch(e){} },ms));
+   return true }catch(e){ console.warn('frame theme',e); return false } }
+ window.themeFrames=function(){ document.querySelectorAll('iframe.pframe').forEach(fr=>{ if(!fr.dataset.psjHook){ fr.dataset.psjHook=1; fr.addEventListener('load',()=>themeFrame(fr)) } try{ if(fr.contentDocument&&fr.contentDocument.readyState!=='loading'&&fr.contentDocument.URL!=='about:blank')themeFrame(fr) }catch(e){} }) };
+ window.themeFrame=themeFrame;
+ /* 外面包一層：深色主題時疊一層 mix-blend-mode:lighten 的底色，生產平台寫死的白底反相後變主題底色（不是純黑） */
+ Object.keys(window.FRAMES||{}).forEach(k=>{ const f0=RENDER[k]; if(!f0)return; RENDER[k]=function(){ return String(f0.apply(this,arguments)).replace('<iframe class="pframe"','<div class="pframe-wrap"><iframe class="pframe"').replace('</iframe>','</iframe></div>') } });
+ const _rr=rerender; rerender=function(){ const r=_rr.apply(this,arguments); try{ themeFrames() }catch(e){} return r };
+ const _st=window.setTint; window.setTint=function(){ const r=_st.apply(this,arguments); setTimeout(()=>{ document.querySelectorAll('iframe.pframe').forEach(themeFrame) },30); return r };
+ const st=document.createElement('style'); st.textContent=`
+ :root[data-dark] iframe.pframe.psj-themed{filter:invert(1) hue-rotate(180deg);background:#fff}
+ .pframe-wrap{position:relative;display:block}
+ :root[data-dark] .pframe-wrap:has(> iframe.psj-themed)::after{content:'';position:absolute;inset:1px;background:var(--bg);mix-blend-mode:lighten;pointer-events:none;border-radius:var(--r)}
+ @media (max-width:860px){:root[data-dark] .pframe-wrap:has(> iframe.psj-themed)::after{inset:0;border-radius:0}}
+ iframe.pframe.psj-themed{background:var(--bg)}
+ :root[data-dark] body{color:var(--ink)!important}`;
  document.head.appendChild(st);
 })();
 
