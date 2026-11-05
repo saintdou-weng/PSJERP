@@ -4020,7 +4020,7 @@ async function syncTpl(man){
   ['dashboard','📊','g_over','both',null,['dashboard']],
   ['inbox','📥','g_over','prod','hub_inbox',['inbox','smart-import']],
   ['prodreports','📰','g_over','prod',null,['prodreports','p-weekly']],
-  ['ordercenter','🧭','g_order','prod',null,['ordercenter','orders','prodorders','p-orders']],
+  ['ordercenter','🧭','g_order','prod',null,['ordercenter','custrep','orders','prodorders','p-orders']],
   ['styles','👕','g_order','prod',null,['styles','p-ie']],
   ['bom','🧵','g_order','prod','hub_bom',['bom','p-bom']],
   ['purchase','🛒','g_matl','prod','hub_purchase',['purchase','pprice','receiving']],
@@ -4043,14 +4043,14 @@ async function syncTpl(man){
   ['telegram','✈️','g_sys','both',null,['telegram']],['audit','🗂️','g_sys','both',null,['audit']],['settings','⚙️','g_sys','both',null,['settings']],
  ];
  const exists=k=>!!(RENDER[k]||CFG[k]);
- const HUB_OF={}, HUB={}; HUBS.forEach(h=>{ h[5]=h[5].filter(k=>k==='styles'||exists(k)); h[5].forEach(k=>{HUB_OF[k]=h[0]}); HUB[h[0]]=h });
+ const HUB_OF={}, HUB={}; HUBS.forEach(h=>{ h[5]=h[5].filter(k=>k==='styles'||k==='custrep'||exists(k)); h[5].forEach(k=>{HUB_OF[k]=h[0]}); HUB[h[0]]=h });
  const icoOf={}; MODS.forEach(m=>icoOf[m[0]]=m[1]);
  MODS.length=0; HUBS.forEach(h=>{ if(h[5].length)MODS.push([h[0],h[1],h[2],h[3]]) });
  const _rn=renderNav;
  renderNav=function(){ _rn(); const cur=HUB_OF[CUR]||CUR;
   document.querySelectorAll('#nav a[data-k]').forEach(a=>{ const h=HUB[a.dataset.k]; if(!h)return; if(h[4]){const sp=a.children[1]; if(sp)sp.textContent=t(h[4])} if(h[5].length>1){const c=a.querySelector('.ct'); if(c)c.innerHTML=`<i class="ptag">${h[5].length}</i>`} a.classList.toggle('on',a.dataset.k===cur) });
   const tt_=document.getElementById('topTitle'); if(tt_)tt_.textContent=(SEC[SECTION].ic+' '+t(SEC[SECTION].k)+' · '+t(CUR)) };
- const hubTabs=k=>{ const h=HUB[HUB_OF[k]]; if(!h||h[5].length<2)return ''; return `<div class="hub-tabs">${h[5].map(m=>`<a href="#${m}" class="${m===k?'on':''}">${icoOf[m]||(m==='styles'?'👕':'')} ${esc(t(m))}${FRAMES[m]?` <i class="ptag" title="${esc(tt('生產平台頁面，來源：','Production-platform page, source: ','ទំព័រវេទិកា: ')+({erp:'ERP',email:'Email',tg:'Telegram',manual:tt('手動','Manual','ដោយដៃ'),mixed:'Email + Telegram'}[FRAMES[m][1]]||''))}">${({erp:'🔵',email:'🟠',tg:'🟢',manual:'⚪',mixed:'🟠🟢'}[FRAMES[m][1]]||'')} ${esc(t('platform_tag'))}</i>`:''}</a>`).join('')}</div>` };
+ const hubTabs=k=>{ const h=HUB[HUB_OF[k]]; if(!h||h[5].length<2)return ''; return `<div class="hub-tabs">${h[5].map(m=>`<a href="#${m}" class="${m===k?'on':''}">${icoOf[m]||(m==='styles'?'👕':m==='custrep'?'📑':'')} ${esc(t(m))}${FRAMES[m]?` <i class="ptag" title="${esc(tt('生產平台頁面，來源：','Production-platform page, source: ','ទំព័រវេទិកា: ')+({erp:'ERP',email:'Email',tg:'Telegram',manual:tt('手動','Manual','ដោយដៃ'),mixed:'Email + Telegram'}[FRAMES[m][1]]||''))}">${({erp:'🔵',email:'🟠',tg:'🟢',manual:'⚪',mixed:'🟠🟢'}[FRAMES[m][1]]||'')} ${esc(t('platform_tag'))}</i>`:''}</a>`).join('')}</div>` };
  const _rr=rerender;
  rerender=function(){ _rr.apply(this,arguments); const ht=hubTabs(CUR); if(ht){ const pg=$('#page'); pg.insertAdjacentHTML('afterbegin',ht); const on=pg.querySelector('.hub-tabs .on'); if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'}) } };
  /* 舊網址仍可用；被併掉的頁面仍屬於同一入口 */
@@ -5102,6 +5102,253 @@ ${isDark()?'img,video,picture{filter:invert(1) hue-rotate(180deg)}':''}`; }
  @media (max-width:860px){:root[data-dark] .pframe-wrap:has(> iframe.psj-themed)::after{inset:0;border-radius:0}}
  iframe.pframe.psj-themed{background:var(--bg)}
  :root[data-dark] body{color:var(--ink)!important}`;
+ document.head.appendChild(st);
+})();
+
+
+/* ══════════ v1.3.0（2026-11-05）：📑 客戶報表核對 —— ALL CUSTOMER STATISTICS（訂單總表）、MONTHLY SHIPPING SCHEDULE（月出貨排程）、CUSTOMER YEARLY ORDER VOLUME（年度訂單量）自動對 ERP
+   來源：生產平台已匯入的雲端資料（custstats／monthship，唯讀，不必再匯一次）或在這裡直接匯入檔案（存 PSJERP＋雲端）；年度訂單量生產平台沒有，只能在這裡匯入。
+   三份報表不一定每次都有、也不一定同一天：每份各自顯示日期與新舊，缺哪份就只比有的。 ══════════ */
+(function(){
+ const L=(z,e)=>LANG===0?z:e;
+ const d10=v=>String(v||'').slice(0,10);
+ const nk=v=>{ if(typeof v==='number'&&Number.isInteger(v))v=String(v); return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'') };
+ const dk=v=>nk(v).replace(/\D/g,'').replace(/^0+/,'');
+ const ks=s=>nk(s);
+ const num=v=>{ if(v==null||v===''||v==='-')return 0; const n=typeof v==='number'?v:Number(String(v).replace(/,/g,'')); return isFinite(n)?n:0 };
+ const opt=(v,l,c)=>`<option value="${esc(v)}" ${String(v)===String(c)?'selected':''}>${esc(l)}</option>`;
+ const jsq=s=>String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+ const today=()=>ymd(TODAY);
+ const daysAgo=d=>d?Math.round((TODAY-new Date(d10(d)+'T00:00:00'))/864e5):null;
+ Object.assign(T,{ custrep:['客戶報表核對','Customer reports check','ពិនិត្យរបាយការណ៍អតិថិជន'],
+  sub_custrep:['訂單總表（ALL CUSTOMER STATISTICS）、月出貨排程、年度訂單量，自動對 ERP 訂單（W_COD700）與出貨（W_CBL300），列出不符的地方。資料可直接讀生產平台已匯入的，或在這裡匯入；缺哪份就只比有的。','Customer statistics, monthly shipping schedule and yearly order volume, checked against ERP orders and shipments automatically.'] });
+
+ /* ── 客戶分組（ERP 客戶代碼 + PO 字頭；報表上的客戶名稱）── */
+ const ERPG={ADI:'AMERICAN DAWN',DKSON:'DICKSON',NORUN:'NORTHERN UNIFORM',MAGNUS:'MAGNUS TEXTILES',WPL:'WHITE PLAIN LINEN',LECHNE:'LECHNER & SONS',DEANE:'DEANE APPAREL',PLYMAT:'PLYMATE',ARAMAR:'VESTIS (ARAMARK)',ALSCUS:'ALSCO USA'};
+ function gOfErp(cust,po){ const c=String(cust||'').trim().toUpperCase(), p=nk(po); if(c==='ALSCO'){ if(p.startsWith('SSN'))return 'ALSCO SINGAPORE'; if(p.startsWith('SKU'))return 'ALSCO MALAYSIA'; if(p.startsWith('SOR')||p.startsWith('SFO'))return 'AUSTRALIA'; return 'ALSCO 樣品/其他' } return ERPG[c]||c }
+ const NAMEG=[[/AMERICAN\s*DAWN|^ADI\b/,'AMERICAN DAWN'],[/MALAYSIA/,'ALSCO MALAYSIA'],[/ALSCO\s*(SIN|SING|PTE)|SINGPORE|SINAGPORE|SINGAPORE/,'ALSCO SINGAPORE'],[/ALSCO\s*US/,'ALSCO USA'],[/AUSTRAL|AUTRAL/,'AUSTRALIA'],[/DICK|DICSK|DKSON/,'DICKSON'],[/NORTHERN|^NU\b/,'NORTHERN UNIFORM'],[/MAGNUS/,'MAGNUS TEXTILES'],[/WHITE\s*PLAIN|^WPL\b/,'WHITE PLAIN LINEN'],[/LECHNER/,'LECHNER & SONS'],[/DEANE/,'DEANE APPAREL'],[/PLYMATE/,'PLYMATE'],[/VESTIS|ARAMARK/,'VESTIS (ARAMARK)']];
+ const gOfName=n=>{ const u=String(n||'').toUpperCase().trim(); for(const [re,g] of NAMEG)if(re.test(u))return g; return u };
+ window.crGroup={gOfErp,gOfName};
+
+ /* ── 存放：在這裡匯入的報表（PSJERP 本機＋雲端，ORDERS 試算表的分頁，跟客戶 PO 一樣）── */
+ REP_DS.xrep='xreports'; REP_SHEET.xrep='ORDERS';
+ const _ld=loadDB; loadDB=async function(){ await _ld.apply(this,arguments); if(!Array.isArray(DB.xreports))DB.xreports=[] };
+ if(DB&&!Array.isArray(DB.xreports))DB.xreports=[];
+ const _por=pageOfRep; pageOfRep=function(r){return r==='xrep'?'custrep':_por(r)};
+ const KEYS={stat:'xrep|stat',ship:'xrep|ship',vol:'xrep|vol'};
+ const localMeta=t=>(DB.erpfiles||[]).find(f=>f.key===KEYS[t])||null;
+ const localRecs=t=>live(DB.xreports||[]).filter(r=>r.import_key===KEYS[t]);
+
+ /* ══════════ 1. 解析檔案 ══════════ */
+ const rowsWs=ws=>{ if(!ws||!ws['!ref'])return []; const R=XLSX.utils.decode_range(ws['!ref']); R.s.c=0; R.s.r=0; return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:R}) };   /* 從 A1 開始，欄位才不會位移 */
+ const rowsOf=(wb,name)=>{ const n=wb.SheetNames.find(s=>String(s).trim().toUpperCase()===name); return n?rowsWs(wb.Sheets[n]):null };
+ const toD=v=>{ if(v instanceof Date&&!isNaN(v))return ymd(new Date(v.getTime()+12*3600e3)); if(typeof v==='number'&&v>30000&&v<70000){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d.toISOString().slice(0,10)} const s=String(v||''); const m=s.match(/(20\d\d)[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`; return '' };
+ function detect(wb){ const S=wb.SheetNames.map(s=>String(s).trim().toUpperCase()); if(S.includes('ALL CUSTOMER'))return 'stat'; if(S.includes('CUSTOMER ORDER VOLUME')||S.some(s=>/ORDER\s*VOLUME/.test(s)))return 'vol'; if(S.includes('SUMMARY')&&S.some(s=>/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*-20\d\d$/.test(s)))return 'ship'; return null }
+ function parseStat(wb,file){
+  const R=rowsOf(wb,'ALL CUSTOMER'); if(!R)throw new Error('ALL CUSTOMER?');
+  let hi=R.findIndex(r=>r&&String(r[0]||'').trim().toUpperCase()==='CUSTOMER'); if(hi<0)hi=2;
+  const h1=(R[hi]||[]).map(x=>String(x||'').trim()), h2=(R[hi+1]||[]).map(x=>String(x||'').trim());
+  const col=(re,def)=>{ for(let i=0;i<Math.max(h1.length,h2.length);i++){ if(re.test(h2[i]||'')||re.test(h1[i]||''))return i } return def };
+  const C={cust:0,podate:col(/^PO Date/i,1),etd:col(/VRT Ship Date|ETD/i,2),type:col(/Garment Type/i,4),po:col(/^P\.?O\.?$/i,5),style:col(/Style/i,6),color:col(/^Color$/i,8),size:col(/^Size$/i,9),qty:col(/^Open Qty$/i,10),yrd:col(/Yrd\/pcs/i,14),yds:col(/Total YDS Required/i,15),cut:col(/Actual Cut \(Pcs\)/i,32),shipped:col(/^Total Shipped$/i,53),fg:col(/Stock FG In WH \(Pcs\)/i,54),open:col(/Open Order \(Pcs\)/i,57)};
+  const recs=[]; const checks=[];
+  for(let i=hi+2;i<R.length;i++){ const r=R[i]; if(!r)continue; const cu=r[C.cust], po=r[C.po]; if(!cu&&(po==null||po===''))continue; if(typeof cu==='number')continue;   /* 合計列 */
+   const rec={t:'stat',row:i+1,cust:String(cu||'').trim(),G:gOfName(cu),po:String(po==null?'':po).trim(),style:String(r[C.style]||'').trim(),color:String(r[C.color]||'').trim(),size:String(r[C.size]||'').trim(),type:String(r[C.type]||'').trim(),podate:toD(r[C.podate]),etd:toD(r[C.etd]),qty:num(r[C.qty]),shipped:num(r[C.shipped]),cut:num(r[C.cut]),fg:num(r[C.fg]),open:num(r[C.open]),yrd:num(r[C.yrd])};
+   recs.push(rec);
+   if(rec.yrd>20)checks.push(['ALL CUSTOMER 第 '+(i+1)+' 列 '+rec.po+' '+rec.style,`Yrd/pcs 寫 ${rec.yrd}（總需求 ${fmt(num(r[C.yds]))} 碼）`,'單耗明顯錯誤，面料需求會被放大','改成正確單耗']) }
+  /* DASHBOARD：更新日、標題月份、總訂單量 */
+  const D=rowsOf(wb,'DASHBOARD')||[]; let snap='', title='', tot=null;
+  D.slice(0,8).forEach((r,i)=>{ (r||[]).forEach((v,j)=>{ const s=String(v||''); if(/Updated|更新/.test(s)&&!snap){ const nx=(r||[]).slice(j+1).find(x=>x!=null&&x!==''); snap=toD(nx) } if(/MONTHLY PRODUCTION SUMMARY/i.test(s))title=s; if(/Total Order Qty/i.test(s)&&tot==null){ const nr=D[i+1]||[]; tot=num(nr[j]) } }) });
+  const tm=title.match(/\((JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+(20\d\d)\)/i);
+  if(tm&&snap){ const mi=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'].indexOf(tm[1].toUpperCase())+1; if(tm[2]+'-'+String(mi).padStart(2,'0')!==snap.slice(0,7))checks.push(['DASHBOARD 標題',`寫 (${tm[1]} ${tm[2]})，更新日 ${snap}`,'標題月份跟更新日不同','標題改成更新月份']) }
+  const sq=recs.reduce((t,r)=>t+r.qty,0); if(tot!=null&&Math.abs(tot-sq)>0.5)checks.push(['DASHBOARD Total Order Qty',`${fmt(tot)}，明細合計 ${fmt(sq)}`,'總表跟明細對不起來','檢查合計範圍']);
+  /* 同一張 PO 不同寫法（5677／0005677）*/
+  const byD=new Map(); recs.forEach(r=>{ const k=r.G+'|'+dk(r.po); if(!dk(r.po))return; if(!byD.has(k))byD.set(k,new Set()); byD.get(k).add(r.po) });
+  byD.forEach((s,k)=>{ if(s.size>1)checks.push([k.split('|')[0]+' PO '+[...s].join('、'),'同一張 PO 寫成不同號碼','分開算會重複或漏算','統一寫法']) });
+  checks.push(['整體','只列追蹤中的款色，已出完的款色不列','總數不是全廠訂單量，不能拿來對 ERP 總量','（提醒）']);
+  return {t:'stat',recs,meta:{file,snap:snap||'',title,checks}} }
+ function parseShip(wb,file){
+  const S=rowsOf(wb,'SUMMARY')||[]; const recs=[]; let mon='';
+  S.forEach((r,i)=>{ if(!r)return; if(r[1]&&String(r[1]).trim())mon=String(r[1]).trim(); const d=toD(r[2]); const cu=r[3]; if(!d||!cu||/TOTAL/i.test(String(cu)))return;
+   const pcsRaw=r[6]; const pcs=typeof pcsRaw==='number'?pcsRaw:(/^\s*[\d,]+\s*$/.test(String(pcsRaw||''))?num(pcsRaw):null);
+   recs.push({t:'ship',src:'SUMMARY',row:i+1,month:mon,date:d,cust:String(cu).trim(),G:gOfName(cu),mode:String(r[5]||'').trim(),pcs,ctn:num(r[7])||null,remark:String(r[8]||'').trim()}) });
+  const checks=[]; const MONS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  wb.SheetNames.forEach(n=>{ const u=String(n).trim().toUpperCase(); const mm=u.match(/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*-(20\d\d)$/); if(!mm)return; const R=rowsWs(wb.Sheets[n]); const ym=mm[2]+'-'+String(MONS.indexOf(mm[1])+1).padStart(2,'0');
+   const hd=R.slice(0,4).flat().find(v=>v instanceof Date||(typeof v==='number'&&v>40000&&v<70000)); const hdd=toD(hd); if(hdd&&hdd.slice(0,7)!==ym)checks.push([n+' 表頭',`日期寫 ${hdd}`,'月份跟分頁名稱不同','改成 '+ym]);
+   let txt=0, wk=''; const lines=[];
+   R.forEach(r=>{ if(!r)return; if(r[1]&&/WEEK/i.test(String(r[1])))wk=String(r[1]); const cu=r[2]; if(!cu||/CUSTOMER/i.test(String(cu)))return; ['5','6'].forEach(j=>{ if(typeof r[j]==='string'&&/^\s*[\d,]+\s*$/.test(r[j]))txt++ }); const m=String(wk).match(/([A-Z]{3})[A-Z]*-(\d{1,2})-(20\d\d)/i); const d=m?`${m[3]}-${String(MONS.indexOf(m[1].toUpperCase().slice(0,3))+1).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`:''; lines.push({d,G:gOfName(cu),pcs:r[5],ctn:r[6]}) });
+   if(txt)checks.push([n,`${txt} 格件數／箱數存成文字`,'Excel 加總會漏算','轉成數字']);
+   lines.forEach(l=>{ const s=recs.filter(x=>x.G===l.G&&x.date.slice(0,7)===ym&&(!l.d||Math.abs(daysBetween(x.date,l.d))<=3)); if(!s.length)return; const p=l.pcs==null||l.pcs===''||/N\/A/i.test(String(l.pcs))?null:num(l.pcs); const c=l.ctn==null||l.ctn===''?null:num(l.ctn);
+    const best=p!=null?s.find(x=>x.pcs!=null&&Math.abs(x.pcs-p)<0.5):(s.find(x=>x.pcs==null)||null);
+    if(!best){ if(p==null){ const o=s.find(x=>x.pcs!=null); if(o)checks.push([n+' '+l.G+' '+(l.d||''),'件數空白（SUMMARY 寫 '+fmt(o.pcs)+'）','分頁跟總表不一致','補上件數']) } else checks.push([n+' '+l.G+' '+(l.d||''),`件數 ${fmt(p)}，SUMMARY 沒有這個數（${s.map(x=>x.pcs==null?'空白':fmt(x.pcs)).join('、')}）`,'分頁跟總表不一致','核對後統一']); return }
+    if(c!=null&&best.ctn!=null&&Math.abs(c-best.ctn)>0.5)checks.push([n+' '+l.G+' '+(l.d||''),`箱數 ${fmt(c)}，SUMMARY ${fmt(best.ctn)}`,'分頁跟總表不一致','核對後統一']);
+    if(l.d&&best.date!==l.d)checks.push([n,`日期 ${l.d}，SUMMARY ${best.date}`,'分頁跟總表日期不同','統一日期']) }) });
+  { const seen=new Set(); for(let i=checks.length-1;i>=0;i--){ const k=checks[i][0].split(' ')[0]+'|'+checks[i][1]; if(seen.has(k))checks.splice(i,1); else seen.add(k) } }
+  const P=rowsOf(wb,'CUSTOMER SHIPPING PLAN'); if(P){ const t=JSON.stringify(P.slice(0,4)); const m=t.match(/SHIPPING IN (JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)/i); const last=recs.map(r=>r.date).sort().pop()||''; if(m&&last){ const mi=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'].indexOf(m[1].toUpperCase())+1; if(String(mi).padStart(2,'0')!==last.slice(5,7))checks.push(['CUSTOMER SHIPPING PLAN',`還是 ${m[1]} 的內容`,'已經過期','更新或移除']) } }
+  const spell=new Map(); recs.forEach(r=>{ const k=r.G; if(!spell.has(k))spell.set(k,new Set()); spell.get(k).add(r.cust.toUpperCase()) }); spell.forEach((s,g)=>{ if(s.size>1)checks.push(['客戶名稱 '+g,[...s].join('／'),'同一客戶拼法不一，匯入時會被當成不同客戶','統一拼法']) });
+  return {t:'ship',recs,meta:{file,snap:recs.map(r=>r.date).sort().pop()||'',checks}} }
+ const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5);
+ function parseVol(wb,file){
+  const n=wb.SheetNames.find(s=>/ORDER\s*VOLUME/i.test(s))||wb.SheetNames[0]; const R=rowsWs(wb.Sheets[n]);
+  const hi=R.findIndex(r=>r&&r.some(v=>typeof v==='number'&&v>=2015&&v<=2035)); if(hi<0)throw new Error('找不到年份列');
+  const Y=[]; (R[hi]||[]).forEach((v,i)=>{ if(typeof v==='number'&&v>=2015&&v<=2035)Y.push([v,i]) });
+  const recs=[];
+  for(let i=hi+2;i<R.length;i++){ const r=R[i]; if(!r||!r[0])continue; const cu=String(r[0]).trim(); if(/^TOTAL/i.test(cu))continue;
+   Y.forEach(([y,c])=>{ for(let m=0;m<12;m++){ const v=r[c+m]; if(v==null||v==='')continue; const ym=`${y}-${String(m+1).padStart(2,'0')}`; if(ym>today().slice(0,7))continue; recs.push({t:'vol',cust:cu,G:gOfName(cu),m:ym,qty:num(v)}) } }) }
+  const checks=[]; const custs=new Set(recs.map(r=>r.G));
+  return {t:'vol',recs,meta:{file,snap:recs.filter(r=>r.qty).map(r=>r.m).sort().pop()||'',custs:[...custs],checks}} }
+ window.crImport=async function(inp){ const files=[...(inp.files||[])]; inp.value=''; if(!files.length)return; if(!window.XLSX){toast(L('Excel 元件未載入','Excel library not loaded'));return}
+  let ok=0; for(const f of files){ try{ const wb=XLSX.read(new Uint8Array(await f.arrayBuffer()),{type:'array',cellDates:true}); const t=detect(wb); if(!t){toast(L('看不出是哪一份報表：','Unknown report: ')+f.name);continue}
+    const P=t==='stat'?parseStat(wb,f.name):t==='ship'?parseShip(wb,f.name):parseVol(wb,f.name);
+    const key=KEYS[t]; const recs=P.recs.map((r,i)=>Object.assign({id:'xr'+t+i+'_'+Date.now().toString(36),import_key:key,source_system:'CUSTOMER_REPORT',source_file:f.name},r));
+    const meta={key,rep:'xrep',fn:'XREP',file:f.name,rows:recs.length,at:nowStamp(),dirty:true,version:null,cloud:false,t,snap:P.meta.snap,checks:P.meta.checks,title:P.meta.title||'',range:[P.meta.snap||today(),P.meta.snap||today()]};
+    storeBatch('xrep',key,meta,recs); if(window.markDS)markDS('xreports'); ok++;
+    try{(DB.importlog=DB.importlog||[]).unshift({at:meta.at,rep:'xrep',file:f.name,key,added:recs.length,user:'paul.weng'})}catch(e){}
+    CR.src[t]='local'; toast(L('已匯入 ','Imported ')+({stat:'訂單總表',ship:'月出貨排程',vol:'年度訂單量'})[t]+' · '+fmt(recs.length)+L(' 列',' rows'))
+   }catch(e){ console.error(e); toast(L('匯入失敗：','Import failed: ')+f.name+' · '+(e.message||e)) } }
+  if(ok){ GC.clear(); persist(); rerender(); if(cloudReady&&cloudReady())setTimeout(()=>cloudSync(false),400) } };
+
+ /* ══════════ 2. 生產平台雲端（唯讀）══════════ */
+ const CR={view:LS.get('psjerp_cr_view','sum'),cust:'',jf:'',src:LS.get('psjerp_cr_src',{}),prod:{},busy:false};
+ async function prodLoad(tool,force){ const ck='prodcache#'+tool; let c=null; try{c=await IDB.get(ck)}catch(e){} c=c&&c.b?c:{h:{},b:{}};
+  if(!force&&CR.prod[tool])return CR.prod[tool];
+  try{ const m=await fetch(PROD_GAS+'?action=smartManifest&tool='+tool+'&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const d=m.data||m; const H=d.hashes||{}; let ch=false;
+   for(const k of Object.keys(H)){ if(c.h[k]===H[k]&&c.b[k])continue; const b=await fetch(PROD_GAS+'?action=smartBucket&tool='+tool+'&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json()); c.b[k]=(b.data&&b.data.records)||[]; c.h[k]=H[k]; ch=true }
+   Object.keys(c.b).forEach(k=>{ if(!H[k]){delete c.b[k];delete c.h[k];ch=true} }); c.up=d.updatedAt||''; if(ch)try{await IDB.set(ck,c)}catch(e){}
+  }catch(e){ c.err=String(e.message||e) }
+  CR.prod[tool]=c; return c }
+ function prodRecs(t){ const c=CR.prod[t==='stat'?'custstats':'monthship']; if(!c)return null; const all=Object.values(c.b||{}).flat();
+  if(t==='stat')return all.filter(r=>r&&r.po!=null).map((r,i)=>({t:'stat',row:r.id||i,cust:String(r.customer||''),G:gOfName(r.customer),po:String(r.po==null?'':r.po),style:String(r.style||''),color:String(r.color||''),size:String(r.size||''),type:String(r.product||''),podate:d10(r.poDate),etd:d10(r.etd),qty:num(r.orderQty),shipped:num(r.completedQty),cut:num(r.cutQty||r.actualCut||0),fg:num(r.fgPcs),open:num(r.balanceQty),yrd:num(r.yrdPcs||r.consumption||0)}));
+  return all.filter(r=>r&&r.date).map((r,i)=>({t:'ship',src:'PROD',row:i,month:r.month||'',date:d10(r.date),cust:String(r.customer||''),G:gOfName(r.customer),mode:r.mode||'',pcs:num(r.pieces)||null,ctn:num(r.cartons)||null,remark:r.remark||r.status||''})) }
+ window.crProd=async function(){ if(CR.busy)return; CR.busy=true; toast(L('讀取生產平台雲端…','Reading production cloud…')); try{ await Promise.all([prodLoad('custstats',true),prodLoad('monthship',true)]) }finally{ CR.busy=false; GC.delete('crcmp'); rerender() } };
+ /* 用哪一份：預設用日期比較新的（這裡匯入的 vs 生產平台雲端），可手動切換 */
+ function pick(t){ const lm=localMeta(t); const lr=lm?localRecs(t):[]; if(t==='vol')return lr.length?{src:'local',recs:lr,date:lm.snap||d10(lm.at),file:lm.file,at:lm.at,checks:lm.checks||[]}:null;
+  const pt=t==='stat'?'custstats':'monthship'; const pc=CR.prod[pt]; const pr=prodRecs(t)||[]; const pd=pc&&pc.up?d10(pc.up):'';
+  const local=lr.length?{src:'local',recs:lr,date:d10(lm.at),snap:lm.snap,file:lm.file,at:lm.at,checks:lm.checks||[]}:null, prod=pr.length?{src:'prod',recs:pr,date:pd,file:L('生產平台雲端','production cloud'),at:pc.up,checks:[]}:null;
+  if(local)local.date=lm.snap&&lm.snap<=today()?lm.snap:local.date;
+  const want=CR.src[t]; if(want==='local'&&local)return local; if(want==='prod'&&prod)return prod;
+  if(local&&prod)return (local.date>=prod.date)?local:prod; return local||prod }
+ window.crSrc=(t,s)=>{ CR.src[t]=s; LS.set('psjerp_cr_src',CR.src); GC.delete('crcmp'); rerender() };
+
+ /* ══════════ 3. 對 ERP ══════════ */
+ function erpIdx(){ if(GC.has('crerp'))return GC.get('crerp'); const ov=ordersView(); const byPk=new Map(), byG=new Map();
+  ov.forEach(o=>{ const G=gOfErp(o.cust,o.po_no), pk=nk(o.po_no); if(!pk)return; const x=byPk.get(pk)||{pk,po:o.po_no,G,qty:0,ship:0,open:0,od:'',dl:'',closed:true,n:0,styles:new Set()}; x.qty+=+o.qty||0; x.ship+=+o.ship_qty||0; x.n++; if(o.status!=='closed')x.closed=false; const od=d10(o.order_date); if(od&&(!x.od||od<x.od))x.od=od; const dl=d10(o.delivery); if(dl>x.dl)x.dl=dl; x.styles.add(o.style); byPk.set(pk,x); if(!byG.has(G))byG.set(G,[]); if(x.n===1)byG.get(G).push(x) });
+  const sh=new Map(), shLast=new Map(); live(DB.shipping||[]).forEach(s=>{ const pk=nk(s.po_no); if(!pk)return; sh.set(pk,(sh.get(pk)||0)+(+s.qty||0)); const d=d10(s.ship_date); if(d>(shLast.get(pk)||''))shLast.set(pk,d) });
+  const r={byPk,byG,sh,shLast,ov}; GC.set('crerp',r); return r }
+ function matchPo(E,G,po){ const pk=nk(po), d=dk(po); const c=E.byG.get(G)||[]; if(E.byPk.has(pk)&&E.byPk.get(pk).G===G)return [pk];
+  let h=c.filter(x=>dk(x.po)===d&&d); if(h.length)return h.map(x=>x.pk);
+  if(d&&d.length>=4){ h=c.filter(x=>{const y=dk(x.po);return y.length>=4&&(d.startsWith(y)||y.startsWith(d))}); if(h.length)return h.map(x=>x.pk) }
+  return E.byPk.has(pk)?[pk]:[] }
+ function cmpStat(S){ const E=erpIdx(); const pos=new Map();
+  S.recs.forEach(r=>{ const k=r.G+'|'+r.po; let p=pos.get(k); if(!p){p={G:r.G,po:r.po,sq:0,ss:0,so:0,lines:0,podate:'',styles:new Set()};pos.set(k,p)} p.sq+=r.qty; p.ss+=r.shipped; p.so+=r.open; p.lines++; if(r.podate&&(!p.podate||r.podate<p.podate))p.podate=r.podate; p.styles.add(r.style) });
+  const out=[...pos.values()].map(p=>{ const pks=matchPo(E,p.G,p.po); const ex=pks.map(k=>E.byPk.get(k)).filter(Boolean); p.epo=pks.map(k=>(E.byPk.get(k)||{}).po||k).join('、'); p.pks=pks; p.eq=ex.length?ex.reduce((t,x)=>t+x.qty,0):null; p.es=ex.length?pks.reduce((t,k)=>t+(E.sh.get(k)||0),0):null; p.closed=ex.length?ex.every(x=>x.closed):null; p.eod=ex.map(x=>x.od).filter(Boolean).sort()[0]||''; p.elast=pks.map(k=>E.shLast.get(k)||'').sort().pop()||''; return p });
+  const dupE=new Map(); out.forEach(p=>{ if(p.epo)dupE.set(p.epo,(dupE.get(p.epo)||0)+1) });
+  out.forEach(p=>{ const m=[]; let cls='ok';
+   if(!p.pks.length){ m.push(L('ERP 沒有這張 PO（可能還沒建單）','PO not in ERP')); cls='bad' }
+   else if(dupE.get(p.epo)>1){ m.push(L('同一張 PO 寫成兩種號碼，合起來再對 ERP','same PO written two ways')); cls='warn' }
+   else { const dq=p.sq-p.eq, ds=p.ss-p.es;
+    if(Math.abs(dq)<0.5)m.push(L('訂單量相符','qty matches')); else if(dq>0){m.push(L('報表訂單量比 ERP 多（要查）','report qty > ERP'));cls='bad'} else if(p.closed){m.push(L('報表只列部分款色（ERP 已結案，其餘已出完）','report lists part of the PO (ERP closed)'));cls='grey'} else {m.push(L('報表少列 ERP 還沒出完的款色（要補）','report misses open ERP lines'));cls='warn'}
+    if(ds>0.5){m.push(L('報表已出貨比 ERP 多（要查）','report shipped > ERP'));cls='bad'} else if(Math.abs(dq)<0.5&&ds<-0.5){m.push(L('報表已出貨比 ERP 少（報表沒更新）','report shipped < ERP'));if(cls==='ok')cls='warn'} }
+   p.judge=m.join('；'); p.cls=cls });
+  /* ERP 未結但報表沒列（同一批客戶）*/
+  const used=new Set(out.flatMap(p=>p.pks)); const Gs=new Set(out.map(p=>p.G));
+  const miss=[]; E.byPk.forEach(x=>{ if(x.closed||used.has(x.pk)||!Gs.has(x.G)||/^SAMPLE|^$/.test(x.pk))return; miss.push(x) }); miss.sort((a,b)=>a.G.localeCompare(b.G)||b.qty-b.ship-(a.qty-a.ship));
+  return {pos:out.sort((a,b)=>a.G.localeCompare(b.G)||String(a.po).localeCompare(String(b.po))),miss} }
+ function cmpShip(S){ const recs=S.recs.slice().sort((a,b)=>a.date.localeCompare(b.date)); if(!recs.length)return {rows:[],extra:[]};
+  const lo=addDays(recs[0].date,-7), hi=recs[recs.length-1].date; const DO=new Map();
+  live(DB.shipping||[]).forEach(s=>{ const d=d10(s.ship_date); if(d<lo)return; const k=s.bl_no||(d+'|'+s.po_no); let x=DO.get(k); if(!x){x={bl:s.bl_no||'',d,G:gOfErp(s.cust,s.po_no),qty:0};DO.set(k,x)} x.qty+=+s.qty||0 });
+  const used=new Set(); const D=[...DO.values()];
+  const rows=recs.map(r=>{ const c=D.filter(x=>x.G===r.G&&!used.has(x.bl)).map(x=>Object.assign({dd:daysBetween(r.date,x.d)},x)).filter(x=>x.dd>=-3&&x.dd<=31); let pick=[];
+   if(r.pcs){ const e=c.filter(x=>x.qty===r.pcs).sort((a,b)=>a.dd-b.dd); if(e.length)pick=[e[0]];
+    if(!pick.length){ const byD=new Map(); c.filter(x=>x.dd<=14).forEach(x=>{if(!byD.has(x.d))byD.set(x.d,[]);byD.get(x.d).push(x)}); for(const [d,g] of [...byD.entries()].sort()){ if(Math.abs(g.reduce((t,x)=>t+x.qty,0)-r.pcs)<0.5){pick=g;break} } }
+    if(!pick.length){ const b=c.filter(x=>x.dd<=14&&x.qty>=r.pcs*0.5&&x.qty<=r.pcs*1.5).sort((a,b)=>a.dd-b.dd); if(b.length){ const same=c.filter(x=>x.d===b[0].d&&x.qty<r.pcs*0.5); pick=[b[0]].concat(same.filter(x=>Math.abs(b[0].qty+same.reduce((t,y)=>t+y.qty,0)-r.pcs)<Math.abs(b[0].qty-r.pcs))) } }
+    if(!pick.length&&r.date<today()){ const b=c.filter(x=>x.dd<=31&&x.qty>=r.pcs*0.3).sort((a,b)=>a.dd-b.dd); if(b.length)pick=[b[0]] } }
+   pick.forEach(x=>used.add(x.bl)); const ep=pick.length?pick.reduce((t,x)=>t+x.qty,0):null;
+   let st,cls; if(r.pcs==null&&ep==null){st=r.date>today()?L('還沒到出貨日（排程沒件數）','not due yet'):L('排程沒寫件數','no pcs in schedule');cls=r.date>today()?'':'warn'} else if(r.pcs==null){st=L('排程沒寫件數，ERP 有出貨','no pcs in schedule; ERP shipped');cls='warn'} else if(ep==null){ st=r.date>today()?L('還沒到出貨日','not due yet'):L('ERP 找不到這批出貨（還沒出或還沒建出貨單）','no ERP shipment found'); cls=r.date>today()?'':'bad' } else if(Math.abs((r.pcs||0)-ep)<0.5){st=L('相符','matches');cls='ok'} else {st=L('件數不同','qty differs');cls='warn'}
+   return Object.assign({},r,{dos:pick.map(x=>x.bl).join('、'),edate:[...new Set(pick.map(x=>x.d))].join('、'),ep,st,cls}) });
+  const months=new Set(recs.map(r=>r.date.slice(0,7))); const extra=D.filter(x=>!used.has(x.bl)&&months.has(x.d.slice(0,7))&&x.qty>=100&&x.d<=hi).sort((a,b)=>a.d.localeCompare(b.d));
+  return {rows,extra} }
+ const addDays=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return ymd(d)};
+ function cmpVol(S){ const E=erpIdx(); const em=new Map(), cmt=new Map();
+  E.ov.forEach(o=>{ const m=d10(o.order_date).slice(0,7); if(!m)return; const G=gOfErp(o.cust,o.po_no); const k=G+'|'+m; em.set(k,(em.get(k)||0)+(+o.qty||0)); if(/^CMT/i.test(String(o.po_no||'')))cmt.set(k,(cmt.get(k)||0)+(+o.qty||0)) });
+  const vm=new Map(); const Gs=new Set(); S.recs.forEach(r=>{ const k=r.G+'|'+r.m; vm.set(k,(vm.get(k)||0)+r.qty); Gs.add(r.G) });
+  const years=[...new Set(S.recs.map(r=>r.m.slice(0,4)))].sort(); const Y=[]; const M=[];
+  Gs.forEach(G=>years.forEach(y=>{ let v=0,e=0,c=0,has=false; for(let m=1;m<=12;m++){ const k=G+'|'+y+'-'+String(m).padStart(2,'0'); if(vm.has(k))has=true; const vv=vm.get(k)||0, ee=em.get(k)||0, cc=cmt.get(k)||0; v+=vv; e+=ee; c+=cc; if(Math.abs(vv-(ee-cc))>=1000)M.push({G,m:y+'-'+String(m).padStart(2,'0'),v:vv,e:ee-cc}) } if(has||e)Y.push({G,y,v,e,c}) }));
+  const others=new Map(); E.ov.forEach(o=>{ if(d10(o.order_date)<'2024-01-01')return; const G=gOfErp(o.cust,o.po_no); if(Gs.has(G)||/樣品/.test(G))return; const x=others.get(G)||{G,q:0,po:new Set(),nm:new Set()}; x.q+=+o.qty||0; x.po.add(o.po_no); if(x.nm.size<3&&o.style_name)x.nm.add(o.style_name); others.set(G,x) });
+  return {Y:Y.sort((a,b)=>a.G.localeCompare(b.G)||a.y.localeCompare(b.y)),M:M.sort((a,b)=>a.G.localeCompare(b.G)||a.m.localeCompare(b.m)),others:[...others.values()].filter(x=>x.q>0).sort((a,b)=>b.q-a.q)} }
+ function compute(){ if(GC.has('crcmp'))return GC.get('crcmp'); const r={S:pick('stat'),P:pick('ship'),V:pick('vol')}; r.stat=r.S?cmpStat(r.S):null; r.ship=r.P?cmpShip(r.P):null; r.vol=r.V?cmpVol(r.V):null; GC.set('crcmp',r); return r }
+ window.crCompute=compute;
+
+ /* ══════════ 4. 畫面 ══════════ */
+ const CLS={ok:'cr-ok',warn:'cr-warn',bad:'cr-bad',grey:'cr-grey','':''};
+ const tbl=(id,head,rows)=>rows.length?`<div class="tbl-wrap"><table class="t cards" id="${id}"><thead><tr>${head.map(h=>`<th${h[1]?' class="r"':''}>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r._c||''}${r._k?' rowlink':''}" ${r._k?`onclick="${r._k}"`:''}>${r.map((c,i)=>`<td${head[i]&&head[i][1]?' class="r num"':''} data-l="${esc(head[i]?head[i][0]:'')}">${c==null?'—':c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:`<p class="muted small">${L('沒有資料','No data')}</p>`;
+ const N=v=>v==null?'—':fmt(v);
+ const dN=v=>v==null?'—':Math.abs(v)<0.5?'0':`<span class="${v>0?'cr-pos':'cr-neg'}">${v>0?'+':''}${fmt(v)}</span>`;
+ const srcCard=(t,X,name,prodName)=>{ const lm=localMeta(t); const has=!!X; const age=has?daysAgo(X.date):null;
+  const alt=t==='vol'?'':`<select class="inp" style="width:auto" onchange="crSrc('${t}',this.value)">${opt('',L('自動（用比較新的）','auto (newer)'),CR.src[t]||'')}${opt('local',L('這裡匯入的','imported here'),CR.src[t]||'')}${opt('prod',L('生產平台：','PROD: ')+prodName,CR.src[t]||'')}</select>`;
+  return `<div class="cr-src ${has?'':'none'}"><div class="cr-src-h"><b>${esc(name)}</b>${has?`<span class="st ${age>14?'warn':'good'}">${age==null?'':age===0?L('今天','today'):age+L(' 天前',' d ago')}</span>`:`<span class="st neu">${L('還沒有','none')}</span>`}</div>
+   <div class="small muted">${has?`${X.src==='prod'?'☁ '+L('生產平台雲端（','production cloud ('):'📥 '+L('這裡匯入（','imported here (')}${esc(X.file||'')}）· ${L('資料日 ','date ')}${esc(X.snap||X.date)} · ${fmt(X.recs.length)} ${L('列','rows')}`:t==='vol'?L('生產平台沒有這份，請在這裡匯入','Not in PROD — import here'):L('生產平台雲端也沒有，請匯入','not in PROD cloud either — import')}</div>${age>14?`<div class="small warn-t">⚠ ${L('已經 ','')}${age}${L(' 天沒更新，比對結果可能過時',' days old — results may be stale')}</div>`:''}${alt}</div>` };
+ function viewSum(C){ const k=[];
+  if(C.stat){ const P=C.stat.pos; const bad=P.filter(p=>p.cls==='bad').length, ok=P.filter(p=>/訂單量相符|qty matches/.test(p.judge)).length; const sq=P.reduce((t,p)=>t+p.sq,0), eq=P.reduce((t,p)=>t+(p.eq||0),0);
+   k.push(`<li><b>${L('訂單總表','Statistics')}</b>：${fmt(P.length)} ${L('張 PO，訂單量相符 ','POs; qty matches ')}${ok}${L(' 張；要查 ',' ; to check ')}<a href="javascript:void 0" onclick="crView('stat','bad')" class="st crit">${bad}</a> ${L('張。報表 ','. Report ')}${fmt(sq)} vs ERP ${fmt(eq)}${L('（報表只列追蹤中的款色）',' (report lists tracked lines only)')}；ERP ${L('未結但報表沒列 ','open but not listed ')}<a href="javascript:void 0" onclick="crView('miss')">${C.stat.miss.length}</a> ${L('張','POs')}</li>`) }
+  else k.push(`<li class="muted">${L('訂單總表：還沒有資料','Statistics: none')}</li>`);
+  if(C.ship){ const R=C.ship.rows; const done=R.filter(r=>r.cls); k.push(`<li><b>${L('月出貨排程','Shipping schedule')}</b>：${fmt(done.length)} ${L('筆已到期，相符 ','due lines; match ')}${R.filter(r=>r.cls==='ok').length}、${L('件數不同 ','differ ')}${R.filter(r=>r.cls==='warn').length}、${L('ERP 找不到 ','not in ERP ')}<a href="javascript:void 0" onclick="crView('ship')" class="st crit">${R.filter(r=>r.cls==='bad').length}</a>；${L('ERP 有、排程沒列 ','ERP shipments not scheduled ')}${C.ship.extra.length} ${L('筆','')}</li>`) }
+  else k.push(`<li class="muted">${L('月出貨排程：還沒有資料','Shipping schedule: none')}</li>`);
+  if(C.vol){ const Y=C.vol.Y.filter(y=>y.e||y.v); const big=Y.filter(y=>Math.abs(y.v-(y.e-y.c))>Math.max(5000,0.1*(y.e-y.c))); k.push(`<li><b>${L('年度訂單量','Yearly volume')}</b>：${Y.length} ${L('個客戶年度，差超過 10% 的 ','customer-years; >10% off: ')}<a href="javascript:void 0" onclick="crView('vol')" class="st warn">${big.length}</a>${C.vol.others.length?`；${L('年度表沒有的 ERP 客戶 ','ERP customers missing: ')}${C.vol.others.slice(0,4).map(x=>esc(x.G)+' '+fmt(x.q)).join('、')}`:''}</li>`) }
+  else k.push(`<li class="muted">${L('年度訂單量：還沒有資料（生產平台沒有這份，請匯入 3-VRT-CUSTOMER YEARLY ORDER VOLUME）','Yearly volume: none (import the file)')}</li>`);
+  const iss=issues(C).length; k.push(`<li><b>${L('報表本身問題','Report issues')}</b>：<a href="javascript:void 0" onclick="crView('iss')">${iss}</a> ${L('項','items')}</li>`);
+  let h=`<div class="panel"><h3 style="margin-top:0">💡 ${L('重點','Key points')}</h3><ul class="kn-list">${k.join('')}</ul></div>`;
+  if(C.stat){ const G=new Map(); C.stat.pos.forEach(p=>{ const x=G.get(p.G)||{G:p.G,n:0,sq:0,eq:0,ss:0,es:0,bad:0}; x.n++; x.sq+=p.sq; x.eq+=p.eq||0; x.ss+=p.ss; x.es+=p.es||0; if(p.cls==='bad')x.bad++; G.set(p.G,x) });
+   const mi=new Map(); C.stat.miss.forEach(m=>{ const x=mi.get(m.G)||{n:0,q:0}; x.n++; x.q+=Math.max(0,m.qty-m.ship); mi.set(m.G,x) });
+   h+=`<h3>${L('訂單總表 × ERP（依客戶）','Statistics × ERP by customer')}</h3>`+tbl('cr_sum',[[L('客戶','Customer')],[L('PO 數','POs'),1],[L('報表訂單量','Report qty'),1],[L('ERP 同 PO','ERP same POs'),1],[L('差','Δ'),1],[L('報表已出貨','Report shipped'),1],[L('ERP 已出貨','ERP shipped'),1],[L('差','Δ'),1],[L('要查','Check'),1],[L('ERP 未結報表沒列','ERP open, not listed'),1]],[...G.values()].map(x=>{const m=mi.get(x.G)||{n:0,q:0};const r=[`<b>${esc(x.G)}</b>`,fmt(x.n),N(x.sq),N(x.eq),dN(x.sq-x.eq),N(x.ss),N(x.es),dN(x.ss-x.es),x.bad?`<span class="st crit">${x.bad}</span>`:'—',m.n?`${m.n} ${L('張','POs')} · ${fmt(m.q)}`:'—'];r._k=`CR.cust='${jsq(x.G)}';crView('stat')`;return r})) }
+  return h }
+ function viewStat(C){ if(!C.stat)return `<p class="note">${L('還沒有訂單總表。按上面「匯入報表」選 ALL CUSTOMER STATISTICS，或「讀生產平台」。','No statistics yet.')}</p>`;
+  let P=C.stat.pos; const Gs=[...new Set(P.map(p=>p.G))]; if(CR.cust)P=P.filter(p=>p.G===CR.cust); if(CR.jf)P=P.filter(p=>p.cls===CR.jf);
+  return `<div class="panel oc-filters"><select class="inp" onchange="CR.cust=this.value;rerender()">${opt('',L('全部客戶','All customers'),CR.cust)}${Gs.map(g=>opt(g,g,CR.cust)).join('')}</select><select class="inp" onchange="CR.jf=this.value;rerender()">${opt('',L('全部判定','All'),CR.jf)}${opt('bad',L('🔴 要查','🔴 check'),CR.jf)}${opt('warn',L('🟡 漏列／沒更新','🟡 missing / stale'),CR.jf)}${opt('grey',L('⚪ 只列部分（正常）','⚪ partial (ok)'),CR.jf)}${opt('ok',L('🟢 相符','🟢 match'),CR.jf)}</select><span class="small muted">${fmt(P.length)} ${L('張','POs')}</span></div>`
+   +tbl('cr_stat',[[L('客戶','Customer')],[L('報表 PO','Report PO')],[L('ERP PO','ERP PO')],[L('PO 日期','PO date')],[L('列數','Lines'),1],[L('報表訂單量','Report qty'),1],[L('ERP 訂單量','ERP qty'),1],[L('差','Δ'),1],[L('報表已出貨','Report shipped'),1],[L('ERP 已出貨','ERP shipped'),1],[L('差','Δ'),1],[L('ERP 結案','ERP closed')],[L('判定','Result')]],P.map(p=>{const r=[esc(p.G),`<span class="mono">${esc(p.po)}</span>`,`<span class="mono small">${esc(p.epo||'—')}</span>`,esc(p.podate||p.eod),fmt(p.lines),N(p.sq),N(p.eq),p.eq==null?'—':dN(p.sq-p.eq),N(p.ss),N(p.es),p.es==null?'—':dN(p.ss-p.es),p.closed==null?'':p.closed?L('是','yes'):L('否','no'),`<span class="small">${esc(p.judge)}</span>`];r._c=CLS[p.cls];const o=p.pks[0]&&erpIdx().ov.find(x=>nk(x.po_no)===p.pks[0]);if(o)r._k=`openOrder('${o.id}')`;return r})) }
+ function viewMiss(C){ if(!C.stat)return viewStat(C); const M=C.stat.miss.filter(m=>!CR.cust||m.G===CR.cust);
+  return `<p class="small muted">${L('ERP 還沒結案、但訂單總表沒列的 PO。2024 年以前的舊單（Blanket／庫存單）請跟業務確認是否取消，再在 ERP 結案，不然 ERP 未交量會虛胖。','ERP POs still open but not in the statistics report. Old blanket/stock POs should be confirmed and closed in the ERP.')}</p>`
+   +tbl('cr_miss',[[L('客戶','Customer')],['PO'],[L('接單日','Ordered')],[L('交期','Delivery')],[L('款號','Styles')],[L('訂單量','Qty'),1],[L('已出貨','Shipped'),1],[L('未交','Open'),1]],M.map(m=>{const r=[esc(m.G),`<span class="mono">${esc(m.po)}</span>`,esc(m.od),esc(m.dl||''),`<span class="small">${esc([...m.styles].slice(0,6).join('、'))}</span>`,fmt(m.qty),fmt(m.ship),fmt(Math.max(0,m.qty-m.ship))];r._c=m.od<'2025'?'cr-warn':'';const o=erpIdx().ov.find(x=>nk(x.po_no)===m.pk);if(o)r._k=`openOrder('${o.id}')`;return r})) }
+ function viewShip(C){ if(!C.ship)return `<p class="note">${L('還沒有月出貨排程。','No shipping schedule yet.')}</p>`; const R=C.ship.rows.filter(r=>!CR.cust||r.G===CR.cust);
+  return `<p class="small muted">${L('ERP 日期是出貨單（DO）日期，通常比排程的週六晚 1–8 天。排程件數是預估、ERP 是實出。','ERP date = delivery order date; usually 1–8 days after the scheduled Saturday.')}</p>`
+   +tbl('cr_ship',[[L('月份','Month')],[L('排程日','Date')],[L('客戶','Customer')],[L('方式','Mode')],[L('排程件數','Sched. pcs'),1],[L('箱數','Ctns'),1],[L('ERP 出貨單','ERP DO')],[L('ERP 日期','ERP date')],[L('ERP 件數','ERP pcs'),1],[L('差','Δ'),1],[L('判定','Result')]],R.map(r=>{const x=[esc(r.month),esc(r.date),esc(r.cust),esc(r.mode),N(r.pcs),N(r.ctn),`<span class="mono small">${esc(r.dos||'—')}</span>`,esc(r.edate||''),N(r.ep),r.ep==null||r.pcs==null?'—':dN(r.pcs-r.ep),esc(r.st)];x._c=CLS[r.cls];return x}))
+   +`<h3 style="margin-top:16px">${L('ERP 有出貨、排程沒列（100 件以上）','ERP shipments not in the schedule (≥100 pcs)')}</h3>`+tbl('cr_extra',[[L('客戶','Customer')],[L('ERP 日期','Date')],[L('出貨單','DO')],[L('件數','Pcs'),1]],C.ship.extra.filter(x=>!CR.cust||x.G===CR.cust).map(x=>[esc(x.G),esc(x.d),`<span class="mono">${esc(x.bl)}</span>`,fmt(x.qty)])) }
+ function viewVol(C){ if(!C.vol)return `<p class="note">${L('還沒有年度訂單量。生產平台沒有這份，請按「匯入報表」選 3-VRT-CUSTOMER YEARLY ORDER VOLUME（.xlsb 也可以）。','No yearly volume yet — import the file here.')}</p>`;
+  const Y=C.vol.Y.filter(y=>!CR.cust||y.G===CR.cust);
+  return `<p class="small muted">${L('ERP＝依接單日的月份加總；ADI 的 CMT 代工單另列（年度表通常不算）。月份常差一個月是兩邊日期不同，以年總量為準。','ERP = order-date month; ADI CMT orders shown separately.')}</p>`
+   +tbl('cr_vol',[[L('客戶','Customer')],[L('年','Year')],[L('年度表','Volume file'),1],[L('ERP 接單','ERP'),1],[L('其中 CMT','of which CMT'),1],[L('ERP 扣 CMT','ERP excl. CMT'),1],[L('差','Δ'),1],[L('差 %','Δ %'),1]],Y.map(y=>{const e=y.e-y.c, d=y.v-e;const r=[esc(y.G),esc(y.y),N(y.v),N(y.e),y.c?fmt(y.c):'—',N(e),dN(d),e?fmt(d/e*100,1)+'%':'—'];r._c=Math.abs(d)>Math.max(5000,0.1*e)?'cr-bad':Math.abs(d)>1000?'cr-warn':'';return r}))
+   +`<h3 style="margin-top:16px">${L('月份差 1,000 件以上','Monthly differences ≥ 1,000')}</h3>`+tbl('cr_volm',[[L('客戶','Customer')],[L('月份','Month')],[L('年度表','Volume'),1],[L('ERP（扣 CMT）','ERP'),1],[L('差','Δ'),1]],C.vol.M.filter(m=>!CR.cust||m.G===CR.cust).map(m=>[esc(m.G),esc(m.m),fmt(m.v),fmt(m.e),dN(m.v-m.e)]))
+   +`<h3 style="margin-top:16px">${L('年度表沒有、但 ERP 有接單的客戶（2024 起）','ERP customers missing from the volume file (2024+)')}</h3>`+tbl('cr_volx',[[L('ERP 客戶','Customer')],[L('接單量','Qty'),1],[L('PO 數','POs'),1],[L('款名','Names')]],C.vol.others.map(x=>[esc(x.G),fmt(x.q),fmt(x.po.size),`<span class="small">${esc([...x.nm].join('、'))}</span>`])) }
+ function issues(C){ const out=[]; [['stat',C.S,'訂單總表'],['ship',C.P,'月出貨排程'],['vol',C.V,'年度訂單量']].forEach(([t,X,nm])=>{ if(X&&X.src==='local')(X.checks||[]).forEach(c=>out.push([nm].concat(c))) });
+  if(C.stat){ const nf=C.stat.pos.filter(p=>!p.pks.length); nf.forEach(p=>out.push(['訂單總表',p.G+' PO '+p.po,fmt(p.sq)+' 件，ERP 沒有','ERP 還沒建單或 PO 號錯','請 PC 在 ERP 建單'])) }
+  if(C.vol&&C.vol.others.length)out.push(['年度訂單量','客戶清單','沒有 '+C.vol.others.slice(0,4).map(x=>x.G).join('、'),'2024 起少算 '+fmt(C.vol.others.reduce((t,x)=>t+x.q,0))+' 件','加上這些客戶，或註明不含']);
+  return out }
+ function viewIss(C){ const I=issues(C); const anyProd=[C.S,C.P].some(X=>X&&X.src==='prod');
+  return (anyProd?`<p class="small muted">${L('用生產平台雲端資料時，只能檢查跟 ERP 有關的問題；報表格式、分頁不一致這類問題要在這裡匯入原檔才看得到。','Format checks need the original file imported here.')}</p>`:'')+tbl('cr_iss',[[L('報表','Report')],[L('位置','Where')],[L('現況','Now')],[L('問題','Problem')],[L('建議','Fix')]],I.map(r=>r.map(esc))) }
+ window.crView=(v,jf)=>{ CR.view=v; if(jf!==undefined)CR.jf=jf; LS.set('psjerp_cr_view',v); rerender(); try{window.scrollTo(0,0)}catch(e){} };
+ window.crExport=function(){ if(!window.XLSX)return; const C=compute(); const wb=XLSX.utils.book_new(); const keep=CR.view; const cust=CR.cust, jf=CR.jf; CR.cust=''; CR.jf='';
+  const tmp=document.createElement('div'); [['sum',viewSum],['stat',viewStat],['miss',viewMiss],['ship',viewShip],['vol',viewVol],['iss',viewIss]].forEach(([v,fn])=>{ tmp.innerHTML=fn(C); tmp.querySelectorAll('table').forEach((t,i)=>{ const nm=({sum:'總覽',stat:'訂單總表對照',miss:'ERP未結報表沒列',ship:i?'ERP有排程沒列':'出貨排程對照',vol:['年度量對照','月份差異','年度表沒有的客戶'][i]||'年度量',iss:'報表本身問題'})[v]||v; try{XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t,{raw:false}),String(nm).slice(0,30))}catch(e){} }) });
+  CR.cust=cust; CR.jf=jf; XLSX.writeFile(wb,'VRT_客戶報表核對_'+today().replace(/-/g,'')+'.xlsx'); toast(L('已匯出','Exported')) };
+ function renderCR(){ const k='custrep';
+  if(!CR.prod.custstats&&!CR.busy){ CR.busy=true; Promise.all([prodLoad('custstats'),prodLoad('monthship')]).finally(()=>{CR.busy=false;GC.delete('crcmp');if(CUR==='custrep')rerender()}) }
+  let h=pageHead(k,`<label class="btn sm pri" style="cursor:pointer">📥 ${L('匯入報表（可一次選多個）','Import reports')}<input type="file" accept=".xlsx,.xls,.xlsb,.xlsm" multiple hidden onchange="crImport(this)"></label><button class="btn sm" onclick="crProd()">☁ ${L('讀生產平台','Read PROD')}</button><button class="btn sm" onclick="crExport()">⬇ ${L('匯出 Excel','Export')}</button>`);
+  const C=compute();
+  h+=`<div class="cr-srcs">${srcCard('stat',C.S,L('訂單總表 ALL CUSTOMER STATISTICS','ALL CUSTOMER STATISTICS'),L('客戶統計','Customers'))}${srcCard('ship',C.P,L('月出貨排程 MONTHLY SHIPPING SCHEDULE','MONTHLY SHIPPING SCHEDULE'),L('月出貨','Monthly shipping'))}${srcCard('vol',C.V,L('年度訂單量 CUSTOMER YEARLY ORDER VOLUME','CUSTOMER YEARLY ORDER VOLUME'),'')}</div>`;
+  if(!(C.S||C.P||C.V))return h+`<div class="note">${CR.busy?L('⏳ 讀取生產平台雲端…','⏳ reading production cloud…'):L('三份都還沒有。按「匯入報表」選檔案（可以一次選三個），或「讀生產平台」。','Nothing yet — import the files or read PROD.')}</div>`;
+  const V=[['sum','💡',L('總覽','Summary')],['stat','📋',L('訂單總表對照','Statistics × ERP')],['miss','📂',L('ERP 未結報表沒列','ERP open, not listed')],['ship','🚢',L('出貨排程對照','Schedule × ERP')],['vol','📅',L('年度訂單量對照','Volume × ERP')],['iss','⚠️',L('報表本身問題','Report issues')]];
+  h+=`<div class="seg oc-views">${V.map(([v,ic,l])=>`<button class="${CR.view===v?'on':''}" onclick="crView('${v}')">${ic} ${esc(l)}</button>`).join('')}</div>`;
+  if(CR.view!=='sum'&&CR.view!=='iss'){ const Gs=[...new Set([].concat(C.stat?C.stat.pos.map(p=>p.G):[],C.ship?C.ship.rows.map(r=>r.G):[],C.vol?C.vol.Y.map(y=>y.G):[]))].sort(); if(CR.view!=='stat')h+=`<div class="panel oc-filters"><select class="inp" onchange="CR.cust=this.value;rerender()">${opt('',L('全部客戶','All customers'),CR.cust)}${Gs.map(g=>opt(g,g,CR.cust)).join('')}</select></div>` }
+  h+=({sum:viewSum,stat:viewStat,miss:viewMiss,ship:viewShip,vol:viewVol,iss:viewIss}[CR.view]||viewSum)(C);
+  h+=`<p class="small muted" style="margin-top:14px">${L('顏色：紅＝要查　黃＝漏列或沒更新　灰＝只列部分（正常）　綠＝相符。ERP 資料只會跟 PSJERP 一樣新（訂單到 ','Colours: red = check, yellow = missing/stale, grey = partial (ok), green = match. ERP data as of ')}${esc(((DB.erpfiles||[]).filter(f=>f.rep==='cod700').map(f=>(f.range||[])[1]).sort().pop())||'—')}）。</p>`;
+  return h }
+ RENDER.custrep=renderCR; window.CR=CR;
+ /* 生產平台雲端或 ERP 一更新就重算 */
+ const st=document.createElement('style'); st.textContent=`
+ .cr-srcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin:0 0 12px}
+ .cr-src{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.cr-src.none{border-style:dashed;opacity:.85}
+ .cr-src-h{display:flex;gap:8px;align-items:center;justify-content:space-between}
+ tr.cr-bad td{background:var(--crit-soft)!important}tr.cr-warn td{background:var(--warn-soft)!important}tr.cr-ok td{background:var(--good-soft)!important}tr.cr-grey td{color:var(--muted)}
+ .cr-pos{color:var(--crit);font-weight:600}.cr-neg{color:var(--warn)}
+ @media (max-width:860px){.cr-srcs{grid-template-columns:1fr}}`;
  document.head.appendChild(st);
 })();
 
