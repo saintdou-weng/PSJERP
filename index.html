@@ -5497,7 +5497,7 @@ init();
   if(acc.length)await sendToAcc(acc,acc.length===1?kind:'overview') };
 
  /* ══ G. 財務總覽小卡（ACC 最新月份） ══ */
- const _rd=RENDER.dashboard; RENDER.dashboard=function(){ const h=String(_rd.apply(this,arguments)); if(SECTION!=='fin')return h; const E=accExpense(); if(!E.length)return h; const e=E[E.length-1];
+ const accCard=function(h){ h=String(h); if(SECTION!=='fin')return h; const E=accExpense(); if(!E.length)return h; const e=E[E.length-1];
   const wipP=Object.keys((ACC.state||{}).periods||{}).filter(p=>accMod(p,'wip')).sort().pop(); const fgP=Object.keys((ACC.state||{}).periods||{}).filter(p=>accMod(p,'fg')).sort().pop();
   const wipAmt=wipP?sum(accMod(wipP,'wip').records,'wipAmount'):null, fgVal=fgP?sum(accMod(fgP,'fg').records,'value'):null;
   const card=`<div class="sec"><h4>🧾 ${tt('會計（ACC Flow）最新','Accounting (ACC Flow) latest')}</h4><div class="kpis">
@@ -5507,5 +5507,7 @@ init();
    ${wipAmt!=null?kpi('WIP '+wipP,money(wipAmt,0)):''}${fgVal!=null?kpi(tt('成品入庫 ','FG inbound ')+fgP,money(fgVal,0)):''}</div>
    <p class="small muted" style="margin:4px 0 0"><a href="#acc-overview">${tt('打開會計頁 →','Open accounting →')}</a> · ${tt('雲端讀取 ','Cloud read ')}${esc(String(ACC.at||'').slice(0,16).replace('T',' '))}</p></div>`;
   const i=h.indexOf('<div class="kpis"'); return i>=0?h.slice(0,i)+card+h.slice(i):h+card };
+ const _rd=RENDER.dashboard; RENDER.dashboard=function(){ return accCard(_rd.apply(this,arguments)) };
+ const _rpv=renderPeriodView; renderPeriodView=function(k){ const h=_rpv.apply(this,arguments); return k==='dashboard'?accCard(h):h };
 })();
 </script></body></html>
