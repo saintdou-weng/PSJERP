@@ -75,6 +75,7 @@
  const labAll=()=>live(DB.labor||[]).concat(accLaborRows().filter(a=>!live(DB.labor||[]).some(m=>m.month_date===a.month_date)));
  if(typeof SRCS!=='undefined'&&SRCS.labor)SRCS.labor.rows=labAll;
  if(typeof CFG!=='undefined'&&CFG.labor){ CFG.labor.data=labAll; CFG.labor.cols.splice(5,0,COL('ot_cost','加班費 USD',{tp:'money'})); CFG.labor.cols.splice(7,0,COL('pv','產值 PV',{tp:'money'})) }
+ try{ const m0=PM.labor.metrics[0]; m0.g=r=>{ if(!r.length)return null; const ms=new Set(r.map(x=>String(x.month_date).slice(0,7))); return Math.round(sum(r,'headcount')/ms.size) } }catch(e){}   /* 平均人數：按月平均，不是加總 */
  if(typeof NEED!=='undefined')NEED.labor=['自動：ACC Flow 每月工廠費用（雲端直接讀，不用匯入）；手動新增的部門／線別列會蓋過同月份'];
  if(T.sub_labor)T.sub_labor=['每月人工彙總：自動讀 ACC Flow 工廠費用（人數、出勤工時、直接人工、加班費、產值），間接人工取 ERP W_CCS450。個人薪資不放這裡。','Monthly labour summary, read automatically from ACC Flow factory expense; indirect labour from ERP W_CCS450.'];
 
