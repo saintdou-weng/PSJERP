@@ -383,8 +383,10 @@ def label_value(rows, pat):
                 if rest:
                     return rest
                 for w in r[i + 1:]:
+                    if isinstance(w, float) and w.is_integer():
+                        return str(int(w))          # xlrd 數字款號 1505.0 → 1505
                     if str(w or '').strip():
-                        return str(w).strip()
+                        return re.sub(r'^(\d+)\.0$', r'\1', str(w).strip())
     return ''
 
 
