@@ -5493,7 +5493,9 @@ init();
    if(/wip qty|wip amt/.test(txt))w+=8; if(/入庫日期/.test(txt)&&/數量/.test(txt)&&/產值/.test(txt))f+=8; if(/direct labor|manufacturing overhead|total pv|total salary/.test(txt))e+=6 });
   const m=Math.max(w,f,e); return m>=8?(m===w?'wip':m===f?'fg':'expense'):null };
  const waitAcc=()=>new Promise((res,rej)=>{ const t0=Date.now(); (function w(){ try{ const fr=document.getElementById('accFrame'); const cw=fr&&fr.contentWindow; if(cw&&typeof cw.smartImport==='function'&&cw.XLSX&&cw.document.readyState==='complete'&&cw.__accReady)return res(cw) }catch(e){} if(Date.now()-t0>45000)return rej(new Error(tt('ACC 頁面載入逾時','ACC page timed out'))); setTimeout(w,400) })() });
- window.sendToAcc=async function(files,kind){ go('acc-'+(kind||'overview')); try{ const cw=await waitAcc(); toast(tt('會計檔交給 ACC 匯入：','Accounting files → ACC import: ')+files.length); await cw.smartImport(files); setTimeout(()=>accLoad(true),8000) }catch(e){ toast(String(e.message||e)) } };
+ window.sendToAcc=async function(files,kind){ go('acc-'+(kind||'overview')); try{ const cw=await waitAcc(); toast(tt('會計檔交給 ACC 匯入：','Accounting files → ACC import: ')+files.length);
+   const fx=[]; for(const f of files){ const u=new cw.Uint8Array(await f.arrayBuffer()); fx.push(new cw.File([u],f.name,{type:f.type,lastModified:f.lastModified||Date.now()})) }   /* 換成 ACC 頁自己的 File（跨頁的 ArrayBuffer 會被 SheetJS 認錯，讀成空白 Sheet1） */
+   await cw.smartImport(fx); setTimeout(()=>accLoad(true),8000) }catch(e){ toast(String(e.message||e)) } };
  const _hf2=handleFiles; handleFiles=async function(list){ const files=[...(list||[])]; const rest=[], acc=[]; let kind='';
   for(const f of files){ if(/\.xlsx?$/i.test(f.name||'')&&window.XLSX){ try{ const {aoa}=await readAOA(f); if(!detectReport(aoa)&&!(typeof isOBD==='function'&&await isOBD(f))){ const wb=XLSX.read(await f.arrayBuffer(),{type:'array',sheetRows:14}); const k=accScore(wb); if(k){acc.push(f);kind=kind&&kind!==k?'overview':k;continue} } }catch(e){} } rest.push(f) }
   if(rest.length)await _hf2(rest);
