@@ -5415,7 +5415,7 @@ init();
   if(!force&&!stale)return ACC.state; if(ACC.loading)return ACC.loading;
   ACC.loading=(async()=>{ try{ const r=await fetch(ACC_GAS+'?action=pull&tool=vrt_acc&_='+Date.now(),{cache:'no-store',redirect:'follow',referrerPolicy:'no-referrer'}); const d=JSON.parse(await r.text());
     const p=d&&d.data&&d.data.schema==='vrt-flow-cost'?d.data:d&&d.payload&&d.payload.schema==='vrt-flow-cost'?d.payload:d&&d.data&&d.data.data&&d.data.data.schema==='vrt-flow-cost'?d.data.data:null;
-    if(p&&p.state&&p.state.periods){ ACC.state=p.state; ACC.at=new Date().toISOString(); ACC.err=''; try{await IDB.set(ACC_KEY,{state:ACC.state,at:ACC.at})}catch(e){} GC.clear(); try{COSTC.clear()}catch(e){} if(['labor','costing','factory-cost','dashboard','reports'].includes(CUR))rerender() }
+    if(p&&p.state&&p.state.periods){ ACC.state=p.state; ACC.at=new Date().toISOString(); ACC.err=''; try{await IDB.set(ACC_KEY,{state:ACC.state,at:ACC.at})}catch(e){} GC.clear(); try{COSTC.clear()}catch(e){} if(['labor','costing','factory-cost','dashboard','reports','stylepl'].includes(CUR))rerender() }
    }catch(e){ ACC.err=String(e.message||e); console.warn('ACC pull',e) } finally{ ACC.loading=null } return ACC.state })();
   return ACC.loading };
  const accMod=(p,m)=>{ const e=ACC.state&&ACC.state.periods&&ACC.state.periods[p]; const x=e&&e.modules&&e.modules[m]; if(!x||(x.meta&&x.meta.deleteIntent))return null; if(ACC.state.tombstones&&ACC.state.tombstones.periods&&ACC.state.tombstones.periods[p])return null; return x };
