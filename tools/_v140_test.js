@@ -79,7 +79,8 @@
  if(T.sub_labor)T.sub_labor=['每月人工彙總：自動讀 ACC Flow 工廠費用（人數、出勤工時、直接人工、加班費、產值），間接人工取 ERP W_CCS450。個人薪資不放這裡。','Monthly labour summary, read automatically from ACC Flow factory expense; indirect labour from ERP W_CCS450.'];
 
  /* ══ D. 成本分析接通 ══ */
- window.smvOfOrder=function(o){ if(o.smv>0.01)return {v:o.smv,src:'erpo'}; try{ return smvFor(o.style,o.style_name)||null }catch(e){ return null } };
+ window.smvOfOrder=function(o){ let x=null; try{ x=smvFor(o.style,o.style_name)||null }catch(e){} if(x&&x.src==='ie_upd')return x;   /* IE 週報核准第一 */
+  if(o.smv>0.01)return {v:+o.smv,src:'erpo'}; return x };
  const matIdx=()=>{ if(GC.has('matidx'))return GC.get('matidx'); const nc=new Map(), n=new Map();
   live(DB.price||[]).forEach(p=>{ const v=+p.unit_price||+p.price||0; if(!(v>0))return; if(p.currency&&p.currency!=='USD')return; const d=p.purchase_date||''; const put=(m,k)=>{ if(!k)return; const o=m.get(k); if(!o||d>o.d)m.set(k,{v,d,src:'cpu795',no:p.purchase_no}) }; put(nc,N(p.material)+'|'+N(p.color)); put(n,N(p.material)); if(p.material_no&&p.material_no!==p.material){put(nc,N(p.material_no)+'|'+N(p.color));put(n,N(p.material_no))} });
   const r={nc,n}; GC.set('matidx',r); return r };
@@ -96,7 +97,7 @@
   GC.set('rates',R); return R };
  costOrder=function(o,basis){
   const R=rates(), I=bomIdx(); const bom=((o.od_no&&I.a.get(o.od_no))||(o.my_no&&I.b.get(keyN(o.my_no)))||[]);
-  let mat=null, miss=0, priced=0; if(bom.length){ mat=sum(bom,b=>{ let p=basis==='wavg'?wavgPrice(b.material_no,b.color):null; if(p==null){const x=bomPrice(b); p=x?x.v:null} if(p==null){miss++;return 0} priced++; return (+b.total_use||0)*p })/Math.max(1,+o.qty||+bom[0].order_qty||1) }
+  let mat=null, miss=0, priced=0; if(bom.length){ mat=sum(bom,b=>{ let p=basis==='wavg'?wavgPrice(b.material_no,b.color):null; if(p==null){const x=bomPrice(b); p=x?x.v:null} if(p==null){miss++;return 0} priced++; return (+b.total_use||0)*p })/Math.max(1,Math.max(0,...bom.map(b=>+b.order_qty||0))||+o.qty||1) }   /* BOM 用量是整張自編單（各色／尺寸加總），除以 BOM 的訂單量 */
   const S=smvOfOrder(o); const smv=S?+S.v:0; const smvOk=smv>0.01; const eff=costEff()/100; const tm=TERMS[o.cust]||{term:'FOB',freight:0.04,duty:0};
   const labor=smvOk?smv/eff*R.labor:null, oh=smvOk?smv/eff*R.oh:null, other=0.02;
   const total=(mat!=null&&labor!=null)?mat+labor+oh+tm.freight+tm.duty+other:null; const price=+o.price||0;
