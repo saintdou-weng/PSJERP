@@ -5546,6 +5546,7 @@ init();
  RENDER.stylepl=function(){
   const st=S('stylepl'); st.y=st.y||String(TODAY.getFullYear()); st.basis=st.basis||'fg'; st.view=st.view||'style'; st.f=st.f||'all'; st.m=st.m||''; st.sort=st.sort||'margin';
   if(!ACC_CACHE.state&&st.basis==='fg'){ accLoad(false) }
+  { const L=(window.DS_LAZY||{}).LOADED; const need=['bom','price','purchase'].filter(k=>L&&!L.has(k)); if(need.length){ ensureDS(need).then(()=>{ GC.clear(); if(CUR==='stylepl')rerender() }); return pageHead('stylepl')+`<div class="note">⏳ ${tt('載入 BOM／料價…','Loading BOM / prices…')}</div>` } }
   let rows=rowsOf(st.basis,st.y); if(st.m)rows=rows.filter(r=>r.ym===st.m);
   const yrs=[...new Set([TODAY.getFullYear(),TODAY.getFullYear()-1,TODAY.getFullYear()-2,TODAY.getFullYear()-3].map(String))];
   const months=[...new Set(rowsOf(st.basis,st.y).map(r=>r.ym))].sort();
