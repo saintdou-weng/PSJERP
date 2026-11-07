@@ -407,6 +407,8 @@ table.t.list tr.sel td{background:#FFF7ED}
 (function (g) {
   'use strict';
   if (g.__delGuard) return; g.__delGuard = 1;
+  /* 2026-11-07 Paul 指示停用：誤把正常同步當成刪除、一直私訊要核可。整段不再執行（攔截、私訊、橫幅、進頁自動同步都停）。 */
+  return;
   var doc = g.document;
   var PSJHR_GAS = 'https://script.google.com/macros/s/AKfycbx9Pdt5vu_AcTHCrlLH4lcVONXS_VoE47SEjDUn7Iv27C2CRgoADRLpalVIJQHWBcqK/exec';
   var PSJHR_KEY = '12345';
