@@ -2567,7 +2567,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.4.1';
+const APP_VER='1.4.2';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -5779,4 +5779,16 @@ init();
  const _so=window.smvOfOrder; window.smvOfOrder=function(o){ const r=_so(o); if(r)return r; const s=KN(o.style); const c=[s.replace(/^VRT/,''),s.replace(/(LS|SS|SP|CHP)$/,''),s.replace(/^[A-Z]{1,3}(?=\d)/,'')].filter((x,i,a)=>x&&x!==s&&x.length>=3&&a.indexOf(x)===i);
   for(const x of c){ try{ const y=smvFor(x,''); if(y)return Object.assign({},y,{via:x}) }catch(e){} } return null };
 })();
-</script></body></html>
+</script><script>
+/* v1.4.2（2026-11-07）：網址 #style=款號 → 直接開款式卡（生產平台 IE 款式頁的「🏢 PSJERP」按鈕用）。
+   款式索引還在讀（第一次要幾分鐘）就每 1.5 秒再試，最多 5 分鐘；找不到就停在款式清單。 */
+(function(){
+ function want(){ const h=decodeURIComponent((location.hash||'').slice(1)); return /^style=/.test(h)?h.slice(6).trim():'' }
+ function go(){ const w=want(); if(!w)return; try{history.replaceState(null,'','#styles')}catch(e){}
+  setTimeout(()=>{ try{ if(typeof CUR==='undefined'||CUR!=='styles')route() }catch(e){}
+   const t0=Date.now(); const tick=()=>{ let sk=null; try{ if(CUR==='styles')sk=matchStyle([w]) }catch(e){}
+    if(sk){ try{renderStyle(sk)}catch(e){} return } if(Date.now()-t0<300000)setTimeout(tick,1500) }; tick() },0) }
+ window.addEventListener('hashchange',go); if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go); else go();
+})();
+</script>
+</body></html>
