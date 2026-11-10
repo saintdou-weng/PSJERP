@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.5.1';
+const APP_VER='1.5.2';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -5854,15 +5854,15 @@ init();
  const STOP=new Set(['FOR','THE','AND','WITH','BODY','AT','OF','ON','IN','PCS','PC','SIZE','STYLE','COLOR','COLOUR','WHITE','BLACK','NAVY','CENTER','FRONT','BACK','LEFT','RIGHT','INCH','FABRIC']);
  const tok=s=>new Set(String(s||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>=3&&!STOP.has(w)&&!/^\d+$/.test(w)));
  const jac=(a,b)=>{if(!a.size||!b.size)return 0;let i=0;a.forEach(x=>{if(b.has(x))i++});return i/(a.size+b.size-i)};
- let PB=null,pbBusy=false;
- async function loadProdBom(after){ if(PB||pbBusy)return; pbBusy=true; try{
+ let PB=null,pbBusy=false;const waiters=[];
+ async function loadProdBom(after){ if(after)waiters.push(after); if(PB||pbBusy)return; pbBusy=true; try{
    const G=window.PROD_GAS; let c=null; try{c=await IDB.get('prodcache#bom')}catch(e){} c=c&&c.b?c:{h:{},b:{}};
    const m=await fetch(G+'?action=smartManifest&tool=bom&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const H=(m.data||m).hashes||{}; const want=Object.keys(H); let ch=false;
    for(let i=0;i<want.length;i+=3)await Promise.all(want.slice(i,i+3).map(async k=>{ if(c.h[k]===H[k]&&c.b[k])return; const b=await fetch(G+'?action=smartBucket&tool=bom&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json()); const rows=(b.data&&b.data.records)||[];
      c.b[k]=rows.map(r=>{const v=r._vrtValue||r;return {style:String(v.styleNo||''),cust:String(v.customerCode||''),rev:String(v.revision||''),upd:String(v.updatedAt||''),items:(v.items||[]).map(i=>({nm:String(i.itemName||''),ds:String(i.description||''),cat:String(i.category||''),clr:String(i.color||''),pc:+i.qtyPcs||0,dz:+i.qtyDozen||0,w:+i.wastePct||0,u:String(i.unit||'')}))}}); c.h[k]=H[k]; ch=true }));
    Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}}); if(ch)try{await IDB.set('prodcache#bom',c)}catch(e){}
    PB=new Map(); Object.values(c.b).flat().forEach(s=>{const k=K(s.style); if(!k)return; const o=PB.get(k); if(!o||String(s.upd)>String(o.upd))PB.set(k,s)});
-  }catch(e){ PB=new Map(); PB.err=String(e.message||e) } finally{ pbBusy=false; if(after)after() } }
+  }catch(e){ PB=new Map(); PB.err=String(e.message||e) } finally{ pbBusy=false; const w=waiters.splice(0); setTimeout(()=>w.forEach(f=>{try{f()}catch(e){}}),80) } }
  function prodFor(sk){ if(!PB)return null; const k=K(sk); if(PB.has(k))return PB.get(k); for(const [pk,v] of PB){ if(pk.length>=4&&(k.startsWith(pk)||pk.startsWith(k))&&Math.abs(pk.length-k.length)<=3)return v } return null }
  const isFab=i=>/FABRIC|布|LINING|RIB|FUSING/i.test(i.cat)||/YARD|YDS|METER|MTR/i.test(i.u);
  function compare(erpLines,prod){ const P=prod.items.map(i=>({...i,inc:(i.pc||i.dz/12)*(1+i.w/100),t:tok(i.nm+' '+i.ds),fab:isFab(i),used:false}));
@@ -5874,11 +5874,12 @@ init();
    Er.filter(x=>!x.used).forEach(e=>{let best=null,bs=0;P.filter(p=>!p.used&&!p.fab).forEach(p=>{const j=jac(e.t,p.t);if(j>bs){bs=j;best=p}});if(best&&bs>=0.2){best.used=e.used=true;rows.push({e,p:best,j:bs})}});
    Er.filter(x=>!x.used).forEach(e=>rows.push({e,p:null}));P.filter(x=>!x.used).forEach(p=>rows.push({e:null,p}));
    rows.forEach(r=>{const nm=(r.e?r.e.nm:'')+' '+(r.p?r.p.nm+' '+r.p.ds:'');r.consum=CONSUM.test(nm);
+     if(r.consum){r.st='consum';return}
      if(r.e&&r.p){const a=r.e.cons,b=r.p.inc;if(!(b>0))r.st='noqty';else if(r.e.fab||r.p.fab){const d=a>0?(b-a)/a:null;r.d=d;r.st=d==null?'diff':Math.abs(d)<=0.03?'ok':'diff'}else{r.st=Math.round(a)===Math.round(b)?'ok':'diff';r.d=a>0?(b-a)/a:null}}
      else r.st=r.consum?'consum':r.e?'erponly':'prodonly'});
    const ord={diff:0,noqty:1,erponly:2,prodonly:3,ok:4,consum:5};rows.sort((a,b)=>ord[a.st]-ord[b.st]||((b.e&&b.e.fab)?1:0)-((a.e&&a.e.fab)?1:0));return rows }
  const ST={ok:['✅',Lx('一致','Match'),'#166534','#f0fdf4'],diff:['⚠️',Lx('用量不同','Usage differs'),'#9a3412','#fff7ed'],noqty:['⛔',Lx('生產 BOM 沒填用量','No usage in prod BOM'),'#991b1b','#fef2f2'],erponly:['🔵',Lx('只有 ERP 有','Only in ERP'),'#1e40af','#eff6ff'],prodonly:['🟠',Lx('只有生產 BOM 有','Only in prod BOM'),'#9a3412','#fff7ed'],consum:['▫️',Lx('包裝耗材（不比）','Consumable (not compared)'),'#64748b','#f8fafc']};
- const reSty=()=>{ if(window.STY&&STY.sk&&STY.tab==='bomcmp')styTab('bomcmp') };
+ const reSty=()=>{ setTimeout(()=>{ if(window.STY&&STY.sk&&STY.tab==='bomcmp')styTab('bomcmp') },60) };
  window.STAB_EXT.bomcmp=function(s){
   const pre=window.STAB_EXT.bomv?window.STAB_EXT.bomv(s):''; if(/^<p class="note">⏳/.test(pre))return pre;
   if(typeof dsLoaded==='function'&&!dsLoaded('bom')&&typeof ensureDS==='function'){ ensureDS(['bom']).then(()=>{try{GC.delete('v12mi')}catch(e){}reSty()}).catch(e=>{try{toast(String(e.message||e))}catch(_){}}); return `<p class="note">⏳ ${Lx('載入 ERP BOM（W_COD550）…','Loading ERP BOM (W_COD550)…')}</p>` }
