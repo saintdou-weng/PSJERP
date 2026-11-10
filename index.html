@@ -5733,7 +5733,7 @@ init();
  /* ══ G. 財務總覽小卡（ACC 最新月份） ══ */
  const accCard=function(h){ h=String(h); if(SECTION!=='fin')return h; const E=accExpense(); if(!E.length)return h; const e=E[E.length-1];
   const wipP=Object.keys((ACC.state||{}).periods||{}).filter(p=>accMod(p,'wip')).sort().pop(); const fgP=Object.keys((ACC.state||{}).periods||{}).filter(p=>accMod(p,'fg')).sort().pop();
-  const wipAmt=wipP?sum(accMod(wipP,'wip').records,'wipAmount'):null, fgVal=fgP?sum(accMod(fgP,'fg').records.filter(r=>!window.isOfficialFgRow||isOfficialFgRow(r)),'value'):null;
+  const wipAmt=wipP?sum(accMod(wipP,'wip').records,'wipAmount'):null, fgVal=fgP?sum(accMod(fgP,'fg').records,'value'):null;
   const card=`<div class="sec"><h4>🧾 ${tt('會計（ACC Flow）最新','Accounting (ACC Flow) latest')}</h4><div class="kpis">
    ${kpi(tt('製造費用 ','Factory expense ')+e.period,money(+e.totalCost||0,0),'',tt('直接人工 ','DL ')+money(+e.directLabor||0,0)+' · '+tt('製費 ','OH ')+money(+e.overhead||0,0))}
    ${kpi(tt('人數','Headcount'),fmt(+e.associates||0),'',tt('出勤 ','Days ')+fmt(+e.workDays||0)+tt(' 天',''))}
@@ -5833,8 +5833,8 @@ init();
  function want(){ const h=decodeURIComponent((location.hash||'').slice(1)); return /^style=/.test(h)?h.slice(6).trim():'' }
  function go(){ const w=want(); if(!w)return; try{history.replaceState(null,'','#styles')}catch(e){}
   setTimeout(()=>{ try{ if(typeof CUR==='undefined'||CUR!=='styles')route() }catch(e){}
-   const t0=Date.now(); const tick=()=>{ let sk=null; try{ if(CUR==='styles')sk=matchStyle([w]) }catch(e){}
-    if(sk){ try{renderStyle(sk)}catch(e){} return } if(Date.now()-t0<300000)setTimeout(tick,1500) }; tick() },0) }
+   const t0=Date.now(); const tick=()=>{ let ok=false; try{ if(CUR==='styles'&&window.openStyle&&window.styleIdx&&styleIdx().list.length){ openStyle(w); ok=!!(window.STY&&STY.sk) } }catch(e){}
+    if(ok)return; if(Date.now()-t0<300000)setTimeout(tick,1500) }; tick() },0) }
  window.addEventListener('hashchange',go); if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go); else go();
 })();
 </script>
@@ -5871,7 +5871,7 @@ init();
    const ef=Er.filter(x=>x.fab).sort((a,b)=>b.cons-a.cons),pf=P.filter(x=>x.fab).sort((a,b)=>b.inc-a.inc);
    ef.forEach((e,i)=>{const p=pf[i];if(p){p.used=e.used=true;rows.push({e,p})}});
    /* 副料：名稱關鍵字最像的配一對（≥0.25） */
-   Er.filter(x=>!x.used).forEach(e=>{let best=null,bs=0;P.filter(p=>!p.used&&!p.fab).forEach(p=>{const j=jac(e.t,p.t);if(j>bs){bs=j;best=p}});if(best&&bs>=0.25){best.used=e.used=true;rows.push({e,p:best,j:bs})}});
+   Er.filter(x=>!x.used).forEach(e=>{let best=null,bs=0;P.filter(p=>!p.used&&!p.fab).forEach(p=>{const j=jac(e.t,p.t);if(j>bs){bs=j;best=p}});if(best&&bs>=0.2){best.used=e.used=true;rows.push({e,p:best,j:bs})}});
    Er.filter(x=>!x.used).forEach(e=>rows.push({e,p:null}));P.filter(x=>!x.used).forEach(p=>rows.push({e:null,p}));
    rows.forEach(r=>{const nm=(r.e?r.e.nm:'')+' '+(r.p?r.p.nm+' '+r.p.ds:'');r.consum=CONSUM.test(nm);
      if(r.e&&r.p){const a=r.e.cons,b=r.p.inc;if(!(b>0))r.st='noqty';else if(r.e.fab||r.p.fab){const d=a>0?(b-a)/a:null;r.d=d;r.st=d==null?'diff':Math.abs(d)<=0.03?'ok':'diff'}else{r.st=Math.round(a)===Math.round(b)?'ok':'diff';r.d=a>0?(b-a)/a:null}}
@@ -5881,6 +5881,7 @@ init();
  const reSty=()=>{ if(window.STY&&STY.sk&&STY.tab==='bomcmp')styTab('bomcmp') };
  window.STAB_EXT.bomcmp=function(s){
   const pre=window.STAB_EXT.bomv?window.STAB_EXT.bomv(s):''; if(/^<p class="note">⏳/.test(pre))return pre;
+  if(typeof dsLoaded==='function'&&!dsLoaded('bom')&&typeof ensureDS==='function'){ ensureDS(['bom']).then(()=>{try{GC.delete('v12mi')}catch(e){}reSty()}).catch(e=>{try{toast(String(e.message||e))}catch(_){}}); return `<p class="note">⏳ ${Lx('載入 ERP BOM（W_COD550）…','Loading ERP BOM (W_COD550)…')}</p>` }
   if(!PB){ loadProdBom(reSty); return `<p class="note">⏳ ${Lx('讀取生產平台的 BOM…（第一次較久，之後只抓有變的）','Loading production BOMs… (first time is slower)')}</p>` }
   const prod=prodFor(s.sk); let V=[]; try{V=bomVersions(s.sk).V}catch(e){}
   const site=(window.PROD_SITE||'https://saintdou-weng.github.io/vrt-prod/')+'VRT_BOM_Management_v2_AI.html';
@@ -5902,40 +5903,3 @@ init();
 })();
 </script>
 </body></html>
-/* ---------- v1.5.1 (2026-11-10)：背景可以用自己的圖片（同 VRT HR）；成品入庫只算正式成品 ---------- */
-(function(){
- /* ── A. 背景圖片：存在這台裝置（IndexedDB），可調透明度，可移除 ── */
- const K='psjerp_bgimg', KV='psjerp_bgveil';
- const st=document.createElement('style'); st.textContent=`#bgImgLayer{position:fixed;inset:0;z-index:-2;background-position:center;background-size:cover;background-repeat:no-repeat;pointer-events:none}
-  #bgVeil{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--bg,#F0F2F5)}
-  html.has-bgimg body{background:transparent!important}
-  .bg-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
-  .bg-thumb{width:64px;height:40px;border-radius:6px;background:#e5e7eb center/cover;border:1px solid var(--line,#ddd)}`;
- document.head.appendChild(st);
- const veil=()=>{const v=+LS.get(KV,'55');return v>=0&&v<=90?v:55};
- async function applyBg(){ let u=null; try{u=await IDB.get(K)}catch(e){} let L=document.getElementById('bgImgLayer'), V=document.getElementById('bgVeil');
-  if(!u){ if(L)L.remove(); if(V)V.remove(); document.documentElement.classList.remove('has-bgimg'); return }
-  if(!L){L=document.createElement('div');L.id='bgImgLayer';document.body.prepend(L)} if(!V){V=document.createElement('div');V.id='bgVeil';document.body.prepend(V)}
-  L.style.backgroundImage=`url("${u}")`; V.style.opacity=String(veil()/100); document.documentElement.classList.add('has-bgimg') }
- const shrink=(dataUrl,max)=>new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.82))};im.onerror=rej;im.src=dataUrl});
- window.bgPick=function(){ const i=document.createElement('input'); i.type='file'; i.accept='image/*'; i.onchange=async()=>{ const f=i.files&&i.files[0]; if(!f)return;
-   try{ const raw=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(f)}); const u=await shrink(raw,1920); await IDB.set(K,u); await applyBg(); toast(tt('背景圖片已套用（這台裝置會記住）','Background image applied (saved on this device)','បានប្រើរូបភាពផ្ទៃខាងក្រោយ')); bgRefreshUI() }
-   catch(e){ toast(tt('圖片讀不到：','Cannot read image: ')+(e.message||e)) } }; i.click() };
- window.bgClear=async function(){ try{await IDB.set(K,null)}catch(e){} await applyBg(); toast(tt('已移除背景圖片','Background image removed','បានដករូបភាពចេញ')); bgRefreshUI() };
- window.bgVeil=function(v){ LS.set(KV,String(v)); const V=document.getElementById('bgVeil'); if(V)V.style.opacity=String(v/100); const o=document.querySelectorAll('.bgveil-val'); o.forEach(x=>x.textContent=v+'%') };
- window.bgToolsHTML=function(){ return `<div class="bg-tools"><span class="small">🖼 ${tt('背景圖片','Background image','រូបភាពផ្ទៃខាងក្រោយ')}</span><div class="bg-thumb" id="bgThumb"></div>
-   <button class="btn sm" onclick="bgPick()">${tt('選圖片…','Choose image…','ជ្រើសរូបភាព…')}</button><button class="btn sm ghost" onclick="bgClear()">${tt('移除','Remove','ដកចេញ')}</button>
-   <span class="small muted">${tt('淡化','Fade','ធ្វើឲ្យស្រាល')}</span><input type="range" min="0" max="90" step="5" value="${veil()}" oninput="bgVeil(this.value)" style="width:110px"><span class="small muted bgveil-val">${veil()}%</span></div>` };
- async function bgRefreshUI(){ let u=null; try{u=await IDB.get(K)}catch(e){} document.querySelectorAll('#bgThumb').forEach(t=>{t.style.backgroundImage=u?`url("${u}")`:'';t.title=u?'':tt('還沒設定','Not set')}) }
- const _tp=window.tintPop; window.tintPop=function(ev){ _tp(ev); const p=document.getElementById('tintPop'); if(p&&!p.querySelector('.bg-tools')){ const d=document.createElement('div'); d.style.width='100%'; d.innerHTML=bgToolsHTML(); p.appendChild(d); bgRefreshUI() } };
- const tb=document.getElementById('tintBtn'); if(tb)tb.onclick=window.tintPop;
- const _rs=RENDER.settings; if(_rs)RENDER.settings=function(){ const h=_rs.apply(this,arguments); setTimeout(()=>{ const row=document.querySelector('#page .tint-row'); if(row&&!row.parentNode.querySelector('.bg-tools')){ const d=document.createElement('div'); d.innerHTML=bgToolsHTML(); row.after(d.firstElementChild); bgRefreshUI() } },30); return h };
- applyBg();
-
- /* ── B. 會計成品入庫：樣品、賣布、賣輔料不算正式成品（對齊會計 Summary_產量／Summary_產值） ── */
- const nonFg=t=>{const s=String(t||'').toLowerCase(); return /sample/.test(s)||/sell[\s-]*fabric|賣布/.test(s)||/trim|輔料/.test(s)};
- window.isOfficialFgRow=r=>!nonFg(r&&r.type);
- const _ar=window.accRows; window.accRows=function(m){ const r=_ar(m); return m==='fg'?r.filter(isOfficialFgRow):r };
- try{ GC.clear() }catch(e){}
-})();
-
