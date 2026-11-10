@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.5.2';
+const APP_VER='1.5.3';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -5864,11 +5864,11 @@ init();
    PB=new Map(); Object.values(c.b).flat().forEach(s=>{const k=K(s.style); if(!k)return; const o=PB.get(k); if(!o||String(s.upd)>String(o.upd))PB.set(k,s)});
   }catch(e){ PB=new Map(); PB.err=String(e.message||e) } finally{ pbBusy=false; const w=waiters.splice(0); setTimeout(()=>w.forEach(f=>{try{f()}catch(e){}}),80) } }
  function prodFor(sk){ if(!PB)return null; const k=K(sk); if(PB.has(k))return PB.get(k); for(const [pk,v] of PB){ if(pk.length>=4&&(k.startsWith(pk)||pk.startsWith(k))&&Math.abs(pk.length-k.length)<=3)return v } return null }
- const isFab=i=>/FABRIC|布|LINING|RIB|FUSING/i.test(i.cat)||/YARD|YDS|METER|MTR/i.test(i.u);
+ const LEN=/YARD|YDS|\bYD|METER|MTR|\bM\b|碼|米/i;const isFab=i=>i.u?LEN.test(i.u):/FABRIC|布|LINING|FUSING/i.test(i.cat);const isMainP=i=>/MAIN\s*FABRIC|主布|SHELL/i.test(i.cat+' '+i.nm);
  function compare(erpLines,prod){ const P=prod.items.map(i=>({...i,inc:(i.pc||i.dz/12)*(1+i.w/100),t:tok(i.nm+' '+i.ds),fab:isFab(i),used:false}));
    const Er=erpLines.map(l=>({...l,t:tok(l.nm),fab:l.type==='main',used:false})); const rows=[];
    /* 布料：ERP 主料對生產 BOM 的布，依每件用量大小一對一 */
-   const ef=Er.filter(x=>x.fab).sort((a,b)=>b.cons-a.cons),pf=P.filter(x=>x.fab).sort((a,b)=>b.inc-a.inc);
+   const ef=Er.filter(x=>x.fab&&x.cons>=0.05).sort((a,b)=>b.cons-a.cons),pf=P.filter(x=>x.fab).sort((a,b)=>(isMainP(b)-isMainP(a))||(b.inc-a.inc));
    ef.forEach((e,i)=>{const p=pf[i];if(p){p.used=e.used=true;rows.push({e,p})}});
    /* 副料：名稱關鍵字最像的配一對（≥0.25） */
    Er.filter(x=>!x.used).forEach(e=>{let best=null,bs=0;P.filter(p=>!p.used&&!p.fab).forEach(p=>{const j=jac(e.t,p.t);if(j>bs){bs=j;best=p}});if(best&&bs>=0.2){best.used=e.used=true;rows.push({e,p:best,j:bs})}});
