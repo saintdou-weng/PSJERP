@@ -83,7 +83,7 @@ Paul 的要求（11/11 兩次）：一眼懂、精實、整齊、少 AI 味、�
 
 - [x] PROD 生產日報（GAS v412_compact_daily_report，2026-11-10）
 - [x] 情境引擎＋色條版面：日報、效率週報、排單週報（vrt-prod `vrt-report-scen-v1.js`、`AppsScript/scenario_report_block.gs`，
-      測試 13/13，2026-11-11）— **程式已寫好並測試，還要貼進 Apps Script 並部署才會生效**
+      測試 13/13；2026-11-11 00:38 已部署 PROD GAS 第 39 版，群組排程與網頁按鈕都生效）
 - [ ] PROD 月報（同一套情境，加月結、跨月 PO）
 - [ ] PSJERP 匯入摘要、財務摘要
 - [ ] PSJHR 週更新摘要、HRA-PAY／HRA Portal 摘要
