@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.4.2';
+const APP_VER='1.5.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -5836,6 +5836,69 @@ init();
    const t0=Date.now(); const tick=()=>{ let sk=null; try{ if(CUR==='styles')sk=matchStyle([w]) }catch(e){}
     if(sk){ try{renderStyle(sk)}catch(e){} return } if(Date.now()-t0<300000)setTimeout(tick,1500) }; tick() },0) }
  window.addEventListener('hashchange',go); if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go); else go();
+})();
+</script>
+<script>
+/* v1.5.0（2026-11-10）款式卡新分頁「⚖️ 生產 BOM 對照」：ERP BOM（W_COD550 現行版）對生產平台 BOM 頁的 BOM（生產雲端 tool=bom，唯讀）。
+   Paul 11/07：BOM 要秒懂，能跟 PSJERP 的資料連接比對。
+   - 同一個料：比「每件用量（含損耗）」，布料差 3% 以上、副料個數不同 → 標出來。
+   - 只在一邊有的料也列出來；縫線、紙箱、膠袋這類包裝耗材只列不判（各單包裝不同）。
+   - 生產 BOM 用 hash 快取在 IndexedDB（prodcache#bom），只抓有變的區塊。 */
+(function(){
+ if(!window.STAB_EXT||!window.STY_TABS)return;
+ const Lx=(zh,en)=>((typeof LANG!=='undefined'?LANG:0)===1?en:zh);
+ const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const F=(n,d)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d==null?3:d});
+ const K=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
+ const CONSUM=/THREAD|線|CTN|CARTON|\bBOX|POLY\s*BAG|POLYBAG|\bBAG\b|TAPE|STICKER|TISSUE|HANGER|PAPER|SILICA|INSERT|MARKER|GUMMED|STRAP|膠袋|紙箱/i;
+ const STOP=new Set(['FOR','THE','AND','WITH','BODY','AT','OF','ON','IN','PCS','PC','SIZE','STYLE','COLOR','COLOUR','WHITE','BLACK','NAVY','CENTER','FRONT','BACK','LEFT','RIGHT','INCH','FABRIC']);
+ const tok=s=>new Set(String(s||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>=3&&!STOP.has(w)&&!/^\d+$/.test(w)));
+ const jac=(a,b)=>{if(!a.size||!b.size)return 0;let i=0;a.forEach(x=>{if(b.has(x))i++});return i/(a.size+b.size-i)};
+ let PB=null,pbBusy=false;
+ async function loadProdBom(after){ if(PB||pbBusy)return; pbBusy=true; try{
+   const G=window.PROD_GAS; let c=null; try{c=await IDB.get('prodcache#bom')}catch(e){} c=c&&c.b?c:{h:{},b:{}};
+   const m=await fetch(G+'?action=smartManifest&tool=bom&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const H=(m.data||m).hashes||{}; const want=Object.keys(H); let ch=false;
+   for(let i=0;i<want.length;i+=3)await Promise.all(want.slice(i,i+3).map(async k=>{ if(c.h[k]===H[k]&&c.b[k])return; const b=await fetch(G+'?action=smartBucket&tool=bom&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json()); const rows=(b.data&&b.data.records)||[];
+     c.b[k]=rows.map(r=>{const v=r._vrtValue||r;return {style:String(v.styleNo||''),cust:String(v.customerCode||''),rev:String(v.revision||''),upd:String(v.updatedAt||''),items:(v.items||[]).map(i=>({nm:String(i.itemName||''),ds:String(i.description||''),cat:String(i.category||''),clr:String(i.color||''),pc:+i.qtyPcs||0,dz:+i.qtyDozen||0,w:+i.wastePct||0,u:String(i.unit||'')}))}}); c.h[k]=H[k]; ch=true }));
+   Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}}); if(ch)try{await IDB.set('prodcache#bom',c)}catch(e){}
+   PB=new Map(); Object.values(c.b).flat().forEach(s=>{const k=K(s.style); if(!k)return; const o=PB.get(k); if(!o||String(s.upd)>String(o.upd))PB.set(k,s)});
+  }catch(e){ PB=new Map(); PB.err=String(e.message||e) } finally{ pbBusy=false; if(after)after() } }
+ function prodFor(sk){ if(!PB)return null; const k=K(sk); if(PB.has(k))return PB.get(k); for(const [pk,v] of PB){ if(pk.length>=4&&(k.startsWith(pk)||pk.startsWith(k))&&Math.abs(pk.length-k.length)<=3)return v } return null }
+ const isFab=i=>/FABRIC|布|LINING|RIB|FUSING/i.test(i.cat)||/YARD|YDS|METER|MTR/i.test(i.u);
+ function compare(erpLines,prod){ const P=prod.items.map(i=>({...i,inc:(i.pc||i.dz/12)*(1+i.w/100),t:tok(i.nm+' '+i.ds),fab:isFab(i),used:false}));
+   const Er=erpLines.map(l=>({...l,t:tok(l.nm),fab:l.type==='main',used:false})); const rows=[];
+   /* 布料：ERP 主料對生產 BOM 的布，依每件用量大小一對一 */
+   const ef=Er.filter(x=>x.fab).sort((a,b)=>b.cons-a.cons),pf=P.filter(x=>x.fab).sort((a,b)=>b.inc-a.inc);
+   ef.forEach((e,i)=>{const p=pf[i];if(p){p.used=e.used=true;rows.push({e,p})}});
+   /* 副料：名稱關鍵字最像的配一對（≥0.25） */
+   Er.filter(x=>!x.used).forEach(e=>{let best=null,bs=0;P.filter(p=>!p.used&&!p.fab).forEach(p=>{const j=jac(e.t,p.t);if(j>bs){bs=j;best=p}});if(best&&bs>=0.25){best.used=e.used=true;rows.push({e,p:best,j:bs})}});
+   Er.filter(x=>!x.used).forEach(e=>rows.push({e,p:null}));P.filter(x=>!x.used).forEach(p=>rows.push({e:null,p}));
+   rows.forEach(r=>{const nm=(r.e?r.e.nm:'')+' '+(r.p?r.p.nm+' '+r.p.ds:'');r.consum=CONSUM.test(nm);
+     if(r.e&&r.p){const a=r.e.cons,b=r.p.inc;if(!(b>0))r.st='noqty';else if(r.e.fab||r.p.fab){const d=a>0?(b-a)/a:null;r.d=d;r.st=d==null?'diff':Math.abs(d)<=0.03?'ok':'diff'}else{r.st=Math.round(a)===Math.round(b)?'ok':'diff';r.d=a>0?(b-a)/a:null}}
+     else r.st=r.consum?'consum':r.e?'erponly':'prodonly'});
+   const ord={diff:0,noqty:1,erponly:2,prodonly:3,ok:4,consum:5};rows.sort((a,b)=>ord[a.st]-ord[b.st]||((b.e&&b.e.fab)?1:0)-((a.e&&a.e.fab)?1:0));return rows }
+ const ST={ok:['✅',Lx('一致','Match'),'#166534','#f0fdf4'],diff:['⚠️',Lx('用量不同','Usage differs'),'#9a3412','#fff7ed'],noqty:['⛔',Lx('生產 BOM 沒填用量','No usage in prod BOM'),'#991b1b','#fef2f2'],erponly:['🔵',Lx('只有 ERP 有','Only in ERP'),'#1e40af','#eff6ff'],prodonly:['🟠',Lx('只有生產 BOM 有','Only in prod BOM'),'#9a3412','#fff7ed'],consum:['▫️',Lx('包裝耗材（不比）','Consumable (not compared)'),'#64748b','#f8fafc']};
+ const reSty=()=>{ if(window.STY&&STY.sk&&STY.tab==='bomcmp')styTab('bomcmp') };
+ window.STAB_EXT.bomcmp=function(s){
+  const pre=window.STAB_EXT.bomv?window.STAB_EXT.bomv(s):''; if(/^<p class="note">⏳/.test(pre))return pre;
+  if(!PB){ loadProdBom(reSty); return `<p class="note">⏳ ${Lx('讀取生產平台的 BOM…（第一次較久，之後只抓有變的）','Loading production BOMs… (first time is slower)')}</p>` }
+  const prod=prodFor(s.sk); let V=[]; try{V=bomVersions(s.sk).V}catch(e){}
+  const site=(window.PROD_SITE||'https://saintdou-weng.github.io/vrt-prod/')+'VRT_BOM_Management_v2_AI.html';
+  let h=`<div class="note" style="margin-bottom:8px">${Lx('左邊：ERP BOM（W_COD550，現行版）。右邊：生產平台 BOM 頁（PC／IE 匯入的客戶 BOM）。每件用量都含損耗。','Left: ERP BOM (W_COD550, current version). Right: production platform BOM page. Per-piece usage includes waste.')} <a href="${site}" target="_blank" rel="noopener">🧾 ${Lx('開生產 BOM 頁','Open production BOM page')}</a></div>`;
+  if(PB.err)h+=`<p class="muted">⚠️ ${Lx('生產雲端讀不到：','Production cloud not reachable: ')}${E(PB.err)}</p>`;
+  if(!V.length&&!prod)return h+`<p class="muted">${Lx('ERP 和生產平台都沒有這款的 BOM。','Neither the ERP nor the production platform has a BOM for this style.')}</p>`;
+  if(!V.length)return h+`<p>🔵 ${Lx('ERP BOM 裡沒有這款，只有生產 BOM（','No ERP BOM; production BOM only (')}${prod.items.length}${Lx(' 項）。',' items).')}</p>`;
+  const cur=V[V.length-1],el=[...cur.lines.values()];
+  if(!prod)return h+`<p>🟠 ${Lx('生產平台 BOM 頁還沒有這款。ERP 現行版 v','Production BOM page has no BOM for this style. ERP current version v')}${cur.n}${Lx('：',': ')}${el.length}${Lx(' 項。',' items.')}</p>`;
+  const rows=compare(el,prod),cnt={};rows.forEach(r=>cnt[r.st]=(cnt[r.st]||0)+1);
+  h+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">${['diff','noqty','erponly','prodonly','ok','consum'].filter(k=>cnt[k]).map(k=>`<span style="padding:4px 10px;border-radius:999px;background:${ST[k][3]};color:${ST[k][2]};font-size:13px;font-weight:600">${ST[k][0]} ${ST[k][1]} ${cnt[k]}</span>`).join('')}</div>`;
+  h+=`<div class="small muted" style="margin-bottom:6px">ERP v${cur.n}（${E(cur.from)}${cur.to!==cur.from?'→'+E(cur.to):''}，${cur.orders.length} ${Lx('張單','orders')}）　·　${Lx('生產 BOM','Prod BOM')} ${E(prod.cust)} ${E(prod.style)} ${E(prod.rev)}</div>`;
+  h+=`<div class="tbl-wrap"><table class="t"><thead><tr><th>${Lx('狀態','Status')}</th><th>ERP BOM</th><th class="r">${Lx('每件','Per pc')}</th><th>${Lx('生產 BOM','Prod BOM')}</th><th class="r">${Lx('每件（含損耗）','Per pc (incl. waste)')}</th><th class="r">${Lx('差','Diff')}</th></tr></thead><tbody>`+
+   rows.map(r=>{const st=ST[r.st];return `<tr style="background:${st[3]}"><td style="color:${st[2]};white-space:nowrap">${st[0]} ${st[1]}</td><td>${r.e?(r.e.fab?'🧶 ':'')+E(r.e.nm):'<span class="muted">—</span>'}</td><td class="r">${r.e?F(r.e.cons,4)+' '+E(r.e.unit||''):'—'}</td><td>${r.p?(r.p.fab?'🧶 ':'')+E(r.p.nm)+(r.p.ds?`<div class="small muted">${E(r.p.ds)}</div>`:''):'<span class="muted">—</span>'}</td><td class="r">${r.p?(r.p.inc>0?F(r.p.inc,4):'—')+' '+E(r.p.u):'—'}</td><td class="r">${r.d!=null&&r.st!=='ok'?`<b style="color:${st[2]}">${r.d>0?'+':''}${(r.d*100).toFixed(1)}%</b>`:''}</td></tr>`}).join('')+`</tbody></table></div>`;
+  h+=`<p class="small muted">${Lx('配對方式：布料依每件用量大小一對一；副料依名稱關鍵字最像的配一對。布料差 3% 以內、副料每件個數相同算一致。縫線、紙箱、膠袋等包裝耗材每單不同，只列不判。','Matching: fabrics paired by usage size; trims by closest name keywords. Fabric within 3% or same trim count = match. Thread, cartons, polybags are listed but not judged.')}</p>`;
+  return h };
+ if(!window.STY_TABS.some(x=>x[0]==='bomcmp')){ const i=window.STY_TABS.findIndex(x=>x[0]==='bomv')+1||window.STY_TABS.length; window.STY_TABS.splice(i,0,['bomcmp','⚖️',['生產 BOM 對照','Prod BOM check']]) }
+ window.PSJ_BOMCMP={loadProdBom,compare,prodFor,_reset:()=>{PB=null}};
 })();
 </script>
 </body></html>
