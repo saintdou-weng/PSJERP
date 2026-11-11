@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.6.0';
+const APP_VER='1.7.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6064,6 +6064,52 @@ init();
    else { h+=`<div class="panel"><ol style="line-height:1.9;margin:0">${[Lx('要做的量＝ERP 訂單量 − 成品入庫（FG），只看最近 8 個月接的未結單；同款同交期的單合在一起做。','Quantity = ERP order qty − FG received; open orders from the last 8 months; same style + same due date grouped.'),Lx('交期：先用客戶 PO 的出貨日；沒有就用 PC 排產表的出貨日；再沒有就用接單日＋這個客戶過去「接單到出貨」的中位數天數。','Due date: customer PO ship date → PC plan shipment date → order date + this customer\'s median order-to-ship days.'),Lx('生產用 SMV：IE 重測過的款，新 SMV 依跟 ERP 舊 SMV 的差距扣 0/5/10/15%；沒重測的用 ERP 舊 SMV 扣 35%。','Production SMV: IE re-tested → new SMV minus 0/5/10/15% by change vs ERP old SMV; otherwise ERP old SMV −35%.'),Lx('每條線一天做得出的標準分鐘＝最近 4 週每天「件數 × 生產用 SMV」的中位數。','Line capacity = median daily (pieces × production SMV) over the last 4 weeks.'),Lx('排法：線上正在做的款先接著做；其他依交期先後，每張挑最早做完的線，做過同款的線優先；換款第一天只算 6 成；週日和柬埔寨假日不排。','Order: styles already on a line continue first; then by due date, each to the line that finishes earliest, preferring lines that sewed the style; first day after a change at 60%; Sundays and holidays off.'),Lx('跟 PC 排產比：同款（或同 PO）比線、完工日（差 3 天以上）、日產（差 20% 以上）、SMV（差 5% 以上）。','Compared with the PC plan by style / PO: line, finish date (>3 days), daily output (>20%), SMV (>5%).')].map(x=>`<li>${x}</li>`).join('')}</ol><p class="small muted">${Lx('這是第一版，先只比對、不改任何資料。每週一依新訂單和實際產量重排；累積幾週後看跟實際的差距，再調整參數（換款產能、線的習慣、交期來源）。','First version: compare only, nothing is changed. Re-planned every week; parameters tuned after a few weeks of comparison.')}</p></div>` }
    return h };
  window.AIPLAN={run,rerun:()=>{RES=null;PLAN=null;rerender()},view:v=>{VIEW=v;rerender()},copy:()=>{const t=summaryText();try{navigator.clipboard.writeText(t);toast(Lx('已複製','Copied'))}catch(e){prompt('',t)}},summary:summaryText,get:()=>RES,cmp:()=>CMP,_cut:cutRule,_prodSmv:prodSmv};
+})();
+
+</script>
+<script>
+/* v1.7.0（2026-11-11）款式卡新分頁「📦 裁剪・裝箱」：生產平台 Cut & Pack 頁（生產雲端 tool=packing、cutdetail，唯讀）。
+   Paul 11/11：Cutting & Packing Report 也要進 PSJERP。這一款每張 PO：裁了幾件、用了幾碼布（損耗％、馬克效率）、包了幾件幾箱、哪幾條線、哪幾天。
+   跟 ERP 訂單量放在一起看：還差多少沒包。hash 快取在 IndexedDB（prodcache#packing、prodcache#cutdetail），只抓有變的月份。 */
+(function(){
+ if(!window.STAB_EXT||!window.STY_TABS)return;
+ const Lx=(zh,en)=>((typeof LANG!=='undefined'?LANG:0)===1?en:zh);
+ const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const F=(n,d)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d==null?0:d});
+ const P=n=>(n==null||!isFinite(n))?'—':(n*100).toFixed(1)+'%';
+ const K=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
+ const DATA={packing:null,cutdetail:null};let busy=false;const waiters=[];
+ async function loadTool(tool){const G=window.PROD_GAS;let c=null;try{c=await IDB.get('prodcache#'+tool)}catch(e){}c=c&&c.b?c:{h:{},b:{}};
+   const m=await fetch(G+'?action=smartManifest&tool='+tool+'&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json());const H=(m.data||m).hashes||{};const want=Object.keys(H);let ch=false;
+   for(let i=0;i<want.length;i+=3)await Promise.all(want.slice(i,i+3).map(async k=>{if(c.h[k]===H[k]&&c.b[k])return;const b=await fetch(G+'?action=smartBucket&tool='+tool+'&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json());c.b[k]=((b.data&&b.data.records)||[]).map(r=>r._vrtValue||r);c.h[k]=H[k];ch=true}));
+   Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}});if(ch)try{await IDB.set('prodcache#'+tool,c)}catch(e){}
+   return Object.values(c.b).flat()}
+ async function load(after){if(after)waiters.push(after);if(DATA.packing||busy)return;busy=true;
+   try{const[a,b]=await Promise.all([loadTool('packing'),loadTool('cutdetail')]);DATA.packing=a;DATA.cutdetail=b}catch(e){DATA.packing=[];DATA.cutdetail=[];DATA.err=String(e.message||e)}
+   finally{busy=false;const w=waiters.splice(0);setTimeout(()=>w.forEach(f=>{try{f()}catch(e){}}),80)}}
+ /* 款號：裁剪表常帶顏色字尾（O1114KLBL、1200KWBL）→ 前綴相符也算 */
+ const hit=(style,sk)=>{const k=K(style);if(!k||!sk)return false;if(k===sk)return true;return k.length>sk.length&&k.startsWith(sk)&&k.length-sk.length<=5&&/^[A-Z]+$/.test(k.slice(sk.length))};
+ const reSty=()=>{setTimeout(()=>{if(window.STY&&STY.sk&&STY.tab==='cutpack')styTab('cutpack')},60)};
+ window.STAB_EXT.cutpack=function(s){
+  if(!DATA.packing){load(reSty);return `<p class="note">⏳ ${Lx('讀取生產平台的裁剪／裝箱資料…','Loading cutting / packing from the production platform…')}</p>`}
+  const pk=DATA.packing.filter(r=>hit(r.style,s.sk)),ct=DATA.cutdetail.filter(r=>hit(r.style,s.sk));
+  const site=(window.PROD_SITE||'https://saintdou-weng.github.io/vrt-prod/')+'vrt_cut_pack_v1.html';
+  if(!pk.length&&!ct.length)return `<p class="note">${Lx('生產平台還沒有這一款的裁剪用布或裝箱紀錄（11 月起才有）。','No cutting-fabric or packing records for this style yet (available from Nov 2026).')}${DATA.err?' ⚠️ '+E(DATA.err):''}</p><p><a href="${site}" target="_blank" rel="noopener">${Lx('開生產平台 裁剪用布＋裝箱 ↗','Open Cut & Pack ↗')}</a></p>`;
+  /* ERP 訂單量（同 PO） */
+  const ordQ=new Map();try{ordersView().forEach(o=>{if(K(o.style)!==s.sk&&!hit(o.style,s.sk))return;const k=K(o.po_no);ordQ.set(k,(ordQ.get(k)||0)+(+o.qty||0))})}catch(e){}
+  const by=new Map();const g=po=>{const k=K(po)||'—';let o=by.get(k);if(!o){o={po:po||'—',cut:0,plan:0,act:0,effS:0,effW:0,pack:0,ctns:0,lines:new Set(),days:new Set(),cdays:new Set(),recut:0};by.set(k,o)}return o};
+  ct.forEach(r=>{const o=g(r.po);o.cut+=+r.qty||0;o.plan+=+r.planYds||0;o.act+=+r.actYds||0;if(r.markerEff>0){o.effS+=r.markerEff*(+r.actYds||0);o.effW+=+r.actYds||0}o.cdays.add(r.date);if(/RECUT/i.test(r.remark||''))o.recut++});
+  pk.forEach(r=>{const o=g(r.po);o.pack+=+r.qty||0;o.ctns+=+r.ctns||0;o.lines.add(String(r.line||'').replace('Line ','L'));o.days.add(r.date)});
+  const rows=[...by.values()].sort((a,b)=>(b.pack+b.cut)-(a.pack+a.cut));
+  const T=rows.reduce((a,o)=>{a.cut+=o.cut;a.plan+=o.plan;a.act+=o.act;a.pack+=o.pack;a.ctns+=o.ctns;return a},{cut:0,plan:0,act:0,pack:0,ctns:0});const loss=T.plan?(T.act-T.plan)/T.plan:null;
+  const kpi=(v,l,sub,col)=>`<div class="kpi"><div class="v"${col?` style="color:${col}"`:''}>${v}</div><div class="l">${l}</div>${sub?`<div class="small muted">${sub}</div>`:''}</div>`;
+  let h=`<div class="kpis">${kpi(F(T.cut),Lx('件裁出','pcs cut'),F(T.act)+Lx(' 碼布',' yds'))}${kpi(P(loss),Lx('用布損耗','fabric loss'),Lx('計畫 ','plan ')+F(T.plan)+Lx(' 碼',' yds'),loss==null?'':loss>0.05||loss<-0.01?'var(--crit)':loss>0.03?'var(--warn)':'')}${kpi(F(T.pack),Lx('件裝箱','pcs packed'),F(T.ctns,1)+Lx(' 箱',' ctns'))}${kpi(T.cut?P(T.pack/T.cut):'—',Lx('包好／裁出','packed ÷ cut'),'')}</div>`;
+  h+=`<div class="tbl-wrap"><table class="t"><thead><tr><th>PO</th><th class="r">${Lx('ERP 訂單量','ERP qty')}</th><th class="r">${Lx('裁出','Cut')}</th><th class="r">${Lx('用布（碼）','Fabric yds')}</th><th>${Lx('損耗','Loss')}</th><th class="r">${Lx('馬克效率','Marker eff')}</th><th class="r">${Lx('裝箱','Packed')}</th><th class="r">${Lx('箱','Ctns')}</th><th class="r">${Lx('還差','Left')}</th><th>${Lx('線','Lines')}</th><th>${Lx('日期','Dates')}</th></tr></thead><tbody>`+
+   rows.map(o=>{const q=ordQ.get(K(o.po))||0,l=o.plan?(o.act-o.plan)/o.plan:null,ds=[...o.days,...o.cdays].sort();return `<tr><td class="mono">${E(o.po)}</td><td class="r">${q?F(q):'—'}</td><td class="r">${o.cut?F(o.cut):'—'}${o.recut?` <span class="small muted">${Lx('補裁','recut')} ${o.recut}</span>`:''}</td><td class="r">${o.act?F(o.act,1):'—'}</td><td>${l==null?'—':`<b style="color:${l>0.05||l<-0.01?'var(--crit)':l>0.03?'var(--warn)':'var(--ok)'}">${P(l)}</b>`}</td><td class="r">${o.effW?P(o.effS/o.effW):'—'}</td><td class="r">${o.pack?F(o.pack):'—'}</td><td class="r">${o.ctns?F(o.ctns,1):'—'}</td><td class="r">${q?F(Math.max(0,q-o.pack)):'—'}</td><td class="small">${[...o.lines].sort().join(' ')}</td><td class="small">${ds.length?ds[0].slice(5)+(ds.length>1?'～'+ds[ds.length-1].slice(5):''):''}</td></tr>`}).join('')+`</tbody></table></div>`;
+  h+=`<p class="small muted">${Lx('來源：Och Chanmalen 每天的 Cutting & Packing Report（生產平台匯入後上雲）。「還差」＝ERP 訂單量 − 已裝箱（只算 11 月起有紀錄的）。','Source: daily Cutting & Packing Report imported in the production platform. "Left" = ERP qty − packed (records from Nov 2026).')} <a href="${site}" target="_blank" rel="noopener">${Lx('開生產平台 ↗','Open in production platform ↗')}</a></p>`;
+  return h };
+ if(!window.STY_TABS.some(x=>x[0]==='cutpack')){const i=window.STY_TABS.findIndex(x=>x[0]==='bomcmp')+1||window.STY_TABS.length;window.STY_TABS.splice(i,0,['cutpack','📦',['裁剪・裝箱','Cut & pack']])}
+ window.PSJ_CUTPACK={load,hit,_reset:()=>{DATA.packing=null;DATA.cutdetail=null}};
 })();
 
 </script>
