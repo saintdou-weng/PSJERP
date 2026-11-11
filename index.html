@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.0';
+const APP_VER='1.7.1';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6079,10 +6079,12 @@ init();
  const P=n=>(n==null||!isFinite(n))?'—':(n*100).toFixed(1)+'%';
  const K=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
  const DATA={packing:null,cutdetail:null};let busy=false;const waiters=[];
- async function loadTool(tool){const G=window.PROD_GAS;let c=null;try{c=await IDB.get('prodcache#'+tool)}catch(e){}c=c&&c.b?c:{h:{},b:{}};
+ /* IndexedDB 有時被大的寫入卡住（整包訂單存檔）→ 讀 3 秒沒回就當沒有快取，存檔不等 */
+ const idbGet=k=>Promise.race([Promise.resolve().then(()=>IDB.get(k)).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),3000))]);
+ async function loadTool(tool){const G=window.PROD_GAS;let c=await idbGet('prodcache#'+tool);c=c&&c.b?c:{h:{},b:{}};
    const m=await fetch(G+'?action=smartManifest&tool='+tool+'&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json());const H=(m.data||m).hashes||{};const want=Object.keys(H);let ch=false;
    for(let i=0;i<want.length;i+=3)await Promise.all(want.slice(i,i+3).map(async k=>{if(c.h[k]===H[k]&&c.b[k])return;const b=await fetch(G+'?action=smartBucket&tool='+tool+'&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json());c.b[k]=((b.data&&b.data.records)||[]).map(r=>r._vrtValue||r);c.h[k]=H[k];ch=true}));
-   Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}});if(ch)try{await IDB.set('prodcache#'+tool,c)}catch(e){}
+   Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}});if(ch)try{Promise.resolve(IDB.set('prodcache#'+tool,c)).catch(()=>{})}catch(e){}
    return Object.values(c.b).flat()}
  async function load(after){if(after)waiters.push(after);if(DATA.packing||busy)return;busy=true;
    try{const[a,b]=await Promise.all([loadTool('packing'),loadTool('cutdetail')]);DATA.packing=a;DATA.cutdetail=b}catch(e){DATA.packing=[];DATA.cutdetail=[];DATA.err=String(e.message||e)}
@@ -6103,7 +6105,7 @@ init();
   const rows=[...by.values()].sort((a,b)=>(b.pack+b.cut)-(a.pack+a.cut));
   const T=rows.reduce((a,o)=>{a.cut+=o.cut;a.plan+=o.plan;a.act+=o.act;a.pack+=o.pack;a.ctns+=o.ctns;return a},{cut:0,plan:0,act:0,pack:0,ctns:0});const loss=T.plan?(T.act-T.plan)/T.plan:null;
   const kpi=(v,l,sub,col)=>`<div class="kpi"><div class="v"${col?` style="color:${col}"`:''}>${v}</div><div class="l">${l}</div>${sub?`<div class="small muted">${sub}</div>`:''}</div>`;
-  let h=`<div class="kpis">${kpi(F(T.cut),Lx('件裁出','pcs cut'),F(T.act)+Lx(' 碼布',' yds'))}${kpi(P(loss),Lx('用布損耗','fabric loss'),Lx('計畫 ','plan ')+F(T.plan)+Lx(' 碼',' yds'),loss==null?'':loss>0.05||loss<-0.01?'var(--crit)':loss>0.03?'var(--warn)':'')}${kpi(F(T.pack),Lx('件裝箱','pcs packed'),F(T.ctns,1)+Lx(' 箱',' ctns'))}${kpi(T.cut?P(T.pack/T.cut):'—',Lx('包好／裁出','packed ÷ cut'),'')}</div>`;
+  let h=`<div class="kpis">${kpi(F(T.cut),Lx('件裁出','pcs cut'),F(T.act)+Lx(' 碼布',' yds'))}${kpi(P(loss),Lx('用布損耗','fabric loss'),Lx('計畫 ','plan ')+F(T.plan)+Lx(' 碼',' yds'),loss==null?'':loss>0.05||loss<-0.01?'var(--crit)':loss>0.03?'var(--warn)':'')}${kpi(F(T.pack),Lx('件裝箱','pcs packed'),F(T.ctns,1)+Lx(' 箱',' ctns'))}${(()=>{let q=0,l=0;rows.forEach(o=>{const v=ordQ.get(K(o.po))||0;if(v&&o.pack){q+=v;l+=Math.max(0,v-o.pack)}});return q?kpi(F(l),Lx('件還沒包（有裝箱的 PO）','pcs left to pack'),Lx('ERP 訂單量 ','ERP qty ')+F(q)):''})()}</div>`;
   h+=`<div class="tbl-wrap"><table class="t"><thead><tr><th>PO</th><th class="r">${Lx('ERP 訂單量','ERP qty')}</th><th class="r">${Lx('裁出','Cut')}</th><th class="r">${Lx('用布（碼）','Fabric yds')}</th><th>${Lx('損耗','Loss')}</th><th class="r">${Lx('馬克效率','Marker eff')}</th><th class="r">${Lx('裝箱','Packed')}</th><th class="r">${Lx('箱','Ctns')}</th><th class="r">${Lx('還差','Left')}</th><th>${Lx('線','Lines')}</th><th>${Lx('日期','Dates')}</th></tr></thead><tbody>`+
    rows.map(o=>{const q=ordQ.get(K(o.po))||0,l=o.plan?(o.act-o.plan)/o.plan:null,ds=[...o.days,...o.cdays].sort();return `<tr><td class="mono">${E(o.po)}</td><td class="r">${q?F(q):'—'}</td><td class="r">${o.cut?F(o.cut):'—'}${o.recut?` <span class="small muted">${Lx('補裁','recut')} ${o.recut}</span>`:''}</td><td class="r">${o.act?F(o.act,1):'—'}</td><td>${l==null?'—':`<b style="color:${l>0.05||l<-0.01?'var(--crit)':l>0.03?'var(--warn)':'var(--ok)'}">${P(l)}</b>`}</td><td class="r">${o.effW?P(o.effS/o.effW):'—'}</td><td class="r">${o.pack?F(o.pack):'—'}</td><td class="r">${o.ctns?F(o.ctns,1):'—'}</td><td class="r">${q?F(Math.max(0,q-o.pack)):'—'}</td><td class="small">${[...o.lines].sort().join(' ')}</td><td class="small">${ds.length?ds[0].slice(5)+(ds.length>1?'～'+ds[ds.length-1].slice(5):''):''}</td></tr>`}).join('')+`</tbody></table></div>`;
   h+=`<p class="small muted">${Lx('來源：Och Chanmalen 每天的 Cutting & Packing Report（生產平台匯入後上雲）。「還差」＝ERP 訂單量 − 已裝箱（只算 11 月起有紀錄的）。','Source: daily Cutting & Packing Report imported in the production platform. "Left" = ERP qty − packed (records from Nov 2026).')} <a href="${site}" target="_blank" rel="noopener">${Lx('開生產平台 ↗','Open in production platform ↗')}</a></p>`;
