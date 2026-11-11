@@ -2614,7 +2614,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.5.3';
+const APP_VER='1.6.0';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -4255,7 +4255,7 @@ async function syncTpl(man){
   ['purchase','🛒','g_matl','prod','hub_purchase',['purchase','pprice','receiving']],
   ['materials','🗂️','g_matl','prod','hub_materials',['materials','issues','stockmove']],
   ['fabric','🧶','g_matl','prod','hub_fabric',['fabric','accessories','p-fabstock','p-greige']],
-  ['p-prodplan','📅','g_make','prod','hub_plan',['p-prodplan','p-cutplan','p-cutting']],
+  ['p-prodplan','📅','g_make','prod','hub_plan',['p-prodplan','aiplan','p-cutplan','p-cutting']],
   ['p-sewing','🪡','g_make','prod','hub_sew',['p-sewing','production','wip','p-overview']],
   ['p-qc','✅','g_make','prod',null,['p-qc']],
   ['p-spare','🔧','g_make','prod',null,['p-spare']],
@@ -4272,7 +4272,7 @@ async function syncTpl(man){
   ['telegram','✈️','g_sys','both',null,['telegram']],['audit','🗂️','g_sys','both',null,['audit']],['settings','⚙️','g_sys','both',null,['settings']],
  ];
  const exists=k=>!!(RENDER[k]||CFG[k]);
- const HUB_OF={}, HUB={}; HUBS.forEach(h=>{ h[5]=h[5].filter(k=>k==='styles'||k==='custrep'||exists(k)); h[5].forEach(k=>{HUB_OF[k]=h[0]}); HUB[h[0]]=h });
+ const HUB_OF={}, HUB={}; HUBS.forEach(h=>{ h[5]=h[5].filter(k=>k==='styles'||k==='custrep'||k==='aiplan'||exists(k)); h[5].forEach(k=>{HUB_OF[k]=h[0]}); HUB[h[0]]=h });
  const icoOf={}; MODS.forEach(m=>icoOf[m[0]]=m[1]);
  MODS.length=0; HUBS.forEach(h=>{ if(h[5].length)MODS.push([h[0],h[1],h[2],h[3]]) });
  const _rn=renderNav;
@@ -5902,6 +5902,170 @@ init();
  if(!window.STY_TABS.some(x=>x[0]==='bomcmp')){ const i=window.STY_TABS.findIndex(x=>x[0]==='bomv')+1||window.STY_TABS.length; window.STY_TABS.splice(i,0,['bomcmp','⚖️',['生產 BOM 對照','Prod BOM check']]) }
  window.PSJ_BOMCMP={loadProdBom,compare,prodFor,_reset:()=>{PB=null}};
 })();
+</script>
+<script>
+/* v1.6.0（2026-11-11）🤖 AI 預排（排單・裁剪 分頁）：Paul 11/07「生產總覽也能像 PSJHR 薪資一樣先預排，再跟後面的生產排單比哪裡有差別，逐漸修正，最終自己排出差不多的生產計劃」。
+   資料（全部唯讀）：ERP 未結訂單（ordersView）、客戶 PO 交期（custpo）、過去出貨前置天數（shipping）、車縫日報（CHAINIX：每線每天件數）、
+   款式 SMV（styleIdx：ERP 舊 SMV＋IE 新 SMV → 生產用 SMV 規則）、PC 排產（生產雲端 tool=prodplan）、柬埔寨假日。
+   排法（每一步都寫在頁面上，看得懂、可以對）：
+   1. 要做的量＝訂單量 − 成品入庫（FG），只看最近 8 個月的未結單。
+   2. 交期＝客戶 PO 出貨日 → PC 排產的出貨日 → 接單日＋這個客戶過去的接單到出貨天數。
+   3. 每條線一天做得出幾分鐘＝最近 4 週每天「件數 × 生產用 SMV」的中位數。
+   4. 依交期先後排；每張單挑「最早做完」的線：做過同款的線優先，換款第一天只算 6 成產能，假日、週日不排。
+   5. 線上正在做的款先接著做完。 */
+(function(){
+ if(typeof RENDER==='undefined')return;
+ const Lx=(zh,en)=>((typeof LANG!=='undefined'?LANG:0)===1?en:zh);
+ const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const F=(n,d)=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d==null?0:d});
+ const K=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
+ const MON={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+ /* 日期統一成 YYYY-MM-DD：2026-12-01、02-JAN-27、01/12/2026、Excel 序號都吃 */
+ const d10=v=>{ if(v==null||v==='')return ''; if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d.toISOString().slice(0,10)}
+   const t=String(v).trim(); let m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+   m=t.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s](\d{2,4})/); if(m&&MON[m[2].toUpperCase()]){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+String(MON[m[2].toUpperCase()]).padStart(2,'0')+'-'+m[1].padStart(2,'0')}
+   m=t.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/); if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+   return /^\d{4}-\d{2}-\d{2}/.test(t)?t.slice(0,10):'' };
+ const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ const D=s=>new Date((/^\d{4}-\d{2}-\d{2}$/.test(s)?s:d10(s))+'T00:00:00');
+ const addD=(s,n)=>{const d=D(s);d.setDate(d.getDate()+n);return ymd(d)};
+ const today=()=>ymd(new Date());
+ const HOL=new Set(['2026-01-01','2026-01-07','2026-03-08','2026-04-14','2026-04-15','2026-04-16','2026-05-01','2026-05-05','2026-05-14','2026-06-18','2026-09-24','2026-10-10','2026-10-11','2026-10-12','2026-10-15','2026-10-29','2026-11-09','2026-11-23','2026-11-24','2026-11-25','2026-12-29']);
+ const work=d=>D(d).getDay()!==0&&!HOL.has(d);
+ const nextWork=d=>{let x=d;while(!work(x))x=addD(x,1);return x};
+ const median=a=>{const b=a.filter(x=>x>0).sort((x,y)=>x-y);if(!b.length)return 0;const m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2};
+ const lineKey=v=>{const m=String(v||'').toUpperCase().match(/(\d+)/);return m?'L'+Number(m[1]):''};
+ const cutRule=(prev,cur)=>{if(!(prev>0&&cur>0))return 0;const ch=(cur-prev)/prev;return ch>=0?0:ch<=-0.2?0.15:ch<=-0.1?0.10:0.05};
+ /* 生產用 SMV：IE 重測過（有 IE 新值又有 ERP 舊值）→ 新值依差距扣 0/5/10/15%；只有舊值 → 扣 35%；只有日報值 → 照用 */
+ const SMC=new Map();
+ function styOf(sk){let m;try{m=styleIdx().map}catch(e){return null} if(m.has(sk))return m.get(sk); for(let n=sk.length-1;n>=4;n--){if(m.has(sk.slice(0,n)))return m.get(sk.slice(0,n))} return null}
+ function prodSmv(sk,orderSmv){const ck=sk+'|'+(orderSmv||'');if(SMC.has(ck))return SMC.get(ck);const r=prodSmv0(sk,orderSmv);SMC.set(ck,r);return r}
+ function prodSmv0(sk,orderSmv){const s=styOf(sk);
+   const ieU=s&&s.ie&&s.ie.find(v=>v.kind==='upd'&&(!v.appr||/approved/i.test(v.appr))),ieV=ieU&&+ieU.v||0,erpV=s&&s.erp&&+s.erp.smv>0.01?+s.erp.smv:0,prevV=ieU&&+ieU.prev>0?+ieU.prev:erpV;
+   if(ieV>0){const c=cutRule(prevV||ieV,ieV);return {v:ieV*(1-c),how:Lx('IE 新 ','IE ')+F(ieV,3)+(c?' −'+Math.round(c*100)+'%':'')}}
+   if(erpV>0)return {v:erpV*0.65,how:Lx('ERP 舊 ','ERP old ')+F(erpV,3)+' −35%'};
+   const c=s&&s.cur&&+s.cur.v>0?+s.cur.v:(+orderSmv||0);return c>0?{v:c,how:Lx('現行 ','current ')+F(c,3)}:{v:0,how:Lx('沒有 SMV','no SMV')}}
+ /* PC 排產（生產雲端 prodplan），hash 快取 */
+ let PLAN=null,planBusy=false;const planWait=[];
+ async function loadPlan(after){ if(after)planWait.push(after); if(PLAN||planBusy)return; planBusy=true; try{ const G=window.PROD_GAS; let c=null; try{c=await IDB.get('prodcache#prodplan')}catch(e){} c=c&&c.b?c:{h:{},b:{}};
+   const m=await fetch(G+'?action=smartManifest&tool=prodplan&t='+Date.now(),{redirect:'follow',cache:'no-store'}).then(r=>r.json()); const H=(m.data||m).hashes||{}; const want=Object.keys(H); let ch=false;
+   for(let i=0;i<want.length;i+=3)await Promise.all(want.slice(i,i+3).map(async k=>{ if(c.h[k]===H[k]&&c.b[k])return; const b=await fetch(G+'?action=smartBucket&tool=prodplan&bucket='+encodeURIComponent(k)+'&hash='+encodeURIComponent(H[k]),{redirect:'follow'}).then(r=>r.json()); const rows=(b.data&&b.data.records)||[];
+     c.b[k]=rows.map(r=>{const v=r._vrtValue||r;if(!v||!v.style)return null;return {id:String(v.id||''),month:String(v.month||''),line:lineKey(v.line),cust:String(v.customer||''),po:String(v.po||''),style:String(v.style||''),qty:+v.sewingQty||0,daily:+v.dailyOutput||0,mp:+v.manpower||0,smv:+v.smv||0,s:d10(v.startDate),e:d10(v.endDate||v.finishDate),ship:d10(v.shipmentDate)}}).filter(Boolean); c.h[k]=H[k]; ch=true }));
+   Object.keys(c.b).forEach(k=>{if(!want.includes(k)){delete c.b[k];delete c.h[k];ch=true}}); if(ch)try{await IDB.set('prodcache#prodplan',c)}catch(e){}
+   PLAN=Object.values(c.b).flat(); }catch(e){ PLAN=[]; PLAN.err=String(e.message||e) } finally{ planBusy=false; const w=planWait.splice(0); setTimeout(()=>w.forEach(f=>{try{f()}catch(e){}}),50) } }
+
+ /* ── 1. 需求：未結單、還沒入庫的量、交期 ── */
+ function demand(from){ const ov=ordersView(),lim=addD(from,-240);
+   const cpo=new Map();(DB.custpo||[]).forEach(r=>{const k=K(r.po_no);const d=d10(r.ship_date||r.required_date);if(k&&d){const o=cpo.get(k);if(!o||d<o)cpo.set(k,d)}});
+   const planShip=new Map();(PLAN||[]).forEach(p=>{if(p.ship){[K(p.po),K(p.style)].forEach(k=>{if(k&&(!planShip.has(k)||p.ship<planShip.get(k)))planShip.set(k,p.ship)})}});
+   /* 每個客戶：接單到第一次出貨的中位數天數（過去兩年） */
+   const firstShip=new Map();(DB.shipping||[]).forEach(r=>{const k=K(r.my_no||r.od_no);const d=d10(r.ship_date);if(k&&d&&(!firstShip.has(k)||d<firstShip.get(k)))firstShip.set(k,d)});
+   const leadBy=new Map();ov.forEach(o=>{const f=firstShip.get(K(o.my_no))||firstShip.get(K(o.od_no));const od=d10(o.order_date);if(f&&od>=addD(from,-730)){const n=Math.round((D(f)-D(od))/864e5);if(n>5&&n<200){const a=leadBy.get(o.cust)||[];a.push(n);leadBy.set(o.cust,a)}}});
+   const leadAll=median([].concat(...leadBy.values()))||60;
+   /* 已做多少：FG、出貨、車縫日報（同 PO 同款）取最大的；ERP 的 FG 常常沒入，車縫日報比較準 */
+   const grp=new Map();ov.forEach(o=>{ if(o.status!=='open')return; const od=d10(o.order_date); if(!od||od<lim)return; if(!(+o.qty>0))return;
+     const sk=K(o.style); let c=null;try{c=window.chainFor?chainFor(o,1):null}catch(e){} const sw=c&&c.sew&&c.sew.pcs!=null?c.sew:null;
+     const gk=(sw&&sw.key||K(o.po_no))+'|'+sk; let g=grp.get(gk); if(!g){g={sk,os:[],qty:0,fg:0,ship:0,sewn:sw?+sw.raw||0:0,sewLast:sw?d10(sw.last):''};grp.set(gk,g)} g.os.push(o);g.qty+=+o.qty||0;g.fg+=+o.fg_qty||0;g.ship+=+o.ship_qty||0 });
+   const jobs=[],stale=[];grp.forEach(g=>{ const done=Math.max(g.fg,g.ship,g.sewn); if(g.qty-done<12)return;
+     g.os.sort((a,b)=>String(a.order_date).localeCompare(String(b.order_date)));
+     g.os.forEach(o=>{ const q=+o.qty||0;
+       const sk=g.sk,sm=prodSmv(sk,o.smv); let due=cpo.get(K(o.po_no)),src='PO';
+       if(!due){due=planShip.get(K(o.my_no))||planShip.get(K(o.po_no))||planShip.get(sk);src=Lx('排產表','plan')}
+       if(!due){const L=median(leadBy.get(o.cust)||[])||leadAll;due=addD(d10(o.order_date),Math.round(L));src=Lx('推估 ','est. ')+Math.round(L)+Lx(' 天',' d')}
+       const j={id:o.id,my:o.my_no,od:o.od_no,po:o.po_no,cust:o.cust,style:o.style,sk,name:o.style_name,qty:q,fg:+o.fg_qty||0,sewn:g.sewn,sewLast:g.sewLast,rem:0,due,dueSrc:src,smv:sm.v,smvHow:sm.how,orderDate:d10(o.order_date)};
+       j._q=q; jobs.push(j) });
+     /* 把剩下的量（總量−已做）由最晚的單往前分配：最早的單算先做完 */
+     let r=g.qty-done; for(let i=g.os.length-1;i>=0;i--){ const j=jobs.find(x=>x.id===g.os[i].id); if(!j)continue; const v=Math.min(j._q,r); j.rem=v; j.min=v*j.smv; r-=v } });
+   for(let i=jobs.length-1;i>=0;i--){ const j=jobs[i]; if(j.rem<12){jobs.splice(i,1);continue}
+     /* 交期過了 45 天以上、最近 30 天也沒有車縫 → 多半是 ERP 沒結案，列出來請確認，不排 */
+     if(j.due<addD(from,-45)&&(!j.sewLast||j.sewLast<addD(from,-30))){stale.push(j);jobs.splice(i,1)} }
+   demand.stale=stale;
+   /* 同款同交期合併成一個工作（同款連著做才不會一直換款） */
+   const g=new Map();jobs.forEach(j=>{const k=j.sk+'|'+j.due;const o=g.get(k);if(o){o.rem+=j.rem;o.min+=j.min;o.orders.push(j)}else g.set(k,{...j,orders:[j]})});
+   return [...g.values()].sort((a,b)=>a.due.localeCompare(b.due)||b.min-a.min) }
+
+ /* ── 2. 產能：每線每天標準分鐘（最近 4 週中位數）＋線和款的習慣 ── */
+ function capacity(from){ const IX=window.CHAINIX&&CHAINIX(); const lines=new Map(); if(!IX||!IX.sew)return lines; const lo=addD(from,-28),lo2=addD(from,-150);
+   IX.sew.forEach(e=>e.sty.forEach((x,sk)=>{const sm=prodSmv(sk).v;x.rows.forEach(r=>{const L=lineKey(r.line);if(!L||!r.d)return;let o=lines.get(L);if(!o){o={line:L,day:new Map(),styles:new Map(),last:new Map()};lines.set(L,o)}
+     if(r.d>=lo2){o.styles.set(sk,(o.styles.get(sk)||0)+(+r.pcs||0))} if(r.d<from){const p=o.last.get(sk)||'';if(r.d>p)o.last.set(sk,r.d)}
+     if(r.d>=lo&&r.d<from&&sm>0){const v=o.day.get(r.d)||{pcs:0,min:0};v.pcs+=+r.pcs||0;v.min+=(+r.pcs||0)*sm;o.day.set(r.d,v)}})}));
+   lines.forEach(o=>{o.cap=median([...o.day.values()].map(v=>v.min));o.days=o.day.size;const mx=[...o.last.values()].sort().pop()||'';o.lastDay=mx;o.current=[...o.last.entries()].filter(x=>x[1]>=addD(mx,-2)).sort((a,b)=>b[1].localeCompare(a[1])).map(x=>x[0])});
+   [...lines.keys()].forEach(k=>{if(!(lines.get(k).cap>0))lines.delete(k)}); return lines }
+
+ /* ── 3. 排：交期先後，每張挑最早做完的線 ── */
+ function schedule(from,to,jobs,lines){ const L=[...lines.values()].sort((a,b)=>a.line.localeCompare(b.line,undefined,{numeric:true})).map(o=>({...o,free:nextWork(from),lastStyle:o.current[0]||'',bars:[]}));
+   const out=[];
+   /* 正在做的款先接著做 */
+   const ordered=jobs.slice().sort((a,b)=>{const ca=L.some(l=>l.current.includes(a.sk))?0:1,cb=L.some(l=>l.current.includes(b.sk))?0:1;return ca-cb||a.due.localeCompare(b.due)});
+   for(const j of ordered){ if(!(j.smv>0)){out.push({...j,line:'',why:Lx('沒有 SMV，沒辦法排','no SMV')});continue}
+     let best=null;for(const l of L){ if(l.free>to)continue; const same=l.lastStyle===j.sk,known=(l.styles.get(j.sk)||0)>0; let d=l.free,left=j.min,first=!same,days=0,start=null,end=null;
+       while(left>0&&d<=addD(to,60)){ if(work(d)){ const c=l.cap*(first?0.6:1); left-=c; first=false; days++; if(!start)start=d; end=d } d=addD(d,1) }
+       const score=D(end)-(known?2*864e5:0)-(same?3*864e5:0); if(!best||score<best.score)best={l,start,end,days,score,same,known} }
+     if(!best){out.push({...j,line:'',why:Lx('這個月排不下','no room this month')});continue}
+     const l=best.l; l.free=nextWork(addD(best.end,1)); l.lastStyle=j.sk;
+     const r={...j,line:l.line,start:best.start,end:best.end,days:best.days,daily:Math.round(l.cap/j.smv),late:best.end>j.due,same:best.same,known:best.known};l.bars.push(r);out.push(r) }
+   return {jobs:out,lines:L} }
+
+ /* ── 4. 跟 PC 排產比 ── */
+ /* 兩邊都先「同款合起來」再比：PC 排產一款常拆很多色、很多列，AI 也會因交期拆成幾段 */
+ function compare(res,from,to){ const all=(PLAN||[]).filter(p=>p.s&&(p.e||p.s)>=from&&p.s<=to);
+   const pcTo=all.reduce((m,p)=>(p.e||p.s)>m?(p.e||p.s):m,''), upto=pcTo&&pcTo<to?pcTo:to;   /* PC 排產只排到哪天，就只比到那天 */
+   const agg=(list,f)=>{const g=new Map();list.forEach(x=>{const k=f.k(x);if(!k)return;let o=g.get(k);if(!o){o={sk:k,style:f.style(x),cust:f.cust(x),pcs:0,lines:new Map(),s:'',e:'',dsum:0,dn:0,smvs:[],dues:[]};g.set(k,o)}
+     o.pcs+=f.pcs(x);const L=f.line(x);if(L)o.lines.set(L,(o.lines.get(L)||0)+f.pcs(x));const s=f.s(x),e=f.e(x);if(s&&(!o.s||s<o.s))o.s=s;if(e&&e>o.e)o.e=e;const d=f.daily(x);if(d>0){o.dsum+=d;o.dn++}const sm=f.smv(x);if(sm>0)o.smvs.push(sm);const du=f.due(x);if(du)o.dues.push(du)});
+     g.forEach(o=>{o.daily=o.dn?Math.round(o.dsum/o.dn):0;o.smv=median(o.smvs);o.line=[...o.lines.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]).join('、');o.due=o.dues.sort()[0]||''});return g};
+   const AI=agg(res.jobs.filter(j=>j.line&&j.start<=upto),{k:j=>j.sk,style:j=>j.style,cust:j=>j.cust,pcs:j=>{if(j.end<=upto)return j.rem;const tot=Math.max(1,j.days);let n=0;for(let d=j.start;d<=upto;d=addD(d,1))if(work(d))n++;return Math.round(j.rem*Math.min(1,n/tot))},line:j=>j.line,s:j=>j.start,e:j=>j.end>upto?upto:j.end,daily:j=>j.daily,smv:j=>j.smv,due:j=>j.due});
+   const PC=agg(all,{k:p=>K(p.style),style:p=>p.style,cust:p=>p.cust,pcs:p=>p.qty,line:p=>p.line,s:p=>p.s,e:p=>p.e||p.s,daily:p=>p.daily,smv:p=>p.smv,due:p=>p.ship});
+   /* PC 款號常帶顏色字尾（1521G vs 1521）→ 對不到時用前綴找 */
+   const pcFor=sk=>{if(PC.has(sk))return sk;for(const k of PC.keys()){if(k.length>=4&&sk.length>=4&&(k.startsWith(sk)||sk.startsWith(k)))return k}return null};
+   const rows=[],used=new Set();
+   AI.forEach((j,sk)=>{ const pk=pcFor(sk); const p=pk&&!used.has(pk)?PC.get(pk):null; if(p)used.add(pk); const jj={...j,rem:j.pcs,start:j.s,end:j.e};
+     if(!p){rows.push({k:'aionly',j:jj,t:Lx('AI 有排、PC 沒排','AI only')});return}
+     const pp={...p,qty:p.pcs,ship:p.due},flags=[];
+     const sameLine=[...j.lines.keys()].some(l=>p.lines.has(l)); if(!sameLine)flags.push(Lx('線不同（PC ','line differs (PC ')+p.line+Lx('，AI ',', AI ')+j.line+'）');
+     const ds=Math.round((D(p.s)-D(j.s))/864e5); if(Math.abs(ds)>3)flags.push(Lx('開始差 ','start ')+(ds>0?Lx('PC 晚 ','PC later ')+ds:Lx('PC 早 ','PC earlier ')+(-ds))+Lx(' 天',' d'));
+     const de=Math.round((D(p.e)-D(j.e))/864e5); if(Math.abs(de)>3)flags.push(Lx('完工差 ','finish ')+(de>0?Lx('PC 晚 ','PC later ')+de:Lx('PC 早 ','PC earlier ')+(-de))+Lx(' 天',' d'));
+     if(p.pcs&&j.pcs&&Math.abs(p.pcs-j.pcs)/Math.max(p.pcs,j.pcs)>0.2)flags.push(Lx('件數 PC ','pcs PC ')+F(p.pcs)+Lx('、AI ',', AI ')+F(j.pcs));
+     if(p.daily&&j.daily&&Math.abs(p.daily-j.daily)/j.daily>0.2)flags.push(Lx('日產 PC ','daily PC ')+F(p.daily)+Lx('、AI ',', AI ')+F(j.daily));
+     if(p.smv&&j.smv&&Math.abs(p.smv-j.smv)/j.smv>0.05)flags.push('SMV PC '+F(p.smv,2)+Lx('、AI ',', AI ')+F(j.smv,2));
+     rows.push({k:flags.length?'diff':'same',j:jj,p:pp,t:flags.join('；')||Lx('差不多','close'),n:flags.length}) });
+   PC.forEach((p,k)=>{if(!used.has(k))rows.push({k:'pconly',p:{...p,qty:p.pcs,ship:p.due},t:Lx('PC 有排、AI 沒排（ERP 沒有這款的未結單，或日報顯示已做完）','PC only (no open ERP order, or already sewn)')})});
+   rows.upto=upto; rows.pcTo=pcTo; return rows }
+
+ let RES=null,CMP=null,AT='',VIEW='line';
+ function run(){ SMC.clear(); const from=nextWork(addD(today(),1)),nm=new Date(D(from).getFullYear(),D(from).getMonth()+2,0),to=ymd(nm); const lines=capacity(from),jobs=demand(from),res=schedule(from,to,jobs,lines);
+   RES={from,to,lines,jobs,res,stale:demand.stale||[]}; CMP=compare(res,from,to); AT=new Date().toLocaleString(); return RES }
+ function summaryText(){ if(!RES)return ''; const r=RES.res,sch=r.jobs.filter(j=>j.line&&j.start<=RES.to),late=sch.filter(j=>j.late),un=r.jobs.filter(j=>!j.line||j.start>RES.to),c={};CMP.forEach(x=>c[x.k]=(c[x.k]||0)+1);
+   const top=CMP.filter(x=>x.k==='diff').sort((a,b)=>b.n-a.n||b.j.rem-a.j.rem).slice(0,8).map(x=>'・'+x.j.style+'：'+x.t);const ai=CMP.filter(x=>x.k==='aionly').sort((a,b)=>a.j.due.localeCompare(b.j.due)).slice(0,6).map(x=>'・'+x.j.style+' '+F(x.j.rem)+Lx(' 件，交期 ',' pcs, due ')+x.j.due);
+   return [Lx('🤖 AI 預排 vs PC 排產（','🤖 AI plan vs PC plan (')+RESRange()+'）'+(CMP.upto&&CMP.upto<RES.to?Lx('\n　PC 排產目前排到 ','\n  PC plan currently runs to ')+CMP.upto.slice(5)+Lx('，差異只比到這天',' — compared up to that day'):''),Lx('・AI 排了 ','・AI scheduled ')+new Set(sch.map(j=>j.sk)).size+Lx(' 款／',' styles / ')+F(sch.reduce((s,j)=>s+j.rem,0))+Lx(' 件；會晚交的 ',' ; late ')+new Set(late.map(j=>j.sk)).size+Lx(' 款，其中 ',' , of which ')+late.filter(j=>j.due<RES.from).length+Lx(' 段交期已經過了','  already past due')+(un.length?Lx('；排不下 ','; not placed ')+un.length:'')+(RES.stale.length?Lx('\n・ERP 未結但看起來已停的舊單 ','\n・old open ERP orders to confirm ')+RES.stale.length+Lx(' 張（沒排，請確認是否結案）',' (not scheduled)'):''),
+     Lx('・跟 PC 一樣 ','・same as PC ')+(c.same||0)+Lx('，有差異 ',', different ')+(c.diff||0)+Lx('，只有 AI 排 ',', AI only ')+(c.aionly||0)+Lx('，只有 PC 排 ',', PC only ')+(c.pconly||0),
+     top.length?Lx('差異：','Differences:'):'',...top,ai.length?Lx('PC 還沒排、但 ERP 有未結單：','Open ERP orders not in the PC plan:'):'',...ai].filter(Boolean).join('\n') }
+ const RESRange=()=>RES?RES.from.slice(5)+'～'+RES.to.slice(5):'';
+
+ Object.assign(T,{aiplan:['🤖 AI 預排','AI pre-plan','AI ផែនការ'],sub_aiplan:['先用 ERP 未結單、各線過去的產能、生產用 SMV、假日自己排一份計畫，再跟 PC 的排產比哪裡不一樣；差異用來逐步修正。','A plan drafted from open ERP orders, line history, production SMV and holidays, compared with the PC plan.']});
+ RENDER.aiplan=function(){ let h=(typeof pageHead==='function'?pageHead('aiplan',`<button class="btn sm" onclick="AIPLAN.rerun()">↻ ${Lx('重新排','Re-plan')}</button><button class="btn sm" onclick="AIPLAN.copy()">📋 ${Lx('複製差異摘要','Copy summary')}</button>`):'<h2>🤖 AI 預排</h2>');
+   if(!window.CHAINIX||!CHAINIX()){ if(window.loadChain&&!CHAIN.busy)setTimeout(()=>loadChain(false).then(()=>{if(CUR==='aiplan')rerender()}),30); return h+`<div class="note">⏳ ${Lx('讀取車縫日報…（第一次約 3–4 分鐘）','Loading sewing reports…')}</div>` }
+   if(!PLAN){ loadPlan(()=>{RES=null;if(CUR==='aiplan')rerender()}); return h+`<div class="note">⏳ ${Lx('讀取 PC 排產…','Loading PC plan…')}</div>` }
+   if(!RES)run(); const R=RES,r=R.res,sch=r.jobs.filter(j=>j.line&&j.start<=R.to),late=sch.filter(j=>j.late),un=r.jobs.filter(j=>!j.line||j.start>R.to),c={};CMP.forEach(x=>c[x.k]=(c[x.k]||0)+1);
+   const wd=[];for(let d=R.from;d<=R.to;d=addD(d,1))if(work(d))wd.push(d);const capAll=r.lines.reduce((s,l)=>s+l.cap,0)*wd.length,load=sch.reduce((s,j)=>s+Math.min(j.min,j.min),0);
+   const kpi=(v,l,sub,col)=>`<div class="kpi"><div class="v"${col?` style="color:${col}"`:''}>${v}</div><div class="l">${l}</div>${sub?`<div class="small muted">${sub}</div>`:''}</div>`;
+   h+=`<div class="kpis">${kpi(new Set(sch.map(j=>j.sk)).size,Lx('款（排進這段期間）','styles scheduled'),F(sch.reduce((s,j)=>s+j.rem,0))+Lx(' 件',' pcs'))}${kpi(new Set(late.map(j=>j.sk)).size,Lx('款會晚交','styles late'),late.filter(j=>j.due<R.from).length+Lx(' 段交期已經過了（還沒做完）',' already past due'),late.length?'var(--crit)':'')}${kpi(un.length,Lx('排不下／沒有 SMV','not placed'),Lx('要加班或下個月','needs OT or next month'),un.length?'var(--warn)':'')}${kpi(r.lines.length,Lx('條線','lines'),Lx('每天約 ','about ')+F(r.lines.reduce((s,l)=>s+l.cap,0)/60)+Lx(' 標準工時',' std hours / day'))}${kpi((c.same||0)+(c.diff||0),Lx('款兩邊都有排','styles in both'),Lx('一樣 ','same ')+(c.same||0)+Lx('・有差異 ',' · diff ')+(c.diff||0)+Lx('・只有 AI ',' · AI only ')+(c.aionly||0)+Lx('・只有 PC ',' · PC only ')+(c.pconly||0)+(CMP.upto&&CMP.upto<R.to?Lx('（PC 排到 ',' (PC plan to ')+CMP.upto.slice(5)+Lx('）',')'):''))}</div>`;
+   h+=`<div class="note small">${Lx('期間 ','Period ')}<b>${R.from} → ${R.to}</b>（${wd.length} ${Lx('個工作天',' workdays')}）· ${Lx('排的時間 ','planned at ')}${E(AT)} · ${Lx('PC 排產 ','PC plan ')}${(PLAN||[]).length}${Lx(' 筆',' rows')}${PLAN&&PLAN.err?' · ⚠️ '+E(PLAN.err):''}</div>`;
+   h+=`<div class="seg" style="margin:8px 0">${[['line',Lx('依線','By line')],['cmp',Lx('跟 PC 比','vs PC')],['list',Lx('清單','List')],['stale',Lx('要確認的舊單','Old open orders')+' '+R.stale.length],['how',Lx('怎麼排的','How')]].map(([k,t])=>`<button class="${VIEW===k?'on':''}" onclick="AIPLAN.view('${k}')">${t}</button>`).join('')}</div>`;
+   if(VIEW==='line'){ const span=(D(R.to)-D(R.from))/864e5+1,pos=d=>Math.max(0,Math.min(1,((D(d)-D(R.from))/864e5)/span));
+     const ticks=[];for(let d=R.from;d<=R.to;d=addD(d,1))if(D(d).getDay()===1||d===R.from)ticks.push(d);
+     h+=`<div class="panel" style="overflow:auto"><div style="min-width:900px"><div style="display:grid;grid-template-columns:110px 1fr;gap:8px"><div></div><div style="position:relative;height:18px;border-bottom:1px solid var(--line)">${ticks.map(d=>`<span class="small muted" style="position:absolute;left:${pos(d)*100}%;border-left:1px solid var(--line);padding-left:3px">${d.slice(5).replace('-','/')}</span>`).join('')}${CMP&&CMP.upto&&CMP.upto<R.to?`<span title="${E(Lx('PC 排產排到這天','PC plan ends here'))}" style="position:absolute;left:${pos(addD(CMP.upto,1))*100}%;top:0;bottom:-4px;border-left:2px dashed #f59e0b"></span>`:''}</div></div>`+r.lines.map(l=>{const bars=l.bars.filter(b=>b.start<=R.to);const lanes=[];bars.forEach(b=>{let i=lanes.findIndex(e=>e<b.start);if(i<0){i=lanes.length;lanes.push(b.end)}else lanes[i]=b.end;b._lane=i});
+       return `<div style="display:grid;grid-template-columns:110px 1fr;gap:8px;border-bottom:1px solid var(--line);padding:5px 0"><div><b>${E(l.line)}</b><div class="small muted">${F(l.cap/60,1)} ${Lx('標準工時／天','std h/day')}</div></div><div style="position:relative;height:${Math.max(1,lanes.length)*24+4}px">`+
+         bars.map(b=>{const left=pos(b.start)*100,w=Math.max(1.5,(pos(addD(b.end>R.to?R.to:b.end,1))-pos(b.start))*100);return `<div title="${E(b.style+' · '+b.cust+' · '+F(b.rem)+' pcs · '+b.start+'→'+b.end+' · due '+b.due+' ('+b.dueSrc+')')}" style="position:absolute;top:${b._lane*24+2}px;left:${left}%;width:calc(${w}% - 2px);height:20px;border-radius:5px;background:${b.late?'#ef4444':b.same?'#22c55e':'#3b82f6'};color:#fff;font-size:11px;line-height:20px;padding:0 5px;overflow:hidden;white-space:nowrap;cursor:pointer" onclick="openStyle&&openStyle('${E(b.sk)}')">${E(b.style)} · ${F(b.rem)}</div>`}).join('')+`</div></div>`}).join('')+`</div></div><div class="small muted">${Lx('綠＝接著做線上同一款（不用換款）、藍＝換款、紅＝會晚交；橘色虛線＝PC 排產目前排到的那天。點一下開款式卡。','Green = continues the same style, blue = style change, red = late; orange dashed line = where the PC plan currently ends. Click to open the style card.')}</div>` }
+   else if(VIEW==='cmp'){ const ord={diff:0,aionly:1,pconly:2,same:3};const list=CMP.slice().sort((a,b)=>ord[a.k]-ord[b.k]);const lab={diff:['⚠️',Lx('有差異','Different')],aionly:['🤖',Lx('只有 AI 排','AI only')],pconly:['📋',Lx('只有 PC 排','PC only')],same:['✅',Lx('差不多','Close')]};
+     h+=`<div class="tbl-wrap"><table class="t"><thead><tr><th>${Lx('狀態','Status')}</th><th>${Lx('款式','Style')}</th><th>${Lx('客戶','Cust')}</th><th class="r">${Lx('件數','Pcs')}</th><th>${Lx('交期','Due')}</th><th>AI</th><th>PC</th><th>${Lx('差在哪','What differs')}</th></tr></thead><tbody>`+list.slice(0,400).map(x=>{const j=x.j,p=x.p;return `<tr><td>${lab[x.k][0]} ${lab[x.k][1]}</td><td class="mono">${E(j?j.style:p.style)}</td><td>${E(j?j.cust:p.cust)}</td><td class="r">${F(j?j.rem:p.qty)}</td><td>${E(j?j.due:p.ship)}</td><td class="small">${j&&j.line?E(j.line+' '+j.start.slice(5)+'→'+j.end.slice(5)):'—'}</td><td class="small">${p?E((p.line||'?')+' '+p.s.slice(5)+'→'+(p.e||'').slice(5)):'—'}</td><td class="small">${E(x.t)}</td></tr>`}).join('')+`</tbody></table></div>`;
+     h+=`<div class="panel"><b>📋 ${Lx('差異摘要（給群組用，先給你看）','Summary for the group (preview)')}</b><pre style="white-space:pre-wrap;font-size:12px;margin:6px 0 0">${E(summaryText())}</pre></div>` }
+   else if(VIEW==='list'){ h+=`<div class="tbl-wrap"><table class="t"><thead><tr><th>${Lx('款式','Style')}</th><th>${Lx('客戶','Cust')}</th><th class="r">${Lx('還要做','To make')}</th><th>${Lx('交期（來源）','Due (source)')}</th><th class="r">SMV</th><th>${Lx('線','Line')}</th><th>${Lx('開始→完工','Start → finish')}</th><th class="r">${Lx('日產','Daily')}</th><th>${Lx('狀態','Status')}</th></tr></thead><tbody>`+r.jobs.slice(0,500).map(j=>`<tr><td class="mono"><a href="javascript:void 0" onclick="openStyle&&openStyle('${E(j.sk)}')">${E(j.style)}</a><div class="small muted">${j.orders.length} ${Lx('張單','orders')}</div></td><td>${E(j.cust)}</td><td class="r">${F(j.rem)}</td><td>${E(j.due)} <span class="small muted">${E(j.dueSrc)}</span></td><td class="r" title="${E(j.smvHow)}">${F(j.smv,3)}</td><td>${E(j.line||'—')}</td><td>${j.line?E(j.start+' → '+j.end):'<span class="muted">'+E(j.why||'')+'</span>'}</td><td class="r">${j.daily?F(j.daily):'—'}</td><td>${!j.line?'⚪':j.late?'<b style="color:var(--crit)">'+Lx('會晚交','late')+'</b>':j.start>R.to?Lx('下個月','next month'):'✅'}</td></tr>`).join('')+`</tbody></table></div>` }
+   else if(VIEW==='stale'){ h+=`<div class="note small">${Lx('這些 ERP 還是「未結」，但交期已過 45 天以上、最近 30 天也沒有車縫紀錄，多半是 ERP 沒結案或已經改單。沒有排進去，請業務／PC 確認。','Still open in ERP, due more than 45 days ago and no sewing in the last 30 days — probably not closed in ERP. Not scheduled; please confirm.')}</div><div class="tbl-wrap"><table class="t"><thead><tr><th>${Lx('自編單號','My no')}</th><th>PO</th><th>${Lx('款式','Style')}</th><th>${Lx('客戶','Cust')}</th><th class="r">${Lx('訂單量','Qty')}</th><th class="r">${Lx('已車','Sewn')}</th><th class="r">${Lx('還差','Left')}</th><th>${Lx('交期','Due')}</th><th>${Lx('最後車縫','Last sewn')}</th></tr></thead><tbody>`+R.stale.slice().sort((a,b)=>a.due.localeCompare(b.due)).map(j=>`<tr><td class="mono">${E(j.my)}</td><td class="mono">${E(j.po)}</td><td class="mono">${E(j.style)}</td><td>${E(j.cust)}</td><td class="r">${F(j.qty)}</td><td class="r">${F(j.sewn)}</td><td class="r">${F(j.rem)}</td><td>${E(j.due)}</td><td>${E(j.sewLast||'—')}</td></tr>`).join('')+`</tbody></table></div>` }
+   else { h+=`<div class="panel"><ol style="line-height:1.9;margin:0">${[Lx('要做的量＝ERP 訂單量 − 成品入庫（FG），只看最近 8 個月接的未結單；同款同交期的單合在一起做。','Quantity = ERP order qty − FG received; open orders from the last 8 months; same style + same due date grouped.'),Lx('交期：先用客戶 PO 的出貨日；沒有就用 PC 排產表的出貨日；再沒有就用接單日＋這個客戶過去「接單到出貨」的中位數天數。','Due date: customer PO ship date → PC plan shipment date → order date + this customer\'s median order-to-ship days.'),Lx('生產用 SMV：IE 重測過的款，新 SMV 依跟 ERP 舊 SMV 的差距扣 0/5/10/15%；沒重測的用 ERP 舊 SMV 扣 35%。','Production SMV: IE re-tested → new SMV minus 0/5/10/15% by change vs ERP old SMV; otherwise ERP old SMV −35%.'),Lx('每條線一天做得出的標準分鐘＝最近 4 週每天「件數 × 生產用 SMV」的中位數。','Line capacity = median daily (pieces × production SMV) over the last 4 weeks.'),Lx('排法：線上正在做的款先接著做；其他依交期先後，每張挑最早做完的線，做過同款的線優先；換款第一天只算 6 成；週日和柬埔寨假日不排。','Order: styles already on a line continue first; then by due date, each to the line that finishes earliest, preferring lines that sewed the style; first day after a change at 60%; Sundays and holidays off.'),Lx('跟 PC 排產比：同款（或同 PO）比線、完工日（差 3 天以上）、日產（差 20% 以上）、SMV（差 5% 以上）。','Compared with the PC plan by style / PO: line, finish date (>3 days), daily output (>20%), SMV (>5%).')].map(x=>`<li>${x}</li>`).join('')}</ol><p class="small muted">${Lx('這是第一版，先只比對、不改任何資料。每週一依新訂單和實際產量重排；累積幾週後看跟實際的差距，再調整參數（換款產能、線的習慣、交期來源）。','First version: compare only, nothing is changed. Re-planned every week; parameters tuned after a few weeks of comparison.')}</p></div>` }
+   return h };
+ window.AIPLAN={run,rerun:()=>{RES=null;PLAN=null;rerender()},view:v=>{VIEW=v;rerender()},copy:()=>{const t=summaryText();try{navigator.clipboard.writeText(t);toast(Lx('已複製','Copied'))}catch(e){prompt('',t)}},summary:summaryText,get:()=>RES,cmp:()=>CMP,_cut:cutRule,_prodSmv:prodSmv};
+})();
+
 </script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
 <script src="https://saintdou-weng.github.io/ac-admin/shared/swipe-tabs.js" defer></script>
