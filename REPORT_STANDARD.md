@@ -99,6 +99,6 @@ Paul 的要求（11/11 兩次）：一眼懂、精實、整齊、少 AI 味、�
 - [x] PSJERP 匯入摘要（1.7.2，11/20）
 - [x] 財務摘要（ACC 摘要，vrt-acc-flow-cost，11/20）
 - [x] PSJHR 摘要（11/20）
-- [ ] HRA-PAY／HRA Portal 摘要（在各自 Apps Script，要先讀各自程式再改）
-- [ ] 每週 Outlook 草稿（效率週報、排單報告）第一頁改「結論＋一張總表」
+- [x] HRA Portal 選單訊息（11/20）；HRA-PAY、Attendance 依 Paul 指示不改
+- [x] 每週 Outlook 草稿（效率週報、排單報告）：排程提示詞已加「第一頁結論＋一張總表」與 REPORT_STANDARD 自查（11/20，下週二、週三生效）
 - [ ] AI 排單報告每週自動產出並附準確度分數
