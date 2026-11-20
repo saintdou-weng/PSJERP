@@ -2192,12 +2192,14 @@ function syncCfg(){DB.sync=DB.sync||{time:'08:00',days:'WED',gas:''};if(DB.sync.
 /* ===== v0.7.2 更新摘要（每次匯入後發到 Telegram，並記在雲端 UPDATE_LOG） ===== */
 function digestAdd(done){DB.digest=DB.digest||[];done.forEach(q=>{if(!q.P||!q.done)return;const P=q.P,T2=P.meta.totals||{};DB.digest.push({at:nowStamp(),fn:q.R.fn,zh:q.R.zh,file:q.file,label:P.meta.label||'',rows:P.rows.length,added:q.done.added||0,removed:q.done.removed||0,amount:T2.amount!=null?T2.amount:null,qty:T2.qty!=null?T2.qty:null,bad:P.checks.filter(c=>c.ok===false).length})});persist()}
 function digestText(L){
+ /* v1.7.2 報告標準：先結論（核對）→ 每種報表一行 → 該報表最多 3 個檔 → 連結 */
  const g={};L.forEach(x=>{(g[x.fn+' '+x.zh]=g[x.fn+' '+x.zh]||[]).push(x)});
+ const sg=v=>(v>=0?'+':'−')+fmt(Math.abs(v));
  const lines=Object.keys(g).map(k=>{const a=g[k];const d=a.reduce((s,x)=>s+x.added-x.removed,0);const rows=a.reduce((s,x)=>s+x.rows,0);
-  const det=a.map(x=>`   ${x.file}（${x.label}）${fmt(x.rows)} 列`+(x.removed?`，取代舊 ${fmt(x.removed)} 列`:'，新資料')+(x.amount!=null?` · $${fmt(x.amount,0)}`:'')+(x.bad?` · ❌ ${x.bad} 項核對不符`:'')).join('\n');
-  return `• ${k}：${a.length} 個檔，${fmt(rows)} 列（${d>=0?'+':''}${fmt(d)}）\n${det}`});
+  const det=a.slice(0,3).map(x=>`　${x.file}（${x.label}）${fmt(x.rows)} 列・`+(x.removed?`取代舊 ${fmt(x.removed)} 列`:'新資料')+(x.amount!=null?`・$${fmt(x.amount,0)}`:'')+(x.bad?`・❌ ${x.bad} 項不符`:'')).join('\n')+(a.length>3?`\n　…另 ${a.length-3} 個檔`:'');
+  return `• ${k}　${a.length} 檔・${fmt(rows)} 列（${sg(d)}）\n${det}`});
  const bad=L.reduce((s,x)=>s+x.bad,0);
- return `時間：${nowStamp().slice(0,16)}\n共 ${L.length} 個檔、${Object.keys(g).length} 種報表${bad?`，⚠️ ${bad} 項核對不符`:'，核對全部 ✅'}\n\n${lines.join('\n')}\n\n（括號＝比上次多／少的列數）\n📊 https://${PAGE_BASE}#sync`}
+ return `${bad?`⚠️ ${bad} 項核對不符，請看下面 ❌`:'✅ 核對全部相符'}（${L.length} 檔・${Object.keys(g).length} 種報表）\n━━━━━━━━━━━━\n${lines.join('\n')}\n━━━━━━━━━━━━\n${nowStamp().slice(0,16)}・括號＝比上次多減的列數\n📊 https://${PAGE_BASE}#sync`}
 async function sendDigest(manual){
  const L=(DB.digest||[]).slice(); if(!L.length){if(manual)toast(tt('沒有新的匯入','No new imports'));return}
  if(!cloudReady()){if(manual)toast(tt('請先在「設定 → 雲端同步」輸入同步密碼','Enter the sync password first'));return}
@@ -2614,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.1';
+const APP_VER='1.7.2';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
