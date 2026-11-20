@@ -98,6 +98,7 @@ Paul 的要求（11/11 兩次）：一眼懂、精實、整齊、少 AI 味、�
 >>>>>>> 6458350 (報告標準進度：週報完成)
 - [x] PSJERP 匯入摘要（1.7.2，11/20）
 - [x] 財務摘要（ACC 摘要，vrt-acc-flow-cost，11/20）
-- [ ] PSJHR 週更新摘要、HRA-PAY／HRA Portal 摘要
+- [x] PSJHR 摘要（11/20）
+- [ ] HRA-PAY／HRA Portal 摘要（在各自 Apps Script，要先讀各自程式再改）
 - [ ] 每週 Outlook 草稿（效率週報、排單報告）第一頁改「結論＋一張總表」
 - [ ] AI 排單報告每週自動產出並附準確度分數
