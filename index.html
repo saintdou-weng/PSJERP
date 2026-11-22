@@ -2616,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.6';
+const APP_VER='1.7.7';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6246,78 +6246,7 @@ init();
  const _ws=window.wipStages; if(typeof _ws==='function')window.wipStages=function(){ if(isDemo())return _ws.apply(this,arguments); if(!PW.at&&!PW.busy)prodWip(); const w=PW.d; return w&&w.cutNotSewn!=null?[[Lx('已裁未縫（生產日報 ','Cut, not sewn (daily report ')+PW.date+'）',w.cutNotSewn]]:[] };
 })();
 
-/* ===== v1.7.6（2026-11-22）🎵 放鬆音樂 =====
-   上方工具列多一個 🎵 鈕，預設關。雨聲、海浪、輕鋼琴都是瀏覽器自己即時產生的（不下載、不連外、沒有版權問題）；
-   另有兩個公開網路電台（連不上會自動改播雨聲）。音量小／中／大。換頁不會停（同一頁內切換分頁）。只記住上次選的聲音和音量，不會自動播放。 */
-(function(){
- if(window.__PSJ_MUSIC)return;window.__PSJ_MUSIC=1;
- const Lx=(z,e)=>(typeof tt==='function'?tt(z,e):z);
- const SRC=[
-  {k:'rain',ic:'🌧️',zh:'雨聲',en:'Rain',gen:1},
-  {k:'sea',ic:'🌊',zh:'海浪',en:'Ocean waves',gen:1},
-  {k:'piano',ic:'🎹',zh:'輕鋼琴（自動彈）',en:'Soft piano (generated)',gen:1},
-  {k:'classic',ic:'🎻',zh:'古典音樂電台',en:'Classical radio',note:'Radio Swiss Classic',urls:['https://stream.srg-ssr.ch/m/rsc_de/mp3_128','https://stream.srg-ssr.ch/m/rsc_de/aacp_96']},
-  {k:'ambient',ic:'🌌',zh:'氛圍輕音樂電台',en:'Ambient radio',note:'SomaFM Drone Zone',urls:['https://ice2.somafm.com/dronezone-128-mp3','https://ice4.somafm.com/dronezone-128-mp3','https://ice1.somafm.com/dronezone-128-mp3']}
- ];
- const VOL={s:.12,m:.3,l:.6};
- let st={src:'rain',vol:'m'}; try{ const j=JSON.parse(localStorage.getItem('psj_music')||'null'); if(j&&SRC.some(x=>x.k===j.src)&&VOL[j.vol])st=j }catch(e){}
- const save=()=>{try{localStorage.setItem('psj_music',JSON.stringify(st))}catch(e){}};
- let on=false, ctx=null, master=null, nodes=[], timer=0, radio=null, rTry=0, rWatch=0;
- const noiseBuf=(kind)=>{ const n=ctx.sampleRate*4, b=ctx.createBuffer(1,n,ctx.sampleRate), d=b.getChannelData(0); let last=0; for(let i=0;i<n;i++){ const w=Math.random()*2-1; if(kind==='brown'){ last=(last+0.02*w)/1.02; d[i]=last*3.5 } else d[i]=w } return b };
- const loop=(buf)=>{ const s=ctx.createBufferSource(); s.buffer=buf; s.loop=true; s.start(); nodes.push(s); return s };
- const flt=(type,f,q)=>{ const x=ctx.createBiquadFilter(); x.type=type; x.frequency.value=f; if(q)x.Q.value=q; nodes.push(x); return x };
- const gain=v=>{ const g=ctx.createGain(); g.gain.value=v; nodes.push(g); return g };
- function genStop(){ clearTimeout(timer); timer=0; nodes.forEach(n=>{ try{n.stop&&n.stop()}catch(e){} try{n.disconnect()}catch(e){} }); nodes=[] }
- function genStart(k){
-  if(!ctx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)throw new Error('no audio'); ctx=new AC(); master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination) }
-  if(ctx.state==='suspended')ctx.resume();
-  genStop(); master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(VOL[st.vol],ctx.currentTime,.4);
-  if(k==='rain'){ const w=loop(noiseBuf('white')), a=flt('highpass',900), b=flt('lowpass',7000), g=gain(.5); w.connect(a);a.connect(b);b.connect(g);g.connect(master);
-   const r=loop(noiseBuf('brown')), c=flt('lowpass',350), g2=gain(.55); r.connect(c);c.connect(g2);g2.connect(master) }
-  else if(k==='sea'){ const r=loop(noiseBuf('brown')), c=flt('lowpass',700), g=gain(.6); r.connect(c);c.connect(g);g.connect(master);
-   const lfo=ctx.createOscillator(); lfo.frequency.value=.09; const lg=gain(.38); lfo.connect(lg); lg.connect(g.gain); lfo.start(); nodes.push(lfo);
-   const w=loop(noiseBuf('white')), a=flt('bandpass',2500,.6), g2=gain(.08); w.connect(a);a.connect(g2);g2.connect(master);
-   const l2=ctx.createOscillator(); l2.frequency.value=.09; const lg2=gain(.07); l2.connect(lg2); lg2.connect(g2.gain); l2.start(ctx.currentTime+2.5); nodes.push(l2) }
-  else if(k==='piano'){ const dly=ctx.createDelay(1); dly.delayTime.value=.33; const fb=gain(.38), lp=flt('lowpass',2200), wet=gain(.5), dry=gain(.9); nodes.push(dly);
-   dry.connect(master); dry.connect(dly); dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(wet); wet.connect(master);
-   const CH=[[0,4,7,12,16],[9,12,16,21,24],[5,9,12,17,21],[7,11,14,19,23]], F=n=>261.63*Math.pow(2,n/12); let bar=0, beat=0;
-   const note=(n,vel,len)=>{ const t=ctx.currentTime+.02, o1=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(); o1.type='sine'; o2.type='triangle'; o1.frequency.value=F(n); o2.frequency.value=F(n)*2.001; const g2=ctx.createGain(); g2.gain.value=.18;
-    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vel,t+.012); g.gain.exponentialRampToValueAtTime(.0008,t+len); o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(dry); o1.start(t); o2.start(t); o1.stop(t+len+.1); o2.stop(t+len+.1); o1.onended=()=>{try{g.disconnect();g2.disconnect()}catch(e){}} };
-   const tick=()=>{ if(!on||st.src!=='piano')return; const c=CH[bar%4]; if(beat===0)note(c[0]-12,.32,4.5); if(Math.random()<.8)note(c[1+Math.floor(Math.random()*4)],.2+Math.random()*.12,3+Math.random()*1.5); if(Math.random()<.22)note(c[2]+12,.11,3);
-    beat=(beat+1)%4; if(beat===0)bar++; timer=setTimeout(tick,650+Math.random()*900) }; tick() }
- }
- function radioStop(){ clearTimeout(rWatch); if(radio){ try{radio.pause();radio.removeAttribute('src');radio.load()}catch(e){} radio=null } }
- function radioStart(S){ radioStop(); if(master&&ctx)master.gain.setTargetAtTime(0,ctx.currentTime,.2); genStop(); rTry=0;
-  const next=()=>{ if(!on||st.src!==S.k)return; if(rTry>=S.urls.length){ msg(Lx('這個電台現在連不上，先改播雨聲。','This station is not reachable right now — switched to rain.')); st.src='rain'; save(); genStart('rain'); draw(); return }
-   const a=new Audio(); radio=a; a.preload='none'; a.volume=Math.min(1,VOL[st.vol]*1.4); a.src=S.urls[rTry++]; let ok=false; a.addEventListener('playing',()=>{ok=true;clearTimeout(rWatch);draw()}); a.addEventListener('error',()=>{ if(radio===a&&!ok)next() });
-   clearTimeout(rWatch); rWatch=setTimeout(()=>{ if(radio===a&&!ok){ try{a.pause()}catch(e){} next() } },12000); const p=a.play(); if(p&&p.catch)p.catch(()=>{ if(radio===a&&!ok)next() }) }; next() }
- const msg=t0=>{ try{ if(typeof toast==='function')toast(t0) }catch(e){} };
- function play(){ on=true; const S=SRC.find(x=>x.k===st.src)||SRC[0]; try{ if(S.gen){ radioStop(); genStart(S.k) } else radioStart(S) }catch(e){ on=false; msg(Lx('這個瀏覽器不能播放聲音。','This browser cannot play audio.')) } draw() }
- function stop(){ on=false; radioStop(); clearTimeout(timer); if(ctx&&master){ master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(0,ctx.currentTime,.25); setTimeout(()=>{ if(!on){ genStop(); try{ctx.suspend()}catch(e){} } },900) } draw() }
- function setVol(v){ st.vol=v; save(); if(ctx&&master&&on)master.gain.setTargetAtTime(VOL[v],ctx.currentTime,.15); if(radio)radio.volume=Math.min(1,VOL[v]*1.4); draw() }
- function setSrc(k){ st.src=k; save(); if(on)play(); else draw() }
- window.psjMusic={toggle:()=>on?stop():play(),set:setSrc,vol:setVol,panel:()=>{const p=document.getElementById('musPanel'); if(p){p.hidden=!p.hidden; if(!p.hidden)draw()}},state:()=>({on,src:st.src,vol:st.vol,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio})};
- const css=`#musBtn{position:relative;font-size:16px}#musBtn.on{background:var(--accent,#1F4FA8)!important;color:#fff!important;border-color:transparent!important}
-#musBtn.on::after{content:'';position:absolute;right:4px;top:4px;width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
-#musPanel{position:fixed;z-index:46;right:12px;top:62px;width:min(300px,calc(100vw - 24px));background:var(--surface,#fff);color:var(--text,#14202b);border:1px solid var(--line,#d5dde5);border-radius:14px;box-shadow:0 14px 34px rgba(2,6,23,.22);padding:12px}
-#musPanel h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:6px}#musPanel .x{margin-left:auto;border:0;background:none;font-size:18px;cursor:pointer;color:inherit;padding:2px 6px}
-#musPanel .row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid transparent;background:none;color:inherit;font:inherit;cursor:pointer}
-#musPanel .row:hover{background:var(--surface-2,#f1f5f9)}#musPanel .row.on{border-color:var(--accent,#1F4FA8);background:color-mix(in srgb,var(--accent,#1F4FA8) 10%,transparent);font-weight:700}
-#musPanel .row .ic{font-size:20px;width:26px;text-align:center}#musPanel .row small{display:block;font-weight:400;opacity:.65;font-size:11px}
-#musPanel .bar{display:flex;gap:8px;align-items:center;margin-top:10px}#musPanel .go{flex:1;padding:10px;border-radius:10px;border:0;background:var(--accent,#1F4FA8);color:#fff;font:inherit;font-weight:700;cursor:pointer}#musPanel .go.on{background:#dc2626}
-#musPanel .vol{display:flex;border:1px solid var(--line,#d5dde5);border-radius:10px;overflow:hidden}#musPanel .vol button{border:0;background:none;color:inherit;font:inherit;padding:9px 11px;cursor:pointer}#musPanel .vol button.on{background:var(--accent,#1F4FA8);color:#fff}
-#musPanel p{margin:8px 2px 0;font-size:11px;opacity:.65;line-height:1.5}@media print{#musBtn,#musPanel{display:none!important}}`;
- const stEl=document.createElement('style');stEl.id='psj-music';stEl.textContent=css;document.head.appendChild(stEl);
- function draw(){ const b=document.getElementById('musBtn'); if(b){ b.classList.toggle('on',on); b.title=on?Lx('音樂播放中（點一下開面板）','Music playing (tap for panel)'):Lx('放鬆音樂（預設關）','Relaxing sounds (off by default)') }
-  const p=document.getElementById('musPanel'); if(!p||p.hidden)return;
-  p.innerHTML=`<h3>🎵 ${Lx('放鬆音樂','Relaxing sounds')}<button class="x" onclick="psjMusic.panel()" aria-label="Close">×</button></h3>`+SRC.map(x=>`<button class="row ${st.src===x.k?'on':''}" onclick="psjMusic.set('${x.k}')"><span class="ic">${x.ic}</span><span>${Lx(x.zh,x.en)}${x.note?`<small>${x.note} · ${Lx('需要網路','needs internet')}</small>`:''}</span></button>`).join('')+
-   `<div class="bar"><button class="go ${on?'on':''}" onclick="psjMusic.toggle()">${on?'⏸ '+Lx('停止','Stop'):'▶ '+Lx('播放','Play')}</button><div class="vol">${[['s',Lx('小','Low')],['m',Lx('中','Mid')],['l',Lx('大','High')]].map(v=>`<button class="${st.vol===v[0]?'on':''}" onclick="psjMusic.vol('${v[0]}')">${v[1]}</button>`).join('')}</div></div><p>${Lx('預設關閉，要聽才按播放。雨聲、海浪、鋼琴是本機即時產生，不用網路。','Off by default. Rain, waves and piano are generated on this device — no internet needed.')}</p>` }
- const mount=()=>{ const top=document.querySelector('.top'); if(!top||document.getElementById('musBtn'))return; const b=document.createElement('button'); b.className='icon-btn'; b.id='musBtn'; b.type='button'; b.textContent='🎵'; b.setAttribute('aria-label','Music'); b.onclick=()=>psjMusic.panel();
-  const ref=document.getElementById('langSw'); if(ref&&ref.parentNode===top)top.insertBefore(b,ref); else top.appendChild(b);
-  const p=document.createElement('div'); p.id='musPanel'; p.hidden=true; document.body.appendChild(p); draw();
-  document.addEventListener('click',e=>{ const pp=document.getElementById('musPanel'); if(pp&&!pp.hidden&&!pp.contains(e.target)&&e.target!==b&&!e.target.closest('#musPanel'))pp.hidden=true },true) };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount); else mount();
-})();
+/* v1.7.7：🎵 放鬆音樂改成各平台共用的 music.js（上方 ON/OFF 撥動開關），見檔案結尾的 <script src="music.js"> */
 
 /* ===== v1.7.3 UI 動效（2026-11-22）：懸停回饋／游標聚光／3D 傾斜／導覽列捲動樣式／回到頂部 =====
    只加樣式和滑鼠、捲動監聽（都用 requestAnimationFrame 節流），不改資料、不改版面位置、不碰既有事件。
@@ -6379,6 +6308,7 @@ init();
 })();
 
 </script>
+<script src="music.js?v=1.0.2" defer></script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
 <script src="https://saintdou-weng.github.io/ac-admin/shared/swipe-tabs.js" defer></script>
 <!-- 2026-11-22 主頁摘要輪播（同 Admin OS 首頁瀏覽方式：分類標籤、彩色卡、左右滑、每格可點進頁面） -->
