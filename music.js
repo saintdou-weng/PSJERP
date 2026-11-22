@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1.2（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v1.3（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -48,9 +48,9 @@
  function setVol(v){st.v=Math.max(0,Math.min(100,Math.round(v)));save();if(ctx&&master&&on)master.gain.setTargetAtTime(G(),ctx.currentTime,.1);if(radio)radio.volume=Math.min(1,G()*1.4);draw(true)}
  function setSrc(k){st.src=k;save();if(on)play();else draw()}
  var css='#vmBox{display:inline-flex;align-items:center;gap:3px;font:600 10px/1 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;flex:none;-webkit-user-select:none;user-select:none}'+
- '#vmBox.float{position:fixed;z-index:9990}#vmDot{display:none}'+
+ '#vmBox.float{position:fixed;z-index:9990}#vmDot{display:none}#vmBox.pill{gap:4px}#vmBox.pill #vpBtn{display:none}#vmBox.pill #vmSw{transform:scale(.9);transform-origin:left center;margin-right:-4px}#vmBox.pill #vmMore{width:20px;height:20px;background:rgba(20,33,61,.5);color:#fff;opacity:.85}'+
  '#vmBox.mini #vmSw,#vmBox.mini #vmMore,#vmBox.mini #vpBtn{display:none}#vmBox.mini #vmDot{display:block;width:24px;height:24px;border-radius:50%;border:0;padding:0;background:rgba(20,33,61,.42);color:#fff;font:700 13px/1 system-ui;cursor:pointer;opacity:.6}#vmBox.mini #vmDot:hover{opacity:1}#vmBox.mini #vmDot.on{background:#22a35a;opacity:.9}'+
- '#vmPanel{max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain}#vmPanel .row{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;min-height:0;margin:0;box-shadow:none;text-transform:none;letter-spacing:0}#vmPanel .row>span{display:block;min-width:0}#vmPanel .row>span:last-child{flex:1}#vmPanel .hd{display:flex;gap:8px;margin:0 0 8px}#vmPanel .hd button{flex:1;border:1px solid #d5dde5;background:#fff;border-radius:9px;padding:7px 0;font:inherit;font-weight:700;cursor:pointer;color:inherit}#vmPanel .hd .psw.on{background:#22a35a;border-color:#22a35a;color:#fff}'+
+ '#vmPanel{max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain}#vmPanel .row{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;min-height:0;margin:0;box-shadow:none;text-transform:none;letter-spacing:0}#vmPanel .row>span{display:block;min-width:0}#vmPanel .row>span:last-child{flex:1}#vmPanel .fxl{margin:10px 4px 4px;font-size:11px;opacity:.7}#vmPanel .fx{display:flex;gap:5px;margin:0 4px}#vmPanel .fx button{flex:1;border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 0;font:inherit;font-size:11.5px;cursor:pointer;color:inherit;white-space:nowrap}#vmPanel .fx button.on{background:#14213d;border-color:#14213d;color:#fff}#vmPanel .hd{display:flex;gap:8px;margin:0 0 8px}#vmPanel .hd button{flex:1;border:1px solid #d5dde5;background:#fff;border-radius:9px;padding:7px 0;font:inherit;font-weight:700;cursor:pointer;color:inherit}#vmPanel .hd .psw.on{background:#22a35a;border-color:#22a35a;color:#fff}'+
  '#vmBox.float{gap:12px}#vmBox.float #vmMore{width:26px;height:24px;font-size:11px}#vmBox.float.sm{gap:9px}'+
  '#vmSw{position:relative;width:46px;height:22px;border-radius:11px;border:0;padding:0;cursor:pointer;background:#9aa4b2;box-shadow:inset 0 1px 2px rgba(0,0,0,.28);transition:background .2s ease;color:#fff;font:inherit;letter-spacing:.3px;overflow:hidden}'+
  '#vmSw i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;color:#64748b;display:grid;place-items:center;font:700 11px/1 system-ui;font-style:normal;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .2s ease,color .2s ease}'+
@@ -71,12 +71,13 @@
  function draw(volOnly){ if(sw){sw.classList.toggle('on',on);sw.setAttribute('aria-checked',on?'true':'false');sw.title=(on?'音樂：開 Music ON':'音樂：關 Music OFF')+'　·　音量 Volume '+st.v+'%（滾輪可調 scroll to adjust）';sw.lastChild.textContent=on?'ON':'OFF'}
   if(dot)dot.classList.toggle('on',on);
   if(!panel||panel.hidden)return; if(volOnly){var r=panel.querySelector('input[type=range]'),s=panel.querySelector('.vol span');if(r&&document.activeElement!==r)r.value=st.v;if(s)s.textContent=st.v+'%';panel.querySelectorAll('.q button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===st.v)});return}
-  panel.innerHTML=(box.classList.contains('mini')?'<div class="hd"><button class="psw '+(on?'on':'')+'">♪ '+(on?'ON · 點一下關 Stop':'OFF · 點一下開 Play')+'</button>'+(document.getElementById('vpBtn')?'<button class="pal">🎨 背景 Background</button>':'')+'</div>':'')+SRC.map(function(x){return '<button class="row '+(st.src===x.k?'on':'')+'" data-k="'+x.k+'"><span style="font-size:18px;width:24px;text-align:center">'+x.ic+'</span><span>'+x.t+(x.note?'<small>'+x.note+' · 需要網路 needs internet</small>':'')+'</span></button>'}).join('')+
-   '<div class="vol">🔈<input type="range" min="0" max="100" step="5" value="'+st.v+'" aria-label="Volume"><span>'+st.v+'%</span></div><div class="q">'+[[20,'小 Low'],[40,'中 Mid'],[75,'大 High']].map(function(v){return '<button data-v="'+v[0]+'" class="'+(st.v===v[0]?'on':'')+'">'+v[1]+'</button>'}).join('')+'</div>' }
+  var _vp=document.getElementById('vpBtn'),_mini=box.classList.contains('mini'),_pal=_vp&&!_vp.offsetWidth;panel.innerHTML=((_mini||_pal)?'<div class="hd">'+(_mini?'<button class="psw '+(on?'on':'')+'">♪ '+(on?'ON · 點一下關 Stop':'OFF · 點一下開 Play')+'</button>':'')+(_pal?'<button class="pal">🎨 背景 Background</button>':'')+'</div>':'')+SRC.map(function(x){return '<button class="row '+(st.src===x.k?'on':'')+'" data-k="'+x.k+'"><span style="font-size:18px;width:24px;text-align:center">'+x.ic+'</span><span>'+x.t+(x.note?'<small>'+x.note+' · 需要網路 needs internet</small>':'')+'</span></button>'}).join('')+
+   '<div class="vol">🔈<input type="range" min="0" max="100" step="5" value="'+st.v+'" aria-label="Volume"><span>'+st.v+'%</span></div><div class="q">'+[[20,'小 Low'],[40,'中 Mid'],[75,'大 High']].map(function(v){return '<button data-v="'+v[0]+'" class="'+(st.v===v[0]?'on':'')+'">'+v[1]+'</button>'}).join('')+'</div>'+
+   '<div class="fxl">✨ 重點卡翻頁特效 Card effect</div><div class="fx">'+FXS.map(function(f){return '<button data-fx="'+f[0]+'" class="'+(fxGet()===f[0]?'on':'')+'">'+f[1]+'</button>'}).join('')+'</div>' }
  function dock(){ if(!box)return; var ref=document.querySelector('.top #langSw'), narrow=innerWidth<=640;
   /* 手機窄螢幕：上方工具列放不下，改放左下角（工具列有毛玻璃效果，fixed 不能放在它裡面） */
   if(ref){ if(box.parentNode!==ref.parentNode||box.nextSibling!==ref)ref.parentNode.insertBefore(box,ref); box.className=narrow?'nar':'' }
-  else{ if(box.parentNode!==document.body)document.body.appendChild(box); box.className='float'+(document.getElementById('vrtLangSw')?' sm':' mini') } }
+  else{ if(box.parentNode!==document.body)document.body.appendChild(box); var keep=box.classList.contains('mini')?' mini':box.classList.contains('pill')?' pill':'';box.className='float'+(document.getElementById('vrtLangSw')?' sm':(keep||' pill')) } }
  /* 浮動時（沒有 PSJERP 那種工具列的平台）：不可以蓋到頁面上原有的按鈕／文字 → 從右上角往左、往下找第一個空位 */
  function freeAt(x,y,w,h){x-=3;y-=3;w+=6;h+=6;var pts=[],gx,gy;for(gy=0;gy<3;gy++)for(gx=0;gx<=w;gx+=10)pts.push([Math.max(0,x+gx),Math.max(0,y+1+gy*(h-2)/2)]);
   for(var i=0;i<pts.length;i++){var els=document.elementsFromPoint(pts[i][0],pts[i][1])||[],e=null;for(var j=0;j<els.length;j++){if(box.contains(els[j])||els[j]===panel||/^vp(Tint|Img)$/.test(els[j].id||''))continue;e=els[j];break}
@@ -86,13 +87,18 @@
    try{if(getComputedStyle(e).cursor==='pointer')return false}catch(_){}
    for(var c=e.firstChild;c;c=c.nextSibling){if(c.nodeType===3&&/\S/.test(c.nodeValue)){var rg=document.createRange();rg.selectNodeContents(c);var rs=rg.getClientRects();for(var k=0;k<rs.length;k++){if(rs[k].left<x+w&&rs[k].right>x&&rs[k].top<y+h&&rs[k].bottom>y)return false}}}}
   return true}
- function place(){ if(!box)return; if(box.classList.contains('bl')){box.style.top=box.style.left=box.style.right=''}else if(box.classList.contains('float')){var l=document.getElementById('vrtLangSw');if(l){var r=l.getBoundingClientRect();box.style.top=Math.max(1,r.top)+'px';box.style.left=(r.right+6)+'px';box.style.right='auto'}else{var bw=box.offsetWidth||70,bh=box.offsetHeight||22,cur=box.getBoundingClientRect();if(!(box._ok&&cur.width&&cur.right<=innerWidth&&freeAt(cur.left,cur.top,bw,bh))){var best=null,xx,yy;
-   /* Paul 11/23：只是小工具，要縮在左上或右上角落，不佔位、不搶眼 → 一顆小圓點，貼著角落找空位：最上面一排從右角往左、再從左角往右；都被佔了才沿右邊／左邊往下一點 */
-   for(xx=innerWidth-bw-4;xx>=innerWidth*0.55&&!best;xx-=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
+ function place(){ if(!box)return; if(box.classList.contains('bl')){box.style.top=box.style.left=box.style.right=''}else if(box.classList.contains('float')){var l=document.getElementById('vrtLangSw');if(l){var r=l.getBoundingClientRect();box.style.top=Math.max(1,r.top)+'px';box.style.left=(r.right+6)+'px';box.style.right='auto'}else{var cur=box.getBoundingClientRect(),bw=box.offsetWidth||70,bh=box.offsetHeight||22;if(!(box._ok&&cur.width&&cur.right<=innerWidth&&freeAt(cur.left,cur.top,bw,bh))){var best=null,xx,yy;
+   /* Paul 11/23：能放撥動開關又不佔位就放開關（最上面一排的左右角落）；真的放不下才縮成小圓點，小圓點再沿右邊／左邊往下找 */
+   box.classList.remove('mini');box.classList.add('pill');bw=box.offsetWidth||64;bh=box.offsetHeight||22;
+   for(xx=innerWidth-bw-4;xx>=innerWidth*0.5&&!best;xx-=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
    for(xx=4;xx<=innerWidth*0.3&&!best;xx+=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
-   for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(innerWidth-bw-4,yy,bw,bh))best=[innerWidth-bw-4,yy];
-   for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(4,yy,bw,bh))best=[4,yy];
-   if(!best)best=[innerWidth-bw-4,3];box.style.left=best[0]+'px';box.style.top=best[1]+'px';box.style.right='auto';box._ok=1}}}
+   if(!best){box.classList.remove('pill');box.classList.add('mini');bw=box.offsetWidth||24;bh=box.offsetHeight||24;
+    for(xx=innerWidth-bw-4;xx>=innerWidth*0.55&&!best;xx-=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
+    for(xx=4;xx<=innerWidth*0.3&&!best;xx+=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
+    for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(innerWidth-bw-4,yy,bw,bh))best=[innerWidth-bw-4,yy];
+    for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(4,yy,bw,bh))best=[4,yy];
+    if(!best)best=[innerWidth-bw-4,3]}
+   box.style.left=best[0]+'px';box.style.top=best[1]+'px';box.style.right='auto';box._ok=1}}}
   if(panel&&!panel.hidden){var b=box.getBoundingClientRect(),w=Math.min(264,innerWidth-16),h=panel.offsetHeight||300,up=b.bottom+6+h>innerHeight-4;panel.style.top=Math.max(8,Math.min(innerHeight-h-8,up?b.top-h-6:b.bottom+6))+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.left<innerWidth/2?b.left:b.right-w))+'px'} }
  function mount(){ if(document.getElementById('vmBox')||!document.body)return true;
   var stEl=document.createElement('style');stEl.id='vrt-music-css';stEl.textContent=css;document.head.appendChild(stEl);
@@ -107,13 +113,23 @@
   sw.addEventListener('click',function(){if(lpFired){lpFired=false;return}if(on)stop();else{play();if(box.classList.contains('nar'))openP()}});
   more.addEventListener('click',function(){panel.hidden=!panel.hidden;draw();place()});
   box.addEventListener('wheel',function(e){e.preventDefault();setVol(st.v+(e.deltaY<0?5:-5));tip('🔊 '+st.v+'%')},{passive:false});
-  panel.addEventListener('click',function(e){if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var r=e.target.closest('.row');if(r){setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
+  panel.addEventListener('click',function(e){var fb=e.target.closest('[data-fx]');if(fb){try{localStorage.setItem('vrt_fx',fb.dataset.fx)}catch(_){}draw();window.vrtFx(panel,1);return}if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var r=e.target.closest('.row');if(r){setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
   panel.addEventListener('input',function(e){if(e.target.type==='range')setVol(+e.target.value)});
   document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&!box.contains(e.target))panel.hidden=true},true);
   window.addEventListener('resize',function(){dock();place()},{passive:true});draw();place();
-  if(box.classList.contains('float')&&!box.classList.contains('bl')){var n=0,iv=setInterval(function(){var had=box.classList.contains('sm');if(document.getElementById('vrtLangSw')&&!had){box.classList.add('sm');box.classList.remove('mini')}place();if(++n>12)clearInterval(iv)},500)}
+  if(box.classList.contains('float')&&!box.classList.contains('bl')){var n=0,iv=setInterval(function(){var had=box.classList.contains('sm');if(document.getElementById('vrtLangSw')&&!had){box.classList.add('sm');box.classList.remove('mini');box.classList.remove('pill')}place();if(++n>12)clearInterval(iv)},500);setInterval(function(){if(!document.hidden&&(!panel||panel.hidden))place()},2000)}
   var was=false;try{was=sessionStorage.getItem('vrt_music_on')==='1'}catch(e){} if(was)play();
   return true }
+ /* ✨ 重點卡（Keynote）換上一張／下一張、點開時的翻頁特效：翻書／推入／淡入／縮放／關。各平台的 Keynote 呼叫 window.vrtFx(卡片, 方向)。只做動畫，不動資料。 */
+ var FXS=[['flip','翻書'],['push','推入'],['fade','淡入'],['zoom','縮放'],['off','關']];
+ function fxGet(){var k='flip';try{k=localStorage.getItem('vrt_fx')||'flip'}catch(e){}return FXS.some(function(f){return f[0]===k})?k:'flip'}
+ window.vrtFx=function(el,dir,open){try{var k=fxGet();if(k==='off'||!el||!el.animate)return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+   var d=dir<0?-1:1,kf,ms=300,o0=el.style.transformOrigin;
+   if(k==='flip'){el.style.transformOrigin=d>0?'left center':'right center';kf=[{transform:'perspective(1400px) rotateY('+(d>0?-72:72)+'deg)',opacity:.35,filter:'brightness(.86)'},{transform:'perspective(1400px) rotateY('+(d>0?6:-6)+'deg)',opacity:1,filter:'brightness(1)',offset:.8},{transform:'perspective(1400px) rotateY(0deg)',opacity:1,filter:'brightness(1)'}];ms=440}
+   else if(k==='push')kf=[{transform:'translateX('+(d>0?56:-56)+'%)',opacity:.15},{transform:'translateX(0)',opacity:1}];
+   else if(k==='fade'){kf=[{opacity:0},{opacity:1}];ms=260}
+   else kf=[{transform:'scale(.9)',opacity:0},{transform:'scale(1)',opacity:1}];
+   var an=el.animate(kf,{duration:ms,easing:'cubic-bezier(.2,.7,.2,1)'});an.onfinish=an.oncancel=function(){el.style.transformOrigin=o0}}catch(e){}};
  window.vrtMusic={place:function(){place()},toggle:function(){on?stop():play()},set:setSrc,vol:setVol,state:function(){return {on:on,src:st.src,v:st.v,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio,wait:waitGesture}}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();
