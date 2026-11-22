@@ -2616,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.2';
+const APP_VER='1.7.3';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6114,6 +6114,65 @@ init();
   return h };
  if(!window.STY_TABS.some(x=>x[0]==='cutpack')){const i=window.STY_TABS.findIndex(x=>x[0]==='bomcmp')+1||window.STY_TABS.length;window.STY_TABS.splice(i,0,['cutpack','📦',['裁剪・裝箱','Cut & pack']])}
  window.PSJ_CUTPACK={load,hit,_reset:()=>{DATA.packing=null;DATA.cutdetail=null}};
+})();
+
+/* ===== v1.7.3 UI 動效（2026-11-22）：懸停回饋／游標聚光／3D 傾斜／導覽列捲動樣式／回到頂部 =====
+   只加樣式和滑鼠、捲動監聽（都用 requestAnimationFrame 節流），不改資料、不改版面位置、不碰既有事件。
+   觸控裝置與「減少動態效果」設定下，1–3 項自動不啟用。按鈕用「上移」，KPI 卡用「傾斜」，兩者不會同時作用在同一個元件。 */
+(function(){
+ if(window.__PSJ_FX)return;window.__PSJ_FX=1;
+ const calm=matchMedia('(prefers-reduced-motion: reduce)').matches, fine=matchMedia('(hover:hover) and (pointer:fine)').matches&&!calm;
+ const css=`
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+ .btn,.icon-btn,.prod-links a{transition:transform .15s ease-out,box-shadow .15s ease-out,filter .15s ease-out,background-color .15s ease-out,border-color .15s ease-out}
+ .btn:not(:disabled):hover,.icon-btn:not(:disabled):hover,.prod-links a:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(20,32,43,.16);filter:brightness(.92);cursor:pointer}
+ .seg button,.lang button{transition:filter .15s ease-out,background-color .15s ease-out}
+ .seg button:hover,.lang button:hover{filter:brightness(.92);cursor:pointer}
+ .kpis>.kpi,.grid2>.panel,.grid3>.panel,.grid2>.vz-card,.grid3>.vz-card{box-shadow:0 0 0 1px color-mix(in srgb,var(--fx-c,var(--accent)) calc(var(--fx-b,0)*100%),transparent)}
+ .kpi{transition:transform .3s ease-out,box-shadow .3s ease-out}
+ .kpi.fx-tilt{transition:transform .08s linear,box-shadow .15s ease-out;box-shadow:0 0 0 1px color-mix(in srgb,var(--fx-c,var(--accent)) calc(var(--fx-b,0)*100%),transparent),0 10px 24px rgba(20,32,43,.16);z-index:1}
+}
+#fxGlow{position:fixed;inset:0;pointer-events:none;z-index:15;opacity:0;transition:opacity .2s ease;background:radial-gradient(240px circle at var(--x,-999px) var(--y,-999px),var(--g,rgba(31,79,168,.15)),transparent 100%)}
+#fxGlow.on{opacity:1}
+.top{transition:background-color .2s ease,box-shadow .2s ease}
+.top.fx-stuck{background:rgba(30,41,59,.82)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 6px 18px rgba(2,6,23,.28)!important}
+#fxTop{position:fixed;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));width:48px;height:48px;border-radius:50%;border:0;padding:0;background:#1E293B;color:#fff;font-size:20px;line-height:1;display:grid;place-items:center;cursor:pointer;z-index:45;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .25s ease,transform .2s ease-out,box-shadow .2s ease,visibility 0s linear .25s;box-shadow:0 6px 16px rgba(2,6,23,.28)}
+#fxTop.on{opacity:.92;visibility:visible;transform:none;transition-delay:0s}
+#fxTop.on:hover{transform:translateY(-3px);opacity:1;box-shadow:0 10px 22px rgba(2,6,23,.36)}
+@media print{#fxTop,#fxGlow{display:none!important}}`;
+ const st=document.createElement('style');st.id='psj-fx';st.textContent=css;document.head.appendChild(st);
+ const ready=f=>document.body?f():document.addEventListener('DOMContentLoaded',f);
+ ready(()=>{
+  /* ── 5 回到頂部 ── */
+  const up=document.createElement('button');up.id='fxTop';up.type='button';up.textContent='↑';up.title='回到頂部 Back to top';up.setAttribute('aria-label','回到頂部 Back to top');document.body.appendChild(up);
+  let anim=0;const stop=()=>{if(anim){cancelAnimationFrame(anim);anim=0}};
+  up.addEventListener('click',()=>{stop();const y0=window.scrollY;if(calm||y0<2){window.scrollTo(0,0);return}const t0=performance.now();const step=t=>{const p=Math.min(1,(t-t0)/500),e=1-Math.pow(1-p,3);window.scrollTo(0,Math.round(y0*(1-e)));anim=p<1?requestAnimationFrame(step):0};anim=requestAnimationFrame(step)});
+  ['wheel','touchstart','keydown'].forEach(ev=>window.addEventListener(ev,stop,{passive:true}));
+  /* ── 4 導覽列＋5 顯示時機：捲動用 rAF 節流 ── */
+  let sTick=0;const onScroll=()=>{sTick=0;const y=window.scrollY,top=document.querySelector('.top');if(top)top.classList.toggle('fx-stuck',y>80);up.classList.toggle('on',y>window.innerHeight)};
+  window.addEventListener('scroll',()=>{if(!sTick)sTick=requestAnimationFrame(onScroll)},{passive:true});window.addEventListener('resize',()=>{if(!sTick)sTick=requestAnimationFrame(onScroll)},{passive:true});onScroll();
+  if(!fine)return;
+  /* ── 2 游標聚光＋3 3D 傾斜：滑鼠用 rAF 節流 ── */
+  const glow=document.createElement('div');glow.id='fxGlow';glow.setAttribute('aria-hidden','true');document.body.appendChild(glow);
+  const GRID='.kpis,.grid2,.grid3',CARD=':scope>.kpi,:scope>.panel,:scope>.vz-card',R=240;
+  let ev=null,mTick=0,curGrid=null,lit=[],tilt=null;
+  const dark=el=>{const m=getComputedStyle(el).backgroundColor.match(/[\d.]+/g);if(!m||(m.length>3&&+m[3]===0))return false;return (0.299*m[0]+0.587*m[1]+0.114*m[2])<110};
+  const unlit=()=>{lit.forEach(c=>c.style.removeProperty('--fx-b'));lit=[]};
+  const untilt=()=>{if(tilt){tilt.classList.remove('fx-tilt');tilt.style.transform='';tilt=null}};
+  const frame=()=>{mTick=0;const e=ev;if(!e)return;const t=e.target&&e.target.closest?e.target:null;
+   const grid=t?t.closest(GRID):null;
+   if(grid!==curGrid){unlit();curGrid=grid;if(grid){const c0=grid.querySelector(CARD);const dk=c0?dark(c0):false;glow.style.setProperty('--g',dk?'rgba(255,255,255,.15)':'color-mix(in srgb,var(--accent) 15%,transparent)');grid.style.setProperty('--fx-c',dk?'rgba(255,255,255,.75)':'');}}
+   if(grid){const g=grid.getBoundingClientRect();glow.style.setProperty('--x',e.clientX+'px');glow.style.setProperty('--y',e.clientY+'px');glow.style.clipPath='inset('+Math.max(0,g.top)+'px '+Math.max(0,innerWidth-g.right)+'px '+Math.max(0,innerHeight-g.bottom)+'px '+Math.max(0,g.left)+'px round 10px)';glow.classList.add('on');
+    const cards=grid.querySelectorAll(CARD);unlit();for(let i=0;i<cards.length&&i<80;i++){const c=cards[i],r=c.getBoundingClientRect();const dx=Math.max(r.left-e.clientX,0,e.clientX-r.right),dy=Math.max(r.top-e.clientY,0,e.clientY-r.bottom),d=Math.hypot(dx,dy);if(d<R){c.style.setProperty('--fx-b',(0.7*(1-d/R)).toFixed(3));lit.push(c)}}
+   }else glow.classList.remove('on');
+   const k=t?t.closest('.kpi'):null;
+   if(k!==tilt)untilt();
+   if(k){if(k.dataset.fxNo===undefined)k.dataset.fxNo=k.querySelector('input,select,textarea')?'1':'';if(!k.dataset.fxNo){const r=k.getBoundingClientRect(),px=(e.clientX-r.left)/r.width-.5,py=(e.clientY-r.top)/r.height-.5;k.classList.add('fx-tilt');k.style.transform='perspective(1000px) rotateX('+(-py*16).toFixed(2)+'deg) rotateY('+(px*16).toFixed(2)+'deg) scale(1.02)';tilt=k}}
+  };
+  document.addEventListener('pointermove',e=>{if(e.pointerType&&e.pointerType!=='mouse')return;ev=e;if(!mTick)mTick=requestAnimationFrame(frame)},{passive:true});
+  const off=()=>{ev=null;unlit();untilt();curGrid=null;glow.classList.remove('on')};
+  document.documentElement.addEventListener('pointerleave',off);window.addEventListener('blur',off);window.addEventListener('scroll',()=>{if(tilt||lit.length)off()},{passive:true});
+ });
 })();
 
 </script>
