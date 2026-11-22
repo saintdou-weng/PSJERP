@@ -6131,11 +6131,11 @@ init();
  async function prodWip(){ if(PW.busy||Date.now()-PW.at<30*60e3)return; PW.busy=true;
   try{ const post=b=>fetch(window.PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b),redirect:'follow'}).then(r=>r.json()).then(j=>j.data||j);
    const li=await post({action:'dailyReportList',limit:30}); const day=(li.index||[]).map(x=>x.date).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d)).sort().pop();
-   if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f&&f.wip){PW.d=f.wip;PW.date=day;PW.err=''} }
-  }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip')rerender() } }
+   if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f){PW.f=f;PW.d=f.wip||null;PW.date=day;PW.err=''} }
+  }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip'||CUR==='production')rerender() } }
  const _rw=RENDER.wip;
  /* 「月報列表／比較」檢視原本走 renderPeriodView（沒有期間指標就顯示「還沒有真實資料」）→ 真實資料模式的 WIP 一律走這一頁 */
- const _rpvW=window.renderPeriodView; if(typeof _rpvW==='function')window.renderPeriodView=function(k){ if(k==='wip'&&!isDemo())return RENDER.wip(); return _rpvW.apply(this,arguments) };
+ const _rpvW=window.renderPeriodView; if(typeof _rpvW==='function')window.renderPeriodView=function(k){ if(k==='wip'&&!isDemo())return RENDER.wip(); if(k==='production'&&!isDemo())return RENDER.production(); return _rpvW.apply(this,arguments) };
  window.wipSet=function(k,v){ V[k]=v; if(k!=='lim')V.lim=60; const y=window.scrollY; rerender(); if(k==='lim'||k==='q')window.scrollTo(0,y) };
  RENDER.wip=function(){
   if(isDemo())return _rw.apply(this,arguments);
@@ -6191,6 +6191,23 @@ init();
   /* ── 生產平台：已裁未縫最多的款 ── */
   if(pw&&Array.isArray(pw.top)&&pw.top.length){ const tp=pw.top.slice(0,10).map(x=>({k:x.style||x.sk||x.k||x.name||'—',v:n0(x.wip!=null?x.wip:x.cutNotSewn!=null?x.cutNotSewn:x.qty!=null?x.qty:x.pcs)})).filter(x=>x.v>0), mx=Math.max(...tp.map(x=>x.v),1);
    if(tp.length)h+=`<div class="panel mt"><h2>✂️ ${Lx('生產：已裁未縫最多的款','Production: most cut-not-sewn styles')}</h2><p class="hint">${Lx('生產平台日報 ','Production daily report ')}${esc(PW.date)}</p>${tp.map(x=>meterRow(x.k,x.v,mx,fmt(x.v))).join('')}</div>` }
+  return h;
+ };
+ /* ── 生產頁（真實資料）：原本只寫「要等 VRT Prod 串接」→ 改顯示生產平台最新日報的數字，並直接連到各生產頁 ── */
+ const _rp=RENDER.production;
+ RENDER.production=function(){
+  if(isDemo())return _rp.apply(this,arguments);
+  if(!PW.at&&!PW.busy)prodWip();
+  const f=PW.f; let h=pageHead('production');
+  if(!f)return h+`<div class="panel empty"><h2>⏳ ${PW.busy||!PW.at?Lx('正在讀生產平台最新日報…','Loading the latest production daily report…'):Lx('讀不到生產平台日報','Could not read the production daily report')}</h2><p class="small muted">${esc(PW.err||Lx('數字來自生產平台（車縫、裁剪、QC 日報），這裡只讀不改。','Figures come from the production platform (sewing, cutting, QC). Read-only here.'))}</p></div>`;
+  const s2=f.sewing||{}, c=f.cutting||{}, w=f.wip||{}, q=f.qc||{}, pl=f.plan||{}, cmp=f.compare||{};
+  const ar=v=>v==null||isNaN(v)?'':`<span class="${v>0?'diff-pos':'diff-neg'}">${v>0?'▲':'▼'} ${fmt(Math.abs(v),0)}%</span> ${Lx('比前一天','vs prev day')}`;
+  h+=`<p class="note info small">📅 ${Lx('生產平台日報：','Production daily report: ')}<b>${esc(PW.date)}</b>　${Lx('數字以生產平台為準，這裡唯讀。','Figures are owned by the production platform; read-only here.')}</p>
+  <div class="kpis">${kpi('🧵 '+Lx('車縫','Sewing'),s2.pieces!=null?fmt(s2.pieces):'—',t('pcs'),ar(cmp.piecesVsPrev))}${kpi('📊 '+Lx('車縫效率','Efficiency'),s2.eff!=null?fmt(s2.eff,1)+'%':'—','',s2.manpower?Lx('車工 ','Sewers ')+fmt(s2.manpower):'')}${kpi('✂️ '+Lx('裁剪','Cutting'),c.pieces!=null?fmt(c.pieces):'—',c.pieces!=null?t('pcs'):'',c.pieces==null?Lx('當天沒有裁剪日報','no cutting report that day'):ar(cmp.cutVsPrev))}${kpi('📦 '+Lx('已裁未縫','Cut, not sewn'),w.cutNotSewn!=null?fmt(w.cutNotSewn):'—',t('pcs'),w.daysOfOutput?Lx('約 ','≈ ')+fmt(w.daysOfOutput,1)+Lx(' 天產量',' days of output'):'')}${kpi('🔍 QC '+Lx('退修率','reject rate'),q.reports?fmt(q.rate,1)+'%':'—','',q.reports?Lx('檢驗 ','Insp. ')+fmt(q.inspected)+Lx('・退修 ',' · rej. ')+fmt(q.rejected):Lx('當天沒有 QC 報告','no QC report that day'))}${pl.planQty?kpi('📅 '+Lx('本月排單','Month plan'),fmt(pl.completion||0,0)+'%','',fmt(pl.mtd)+' / '+fmt(pl.planQty)+' '+t('pcs')):''}</div>`;
+  const go=[['p-sewing','🪡',Lx('車縫日報','Sewing')],['p-cutting','✂️',Lx('裁剪日報','Cutting')],['p-prodplan','📅',Lx('排單產能','Plan & capacity')],['p-overview','📈',Lx('生產總覽','Overview')],['wip','⏳',Lx('在製 WIP','WIP')],['prodreports','📰',Lx('生產報告','Reports')]].filter(x=>RENDER[x[0]]||CFG[x[0]]);
+  h+=`<div class="panel mt"><h2>👉 ${Lx('看明細','Open the detail pages')}</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${go.map(x=>`<a class="btn" href="#${x[0]}">${x[1]} ${esc(x[2])}</a>`).join('')}</div></div>`;
+  const ln=(f.lines||[]).filter(x=>x&&x.eff!=null).sort((a,b)=>b.eff-a.eff);
+  if(ln.length){ const mx=Math.max(...ln.map(x=>x.eff),1); h+=`<div class="panel mt"><h2>🏁 ${Lx('各組效率','Efficiency by line')}</h2><p class="hint">${esc(PW.date)}</p>${ln.map(x=>meterRow(String(x.line||''),x.eff,mx,fmt(x.eff,1)+'%'+(x.pieces!=null?' · '+fmt(x.pieces)+' '+t('pcs'):''))).join('')}</div>` }
   return h;
  };
 })();
