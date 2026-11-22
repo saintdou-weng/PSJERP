@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v1.1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -9,7 +9,11 @@
   {k:'classic',ic:'🎻',t:'古典電台 Classical radio',note:'Radio Swiss Classic',urls:['https://stream.srg-ssr.ch/srgssr/rsc_de/mp3/128','https://stream.srg-ssr.ch/srgssr/rsc_de/aac/96','https://stream.srg-ssr.ch/srgssr/rsc_fr/mp3/128']},
   {k:'pianor',ic:'🎼',t:'鋼琴電台 Piano radio',note:'Capriccio Piano',urls:['https://live.hdradiostreaming.com:10443/listen/capriccio_piano/stream']},
   {k:'jazz',ic:'🎷',t:'輕爵士電台 Jazz radio',note:'Radio Swiss Jazz',urls:['https://stream.srg-ssr.ch/srgssr/rsj/mp3/128','https://stream.srg-ssr.ch/srgssr/rsj/aac/96']},
-  {k:'pop',ic:'🎤',t:'抒情流行電台 Soft pop radio',note:'Radio Swiss Pop',urls:['https://stream.srg-ssr.ch/srgssr/rsp/mp3/128','https://stream.srg-ssr.ch/srgssr/rsp/aac/96']}];
+  {k:'pop',ic:'🎤',t:'抒情流行電台 Soft pop radio',note:'Radio Swiss Pop',urls:['https://stream.srg-ssr.ch/srgssr/rsp/mp3/128','https://stream.srg-ssr.ch/srgssr/rsp/aac/96']},
+  {k:'hitz',ic:'🇲🇾',t:'馬來西亞 HITZ',note:'HITZ Malaysia',urls:['https://stream.rcs.revma.com/488kt4sbv4uvv','https://n10.rcs.revma.com/488kt4sbv4uvv']},
+  {k:'bcc',ic:'🇹🇼',t:'台灣 中廣音樂網 Mandarin',note:'中廣音樂網 i radio',urls:['https://n03.rcs.revma.com/ndk05tyy2tzuv','https://stream.rcs.revma.com/ndk05tyy2tzuv']},
+  {k:'bccpop',ic:'🎙️',t:'台灣 中廣流行網 Mandarin pop',note:'中廣流行網 i like',urls:['https://n03.rcs.revma.com/aw9uqyxy2tzuv','https://stream.rcs.revma.com/aw9uqyxy2tzuv']},
+  {k:'khmer',ic:'🇰🇭',t:'柬語電台 Khmer radio',note:'Sweet FM 88',urls:['https://n12.rcs.revma.com/whn9hqwstk3vv','https://stream.rcs.revma.com/whn9hqwstk3vv']}];
  var st={src:'rain',v:40};
  try{ var j=JSON.parse(localStorage.getItem('vrt_music')||'null'); if(!j){ var o=JSON.parse(localStorage.getItem('psj_music')||'null'); if(o)j={src:o.src,v:o.vol==='s'?20:o.vol==='l'?75:40} } if(j&&SRC.some(function(x){return x.k===j.src}))st.src=j.src; if(j&&j.v>=0&&j.v<=100)st.v=+j.v }catch(e){}
  var save=function(){try{localStorage.setItem('vrt_music',JSON.stringify(st))}catch(e){}}, G=function(){return Math.pow(st.v/100,1.5)*0.85};
@@ -59,7 +63,7 @@
  '#vmTip{position:fixed;left:50%;top:40px;transform:translateX(-50%);z-index:9993;background:#14213d;color:#fff;padding:7px 12px;border-radius:9px;font:12px system-ui;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}#vmTip.on{opacity:.96}'+
  '#vmBox.nar #vmMore{display:none}'+
  '#vmBox.bl{left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));top:auto;right:auto;z-index:44;opacity:.92;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}#vmBox.bl #vmMore{background:#14213d;color:#fff;opacity:.9}'+
- '@media print{#vmBox,#vmPanel,#vmTip{display:none!important}}';
+ '@media print{#vmBox,#vmPanel,#vmTip,#vpPanel,#vpTint,#vpImg{display:none!important}}';
  var box,sw,more,panel;
  function draw(volOnly){ if(sw){sw.classList.toggle('on',on);sw.setAttribute('aria-checked',on?'true':'false');sw.title=(on?'音樂：開 Music ON':'音樂：關 Music OFF')+'　·　音量 Volume '+st.v+'%（滾輪可調 scroll to adjust）';sw.lastChild.textContent=on?'ON':'OFF'}
   if(!panel||panel.hidden)return; if(volOnly){var r=panel.querySelector('input[type=range]'),s=panel.querySelector('.vol span');if(r&&document.activeElement!==r)r.value=st.v;if(s)s.textContent=st.v+'%';panel.querySelectorAll('.q button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===st.v)});return}
@@ -69,7 +73,16 @@
   /* 手機窄螢幕：上方工具列放不下，改放左下角（工具列有毛玻璃效果，fixed 不能放在它裡面） */
   if(ref){ if(box.parentNode!==ref.parentNode||box.nextSibling!==ref)ref.parentNode.insertBefore(box,ref); box.className=narrow?'nar':'' }
   else{ if(box.parentNode!==document.body)document.body.appendChild(box); box.className='float'+(document.getElementById('vrtLangSw')?' sm':'') } }
- function place(){ if(!box)return; if(box.classList.contains('bl')){box.style.top=box.style.left=box.style.right=''}else if(box.classList.contains('float')){var l=document.getElementById('vrtLangSw');if(l){var r=l.getBoundingClientRect();box.style.top=Math.max(1,r.top)+'px';box.style.left=(r.right+6)+'px';box.style.right='auto'}else{box.style.top='4px';box.style.right='8px';box.style.left='auto'}}
+ /* 浮動時（沒有 PSJERP 那種工具列的平台）：不可以蓋到頁面上原有的按鈕／文字 → 從右上角往左、往下找第一個空位 */
+ function freeAt(x,y,w,h){x-=3;y-=3;w+=6;h+=6;var pts=[],gx,gy;for(gy=0;gy<3;gy++)for(gx=0;gx<=w;gx+=10)pts.push([Math.max(0,x+gx),Math.max(0,y+1+gy*(h-2)/2)]);
+  for(var i=0;i<pts.length;i++){var els=document.elementsFromPoint(pts[i][0],pts[i][1])||[],e=null;for(var j=0;j<els.length;j++){if(box.contains(els[j])||els[j]===panel||/^vp(Tint|Img)$/.test(els[j].id||''))continue;e=els[j];break}
+   if(!e||e===document.body||e===document.documentElement)continue;
+   if(e.closest&&e.closest('button,a,input,select,textarea,label,summary,[onclick],[role=button],[role=tab],[tabindex]'))return false;
+   if(/^(IMG|SVG|CANVAS|VIDEO)$/i.test(e.tagName))return false;
+   try{if(getComputedStyle(e).cursor==='pointer')return false}catch(_){}
+   for(var c=e.firstChild;c;c=c.nextSibling){if(c.nodeType===3&&/\S/.test(c.nodeValue)){var rg=document.createRange();rg.selectNodeContents(c);var rs=rg.getClientRects();for(var k=0;k<rs.length;k++){if(rs[k].left<x+w&&rs[k].right>x&&rs[k].top<y+h&&rs[k].bottom>y)return false}}}}
+  return true}
+ function place(){ if(!box)return; if(box.classList.contains('bl')){box.style.top=box.style.left=box.style.right=''}else if(box.classList.contains('float')){var l=document.getElementById('vrtLangSw');if(l){var r=l.getBoundingClientRect();box.style.top=Math.max(1,r.top)+'px';box.style.left=(r.right+6)+'px';box.style.right='auto'}else{var bw=box.offsetWidth||70,bh=box.offsetHeight||22,cur=box.getBoundingClientRect();if(!(box._ok&&cur.width&&cur.right<=innerWidth&&freeAt(cur.left,cur.top,bw,bh))){var best=null;for(var yy=4;yy<=124&&!best;yy+=40){for(var xx=innerWidth-bw-8;xx>=8;xx-=22){if(freeAt(xx,yy,bw,bh)){best=[xx,yy];break}}}/* 上方都被原本的按鈕佔滿（手機常見）→ 改從左下角往上找，絕不蓋住原有按鈕 */for(var y2=innerHeight-bh-10;y2>innerHeight*0.45&&!best;y2-=40){for(var x2=8;x2<=innerWidth-bw-8;x2+=22){if(freeAt(x2,y2,bw,bh)){best=[x2,y2];break}}}if(!best)best=[8,innerHeight-bh-10];box.style.left=best[0]+'px';box.style.top=best[1]+'px';box.style.right='auto';box._ok=1}}}
   if(panel&&!panel.hidden){var b=box.getBoundingClientRect(),w=Math.min(264,innerWidth-16),h=panel.offsetHeight||300,up=b.bottom+6+h>innerHeight-4;panel.style.top=(up?Math.max(6,b.top-h-6):b.bottom+6)+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.left<innerWidth/2?b.left:b.right-w))+'px'} }
  function mount(){ if(document.getElementById('vmBox')||!document.body)return true;
   var stEl=document.createElement('style');stEl.id='vrt-music-css';stEl.textContent=css;document.head.appendChild(stEl);
@@ -91,6 +104,56 @@
   if(box.classList.contains('float')&&!box.classList.contains('bl')){var n=0,iv=setInterval(function(){var had=box.classList.contains('sm');if(document.getElementById('vrtLangSw')&&!had)box.classList.add('sm');place();if(++n>12)clearInterval(iv)},500)}
   var was=false;try{was=sessionStorage.getItem('vrt_music_on')==='1'}catch(e){} if(was)play();
   return true }
- window.vrtMusic={toggle:function(){on?stop():play()},set:setSrc,vol:setVol,state:function(){return {on:on,src:st.src,v:st.v,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio,wait:waitGesture}}};
+ window.vrtMusic={place:function(){place()},toggle:function(){on?stop():play()},set:setSrc,vol:setVol,state:function(){return {on:on,src:st.src,v:st.v,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio,wait:waitGesture}}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+})();
+
+/* ===== 🎨 共用調色盤 v1（2026-11-23）— 給「自己沒有調色盤」的平台用（Admin OS、HRA Portal、HRA-PAY、SEC、GA-EXP、Audit）=====
+   PSJERP／PSJHR／PSJGA／GASCheck／生產平台有自己的調色，這裡不出現、不干涉。被嵌在同網域外框裡的分頁也不出現（跟外框走）。
+   做法＝在整頁最上層蓋一層「不擋滑鼠」的色片（multiply 混色）：白底變成所選淡色，字和狀態色不變；完全不動各平台的 CSS／資料。
+   深色＝整頁反相（圖片再反回來，跟生產平台同一招）。背景圖＝同一招蓋一層圖，遮罩越高越淡。
+   設定存 localStorage 'vrt_pal'（同網域各平台共用一份），圖存這台裝置的 IndexedDB，不上傳。 */
+(function(){
+ if(window.__VRT_PAL)return; window.__VRT_PAL=1;
+ var P=(location.pathname||'').toLowerCase();
+ if(/^\/(psjerp|psjhr|psjgas|vrt-prod|ac-gascheck)\//.test(P))return;
+ try{if(window.top!==window&&window.top.location.origin===location.origin)return}catch(e){}
+ var COL=[['','白色 White','#ffffff'],['green','淡綠 Green','#D3EADB'],['yellow','淡黃 Yellow','#F0E4BC'],['blue','淡藍 Blue','#CFE0F2'],['pink','粉紅 Pink','#F0D4DF'],['beige','米色 Beige','#E6DACA'],['dark','深色 Dark','#1b2738']];
+ var st={c:'',veil:70},BG=null;
+ function load(){try{var j=JSON.parse(localStorage.getItem('vrt_pal')||'null');st={c:'',veil:70};if(j){if(COL.some(function(x){return x[0]===j.c}))st.c=j.c;if(j.veil>=0&&j.veil<=95)st.veil=+j.veil}}catch(e){}}
+ function save(){try{localStorage.setItem('vrt_pal',JSON.stringify(st))}catch(e){}}
+ function idb(mode,fn){return new Promise(function(res){try{var rq=indexedDB.open('vrt_pal',1);rq.onupgradeneeded=function(){rq.result.createObjectStore('kv')};rq.onerror=function(){res(null)};rq.onsuccess=function(){try{var tx=rq.result.transaction('kv',mode),r=fn(tx.objectStore('kv'));tx.oncomplete=function(){res(r&&r.result)};tx.onerror=tx.onabort=function(){res(null)}}catch(e){res(null)}}}catch(e){res(null)}})}
+ function lum(c){var m=String(c||'').match(/\d+(\.\d+)?/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return null;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255}
+ function nativeDark(){var h=document.documentElement,was=h.classList.contains('vp-dark');if(was)h.classList.remove('vp-dark');var L=null;try{L=lum(getComputedStyle(document.body).backgroundColor);if(L==null)L=lum(getComputedStyle(h).backgroundColor)}catch(e){}if(was)h.classList.add('vp-dark');return L!=null&&L<0.4}
+ var css='#vpTint,#vpImg{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
+  'html.vp-dark{filter:invert(1) hue-rotate(180deg);background:#fff!important}html.vp-dark img,html.vp-dark video,html.vp-dark picture,html.vp-dark canvas.vp-keep,html.vp-dark #vpImg,html.vp-dark #vpPanel .sw i{filter:invert(1) hue-rotate(180deg)}'+
+  '#vpBtn{border:0;background:none;padding:0 1px;font-size:15px;line-height:1;cursor:pointer}'+
+  '#vpPanel{position:fixed;z-index:2147483100;width:min(272px,calc(100vw - 16px));background:#fff;color:#14202b;border:1px solid #d5dde5;border-radius:12px;box-shadow:0 14px 34px rgba(2,6,23,.24);padding:10px 12px;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}'+
+  '#vpPanel b.h{display:block;margin-bottom:8px}#vpPanel .sw{display:flex;flex-wrap:wrap;gap:8px}#vpPanel .sw button{width:52px;border:0;background:none;padding:0;font:inherit;font-size:10.5px;color:inherit;cursor:pointer;text-align:center}#vpPanel .sw i{display:block;width:34px;height:34px;margin:0 auto 3px;border-radius:50%;border:2px solid #cbd5e1}#vpPanel .sw button.on i{border-color:#22a35a;box-shadow:0 0 0 3px rgba(34,163,90,.25)}'+
+  '#vpPanel .im{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #e5eaf0}#vpPanel .im button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;color:inherit}#vpPanel .im label{display:flex;align-items:center;gap:6px;font-size:12px;width:100%}#vpPanel .im input{flex:1;accent-color:#22a35a}#vpPanel small{display:block;opacity:.65;font-size:10.5px;margin-top:6px}';
+ var tint,img,btn,panel;
+ function apply(){ if(!document.body)return;
+  var c=COL.filter(function(x){return x[0]===st.c})[0]||COL[0],dark=c[0]==='dark',h=document.documentElement;
+  if(c[0]&&!dark){if(!tint){tint=document.createElement('div');tint.id='vpTint';tint.setAttribute('aria-hidden','true')}tint.style.background=c[2];if(tint.parentNode!==document.body)document.body.appendChild(tint)}else if(tint&&tint.parentNode)tint.parentNode.removeChild(tint);
+  h.classList.toggle('vp-dark',dark&&!nativeDark());
+  if(BG){if(!img){img=document.createElement('div');img.id='vpImg';img.setAttribute('aria-hidden','true')}var v=(st.veil/100).toFixed(2);img.style.backgroundImage='linear-gradient(rgba(255,255,255,'+v+'),rgba(255,255,255,'+v+')),url("'+BG+'")';if(img.parentNode!==document.body)document.body.appendChild(img)}else if(img&&img.parentNode)img.parentNode.removeChild(img) }
+ function draw(){ if(!panel||panel.hidden)return;
+  panel.innerHTML='<b class="h">🎨 背景顏色 Background（這台裝置會記住）</b><div class="sw">'+COL.map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+
+   '<div class="im"><button data-a="pick">🖼️ 自訂背景圖 Image</button>'+(BG?'<button data-a="clear">✕ 移除 Remove</button><label>遮罩 Veil <input type="range" min="30" max="95" step="5" value="'+st.veil+'"><span>'+st.veil+'%</span></label>':'')+'</div><small>圖片只存在這台裝置，不會上傳。遮罩越高，圖越淡、字越清楚。<br>The image stays on this device. Higher veil = fainter image.</small>';
+  var b=btn.getBoundingClientRect(),w=Math.min(272,innerWidth-16),hh=panel.offsetHeight||260,up=b.bottom+6+hh>innerHeight-4&&b.top>hh;panel.style.top=(up?Math.max(6,b.top-hh-6):b.bottom+6)+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.right-w))+'px' }
+ function shrink(file){return (window.createImageBitmap?createImageBitmap(file):Promise.reject()).then(function(bmp){var k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(bmp.width*k));c.height=Math.max(1,Math.round(bmp.height*k));c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.8)})}
+ function pick(){var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;shrink(f).then(function(d){BG=d;apply();draw();idb('readwrite',function(s){return s.put(d,'bg')});try{localStorage.setItem('vrt_pal_img',String(Date.now()))}catch(e){}}).catch(function(){})};inp.click()}
+ function mount(){ var box=document.getElementById('vmBox'); if(!box||btn)return !!btn;
+  var s=document.createElement('style');s.id='vrt-pal-css';s.textContent=css;document.head.appendChild(s);
+  btn=document.createElement('button');btn.id='vpBtn';btn.type='button';btn.title='背景顏色／背景圖 Background';btn.setAttribute('aria-label','Background colour');btn.textContent='🎨';box.appendChild(btn);
+  panel=document.createElement('div');panel.id='vpPanel';panel.hidden=true;document.body.appendChild(panel);
+  btn.addEventListener('click',function(e){e.stopPropagation();panel.hidden=!panel.hidden;draw()});
+  panel.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.c!=null){st.c=b.dataset.c;save();apply();draw()}else if(b.dataset.a==='pick')pick();else if(b.dataset.a==='clear'){BG=null;apply();draw();idb('readwrite',function(s){return s.delete('bg')});try{localStorage.setItem('vrt_pal_img',String(Date.now()))}catch(e){}}});
+  panel.addEventListener('input',function(e){if(e.target.type==='range'){st.veil=+e.target.value;save();apply();var sp=panel.querySelector('label span');if(sp)sp.textContent=st.veil+'%'}});
+  document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&e.target!==btn)panel.hidden=true},true);
+  try{window.vrtMusic&&window.vrtMusic.place()}catch(e){} return true }
+ function readImg(){return idb('readonly',function(s){return s.get('bg')}).then(function(d){BG=(typeof d==='string'&&d.indexOf('data:image/')===0)?d:null;apply();draw()})}
+ function start(){load();apply();readImg();var n=0,iv=setInterval(function(){if(mount()||++n>40)clearInterval(iv)},250);mount();
+  window.addEventListener('storage',function(e){if(e.key==='vrt_pal'){load();apply();draw()}else if(e.key==='vrt_pal_img')readImg()})}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
