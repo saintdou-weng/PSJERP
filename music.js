@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1.5（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v1.6（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -121,7 +121,7 @@
   sw.addEventListener('click',function(){if(lpFired){lpFired=false;return}if(on)stop();else{play();if(box.classList.contains('nar'))openP()}});
   more.addEventListener('click',function(){panel.hidden=!panel.hidden;draw();place()});
   box.addEventListener('wheel',function(e){e.preventDefault();setVol(st.v+(e.deltaY<0?5:-5));tip('🔊 '+st.v+'%')},{passive:false});
-  panel.addEventListener('click',function(e){var fb=e.target.closest('[data-fx]');if(fb){try{localStorage.setItem('vrt_fx',fb.dataset.fx)}catch(_){}draw();window.vrtFx(panel,1);return}if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var r=e.target.closest('.row');if(r){setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
+  panel.addEventListener('click',function(e){var fb=e.target.closest('[data-fx]');if(fb){try{localStorage.setItem('vrt_fx2',fb.dataset.fx)}catch(_){}draw();window.vrtFx(panel,1);return}if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var r=e.target.closest('.row');if(r){setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
   panel.addEventListener('input',function(e){if(e.target.type==='range')setVol(+e.target.value)});
   document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&!box.contains(e.target))panel.hidden=true},true);
   window.addEventListener('resize',function(){box._re=1;dock();place()},{passive:true});draw();place();
@@ -129,8 +129,8 @@
   var was=false;try{was=sessionStorage.getItem('vrt_music_on')==='1'}catch(e){} if(was)play();
   return true }
  /* ✨ 重點卡（Keynote）換上一張／下一張、點開時的翻頁特效：翻書／推入／淡入／縮放／關。各平台的 Keynote 呼叫 window.vrtFx(卡片, 方向)。只做動畫，不動資料。 */
- var FXS=[['flip','翻書'],['push','推入'],['fade','淡入'],['zoom','縮放'],['off','關']];
- function fxGet(){var k='flip';try{k=localStorage.getItem('vrt_fx')||'flip'}catch(e){}return FXS.some(function(f){return f[0]===k})?k:'flip'}
+ var FXS=[['push','推入'],['flip','翻書'],['fade','淡入'],['zoom','縮放'],['off','關']];   /* 11/23 Paul：預設用不誇張的「推入」，各平台一致；點開＝由左向右出現 */
+ function fxGet(){var k='push';try{k=localStorage.getItem('vrt_fx2')||'push'}catch(e){}return FXS.some(function(f){return f[0]===k})?k:'push'}
  window.vrtFx=function(el,dir,open,axis,snap){try{var k=fxGet();if(k==='off'||!el||!el.animate){if(snap&&snap.parentNode)snap.parentNode.removeChild(snap);return}if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches){if(snap&&snap.parentNode)snap.parentNode.removeChild(snap);return}
    var d=dir<0?-1:1,kf,ms=380,o0=el.style.transformOrigin,ease='cubic-bezier(.22,.61,.36,1)';
    try{(el.getAnimations?el.getAnimations():[]).forEach(function(x){if(x.id==='vrtfx')x.cancel()})}catch(_){}
@@ -139,8 +139,9 @@
     if(snap&&snap.animate){var sa=snap.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY('+(-d*100)+'%)',opacity:.55}],{duration:ms,easing:ease,fill:'forwards'});var rm=function(){if(snap.parentNode)snap.parentNode.removeChild(snap)};sa.onfinish=sa.oncancel=rm;setTimeout(rm,ms+250);
      kf=[{transform:'translateY('+(d*100)+'%)',opacity:.55},{transform:'translateY(0)',opacity:1}]}
     else kf=[{transform:'translateY('+(d>0?28:-28)+'px)',opacity:0},{transform:'translateY(0)',opacity:1}]}
+   else if(open&&k!=='fade'&&k!=='zoom'){kf=[{transform:'translateX(-36px)',opacity:0},{transform:'translateX(0)',opacity:1}];ms=340}   /* 點開：資訊由左向右出現 */
    else if(k==='flip'){el.style.transformOrigin=d>0?'left center':'right center';kf=[{transform:'perspective(1600px) rotateY('+(d>0?-38:38)+'deg)',opacity:.45},{transform:'perspective(1600px) rotateY(0deg)',opacity:1}];ms=520}
-   else if(k==='push')kf=[{transform:'translateX('+(d>0?26:-26)+'%)',opacity:0},{transform:'translateX(0)',opacity:1}];
+   else if(k==='push'){kf=[{transform:'translateX('+(d>0?48:-48)+'px)',opacity:0},{transform:'translateX(0)',opacity:1}];ms=340}
    else if(k==='fade'){kf=[{opacity:0},{opacity:1}];ms=360}
    else kf=[{transform:'scale(.95)',opacity:0},{transform:'scale(1)',opacity:1}];
    var an=el.animate(kf,{duration:ms,easing:ease});an.id='vrtfx';an.onfinish=an.oncancel=function(){el.style.transformOrigin=o0}}catch(e){}};
