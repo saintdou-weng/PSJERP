@@ -6236,6 +6236,11 @@ init();
      if(k==='production'){ if(s2.pieces!=null)L.push(`🧵 ${Lx('車縫','Sewing')}　${fmt(s2.pieces)} ${t('pcs')}${s2.eff!=null?'・'+Lx('效率 ','eff. ')+fmt(s2.eff,1)+'%':''}`); if((f.cutting||{}).pieces>0)L.push(`✂️ ${Lx('裁剪','Cutting')}　${fmt(f.cutting.pieces)} ${t('pcs')}`); if(q.reports)L.push(`🔍 QC　${Lx('退修率 ','reject ')}${fmt(q.rate,1)}%`); if(pl.planQty)L.push(`📅 ${Lx('本月排單','Month plan')}　${fmt(pl.completion||0,0)}%（${fmt(pl.mtd)} / ${fmt(pl.planQty)}）`) }
      if(w.cutNotSewn!=null)L.push(`📦 ${Lx('已裁未縫','Cut, not sewn')}　${fmt(w.cutNotSewn)} ${t('pcs')}（${Lx('生產日報 ','daily report ')}${PW.date}）`) }
     if(L.length)return head+L.join('\n') }catch(e){} }
+  /* 其他頁：原本每一頁都發同一段「未結訂單 11618・逾期 0・生產 WIP 0 件」（示範資料的算法）→ 真實模式改發「這一頁現在畫面上的數字卡」，看到什麼就發什麼 */
+  if(!isDemo()&&!id&&k===CUR){ try{ const cards=[...document.querySelectorAll('#page .kpi')].slice(0,8), tx=(c,q)=>{const e=c.querySelector(q);return e?e.innerText.replace(/\s+/g,' ').trim():''};
+    const L=cards.map(c=>{const l=tx(c,'.l'),v=tx(c,'.v'),d=tx(c,'.d');return l&&v?'• '+esc(l)+'　<b>'+esc(v)+'</b>'+(d?'（'+esc(d)+'）':''):''}).filter(Boolean);
+    if(L.length){ const d=TODAY; let per=''; try{ const st=S(k); if(st&&st.pt&&typeof periodLabel==='function')per=periodLabel(st.pt,rangeOf(st)) }catch(e){}
+     return `🏭 <b>VRT ERP — ${pad(d.getMonth()+1)}/${pad(d.getDate())}</b>\n${modIcon(k)} <b>${esc(t(k))}</b>${per?'　📅 '+esc(per):''}\n━━━━━━━━━━━━\n`+L.join('\n') } }catch(e){} }
   return _st.apply(this,arguments) };
  /* 總覽頁「生產 WIP 分段」：真實模式沒有 DB.production → 用生產日報的已裁未縫（沒有就不顯示數字，不顯示 0） */
  const _ws=window.wipStages; if(typeof _ws==='function')window.wipStages=function(){ if(isDemo())return _ws.apply(this,arguments); if(!PW.at&&!PW.busy)prodWip(); const w=PW.d; return w&&w.cutNotSewn!=null?[[Lx('已裁未縫（生產日報 ','Cut, not sewn (daily report ')+PW.date+'）',w.cutNotSewn]]:[] };
