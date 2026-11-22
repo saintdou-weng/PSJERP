@@ -6135,7 +6135,7 @@ init();
 #fxGlow{position:fixed;inset:0;pointer-events:none;z-index:15;opacity:0;transition:opacity .2s ease;background:radial-gradient(240px circle at var(--x,-999px) var(--y,-999px),var(--g,rgba(31,79,168,.15)),transparent 100%)}
 #fxGlow.on{opacity:1}
 .top{transition:background-color .2s ease,box-shadow .2s ease}
-.top.fx-stuck{background:rgba(30,41,59,.82)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 6px 18px rgba(2,6,23,.28)!important}
+.top.fx-stuck{background:var(--fx-top,rgba(30,41,59,.82))!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 6px 18px rgba(2,6,23,.28)!important}
 #fxTop{position:fixed;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));width:48px;height:48px;border-radius:50%;border:0;padding:0;background:#1E293B;color:#fff;font-size:20px;line-height:1;display:grid;place-items:center;cursor:pointer;z-index:45;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .25s ease,transform .2s ease-out,box-shadow .2s ease,visibility 0s linear .25s;box-shadow:0 6px 16px rgba(2,6,23,.28)}
 #fxTop.on{opacity:.92;visibility:visible;transform:none;transition-delay:0s}
 #fxTop.on:hover{transform:translateY(-3px);opacity:1;box-shadow:0 10px 22px rgba(2,6,23,.36)}
@@ -6149,7 +6149,7 @@ init();
   up.addEventListener('click',()=>{stop();const y0=window.scrollY;if(calm||y0<2){window.scrollTo(0,0);return}const t0=performance.now();const step=t=>{const p=Math.min(1,(t-t0)/500),e=1-Math.pow(1-p,3);window.scrollTo(0,Math.round(y0*(1-e)));anim=p<1?requestAnimationFrame(step):0};anim=requestAnimationFrame(step)});
   ['wheel','touchstart','keydown'].forEach(ev=>window.addEventListener(ev,stop,{passive:true}));
   /* ── 4 導覽列＋5 顯示時機：捲動用 rAF 節流 ── */
-  let sTick=0;const onScroll=()=>{sTick=0;const y=window.scrollY,top=document.querySelector('.top');if(top)top.classList.toggle('fx-stuck',y>80);up.classList.toggle('on',y>window.innerHeight)};
+  let sTick=0;const onScroll=()=>{sTick=0;const y=window.scrollY,top=document.querySelector('.top');if(top){const on=y>80;if(on&&!top.classList.contains('fx-stuck')){/* 跟著目前主題：用導覽列現在的底色做半透明（深色主題就是深色半透明） */const m=getComputedStyle(top).backgroundColor.match(/[\d.]+/g);if(m&&m.length>=3)top.style.setProperty('--fx-top','rgba('+m[0]+','+m[1]+','+m[2]+','+(m.length>3?Math.min(+m[3],.82):.82)+')')}top.classList.toggle('fx-stuck',on)}up.classList.toggle('on',y>window.innerHeight)};
   window.addEventListener('scroll',()=>{if(!sTick)sTick=requestAnimationFrame(onScroll)},{passive:true});window.addEventListener('resize',()=>{if(!sTick)sTick=requestAnimationFrame(onScroll)},{passive:true});onScroll();
   if(!fine)return;
   /* ── 2 游標聚光＋3 3D 傾斜：滑鼠用 rAF 節流 ── */
