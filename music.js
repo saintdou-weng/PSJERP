@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v2.1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v2.2（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -180,7 +180,7 @@
  function lum(c){var m=String(c||'').match(/\d+(\.\d+)?/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return null;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255}
  function nativeDark(){var h=document.documentElement,was=h.classList.contains('vp-dark');if(was)h.classList.remove('vp-dark');var L=null;try{L=lum(getComputedStyle(document.body).backgroundColor);if(L==null)L=lum(getComputedStyle(h).backgroundColor)}catch(e){}if(was)h.classList.add('vp-dark');return L!=null&&L<0.4}
  var CARDCSS='html.vp-on .vp-card{box-shadow:0 12px 26px rgba(15,23,42,.24),0 3px 7px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important;border-color:rgba(15,23,42,.26)!important;background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
-  'html.vp-acc .cmp-acts button:not(.err):not(.gh),html.vp-acc .gip-btn.pri,html.vp-acc .ic-btn.pri,html.vp-acc .pc-btn.pri,html.vp-acc #kn-foot button:not(:disabled),html.vp-acc .kn-chip.on,html.vp-acc .kn-cc button.on{background:var(--vp-acc)!important;border-color:var(--vp-acc)!important;color:#fff!important}html.vp-acc .ic-h,html.vp-acc .pc-h{background:var(--vp-acc)!important}';
+  'html.vp-acc .cmp-acts button:not(.err):not(.gh),html.vp-acc .gip-btn.pri,html.vp-acc .ic-btn.pri,html.vp-acc .pc-btn.pri,html.vp-acc #kn-foot button:not(:disabled),html.vp-acc .kn-chip.on,html.vp-acc .kn-cc button.on{background:var(--vp-acc)!important;border-color:var(--vp-acc)!important;color:#fff!important}';
  var css='#vpTint,#vpImg{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
   'html.vp-dark{filter:invert(1) hue-rotate(180deg);background:#fff!important}html.vp-dark img,html.vp-dark video,html.vp-dark picture,html.vp-dark canvas.vp-keep,html.vp-dark #vpImg,html.vp-dark #vpPanel .sw i{filter:invert(1) hue-rotate(180deg)}html.vp-dark #kn-box,html.vp-dark .pkn-box{outline:2px solid #000;outline-offset:-1px}'+
   CARDCSS+
@@ -281,4 +281,89 @@
  document.documentElement.addEventListener('mouseleave',function(){if(glow)glow.style.opacity='0';unlit()},{passive:true});
  /* 手機：點到深色區域亮一下 */
  document.addEventListener('touchstart',function(e){var t=e.touches&&e.touches[0];if(!t)return;move(t.clientX,t.clientY);clearTimeout(hideT);hideT=setTimeout(function(){if(glow)glow.style.opacity='0';unlit()},650)},{passive:true});
+})();
+
+/* ===== 🪙 卡片質感＋按壓感＋卡片上方不用黑色 v1（2026-11-23，music.js 2.2.0）=====
+   Paul 11/23：① 卡片要有金屬質感跟立體感；滑鼠或手指按下去，要像鐵板被壓下／按鈕被按下一點點。
+              ② 卡片跳出來以後，上方永遠不要是黑的——改成「接近背景色、再深一點或淺一點」。
+   · 每個平台、每一頁（含嵌在裡面的分頁）都做，不管有沒有選調色；只加影子／光澤／按壓動作，不動資料、不改排版。
+   · ①：常見的卡片（.card、.kpi、xxx-card…）加上浮起的影子＋上亮下暗的邊＋一點拉絲光澤（原本自己有漸層底的不蓋）。
+        小張、裡面沒有輸入框／表格的卡片才有「按下去」的動作（大面板每點一下就晃會很煩）。
+   · ②：跳出來的卡片／視窗，最上面那一條如果是黑色／深藍色 → 換成跟頁面底色同色系、深一點點的顏色，字改深色；
+        卡片後面那片暗幕也從黑色改成底色系的霧面。深色頁則是比底色淺一點。 */
+(function(){
+ if(window.__VRT_CARD3D)return; window.__VRT_CARD3D=1;
+ var H=document.documentElement,W=window;
+ function rgb(c){var m=String(c||'').match(/[\d.]+/g);if(!m||m.length<3)return null;return [+m[0],+m[1],+m[2],m.length>3?+m[3]:1]}
+ function lum(a){return (0.2126*a[0]+0.7152*a[1]+0.0722*a[2])/255}
+ function mix(a,b,t){return [0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)})}
+ function bgOf(e){ /* 這個元素自己的底色（純色或漸層第一個顏色）；透明＝null */
+  try{var cs=W.getComputedStyle(e),c=rgb(cs.backgroundColor);if(c&&c[3]>0.5)return c;
+   if(cs.backgroundImage&&/gradient/.test(cs.backgroundImage)){var q=cs.backgroundImage.match(/rgba?\([^)]+\)/);var g=q&&rgb(q[0]);if(g&&g[3]>0.5)return g}}catch(_){}return null}
+ function pageBg(){var c=document.body&&bgOf(document.body);if(!c)c=bgOf(H);return c||[255,255,255,1]}
+ var CSS=
+  '.vc3{box-shadow:0 12px 26px rgba(15,23,42,.20),0 3px 7px rgba(15,23,42,.14),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important}.vc3:not(.vc3-a){border-color:rgba(15,23,42,.24)!important}'+
+  '.vc3.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
+  '.vc3.vc3-d{box-shadow:0 12px 26px rgba(0,0,0,.46),0 3px 7px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 0 rgba(0,0,0,.36)!important}.vc3.vc3-d:not(.vc3-a){border-color:rgba(255,255,255,.18)!important}'+
+  '.vc3.vc3-d.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.11) 0%,rgba(255,255,255,0) 30%,rgba(0,0,0,.10) 58%,rgba(255,255,255,.06) 74%,rgba(0,0,0,.18) 100%)!important}'+
+  /* 按壓：平常微微浮起 → 按下去往下沉、影子收掉、裡面出現一圈壓痕，放開彈回來 */
+  'html .vc3.vc3-p{transition:transform .13s cubic-bezier(.3,.7,.4,1),box-shadow .13s ease,filter .13s ease;-webkit-tap-highlight-color:transparent}'+
+  '@media(hover:hover){html .vc3.vc3-p:hover{transform:translateY(-2px);box-shadow:0 18px 34px rgba(15,23,42,.24),0 4px 9px rgba(15,23,42,.15),inset 0 1px 0 rgba(255,255,255,.98),inset 0 -2px 0 rgba(15,23,42,.10)!important}'+
+  'html .vc3.vc3-p.vc3-d:hover{box-shadow:0 18px 34px rgba(0,0,0,.52),0 4px 9px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.24),inset 0 -2px 0 rgba(0,0,0,.36)!important}}'+
+  'html .vc3.vc3-p:active,html .vc3.vc3-p.vc3-dn{transform:translateY(2px) scale(.988);box-shadow:0 1px 2px rgba(15,23,42,.28),inset 0 3px 7px rgba(15,23,42,.24),inset 0 -1px 0 rgba(255,255,255,.65)!important;filter:brightness(.965)}'+
+  'html .vc3.vc3-p.vc3-d:active,html .vc3.vc3-p.vc3-d.vc3-dn{box-shadow:0 1px 2px rgba(0,0,0,.5),inset 0 3px 8px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12)!important;filter:brightness(.92)}'+
+  /* ② 卡片上方：不用黑色 */
+  '.vc-hd{background:var(--vc-hd,#e8ecf1)!important;background-image:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0))!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14))!important;text-shadow:none!important}'+
+  '.vc-hd .vc-ink{color:var(--vc-ink,#1d2b3a)!important;text-shadow:none!important}.vc-hd .vc-ink2{border-color:var(--vc-line,rgba(15,23,42,.2))!important}'+
+  '.gip-ov,#kn-mask,.cmp-mask,.pkn-mask,.gcpt-ov,.vc-veil{background:var(--vc-veil,rgba(214,221,230,.74))!important;-webkit-backdrop-filter:blur(7px) saturate(1.05);backdrop-filter:blur(7px) saturate(1.05)}'+
+  '.gip-panel,#kn-box,.pkn-box,.cmp-drawer,.cmp-sheet{box-shadow:0 26px 64px rgba(15,23,42,.30),0 4px 12px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.9)!important;border:1px solid rgba(15,23,42,.16)}'+
+  /* 每頁最上面「回平台選單」那一條：原本黑底白字 → 跟底色同色系、細一點 */
+  '#fx-home{background:var(--vc-hd,#e8ecf1)!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14));padding-top:5px!important;padding-bottom:5px!important;font-size:12px!important}'+
+  '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p:hover,html .vc3.vc3-p:active{transform:none}}'+
+  '@media print{.vc3{box-shadow:none!important;background-image:none!important}}';
+ var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.summary-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,.gip-kpi,.gcpt,.gcpt-kpi,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]';
+ var HSEL='.ic-h,.pc-h,.mh,.dh,.modal-head,.modal-header,.m-head,.gc-modal-head,.cmp-dh,.gip-top,#kn-head,.pkn-head,.drawer-head,.dlg-head,.sheet-head,[class*="-head"],[class*="-hd"],[class*="-top"],[class$="-h"],header';
+ var OSEL='.gip-ov,.cmp-mask,#kn-mask,.pkn-mask,.gcpt-ov,.modal,.modal-bg,.modal-overlay,.modal-mask,.ovl,.overlay,.mask,[role=dialog],dialog[open],.gc-common-modal,#drawer,.drawer,.sheet,[class*="modal"],[class*="-mask"],[class*="overlay"]';
+ function vars(){try{var b=pageBg(),dark=lum(b)<0.45,inv=H.classList.contains('vp-dark')||H.classList.contains('vrt-inv');
+   var hd=dark?mix(b,[255,255,255],.16):mix(b,[15,23,42],.085),ve=dark?mix(b,[255,255,255],.10):mix(b,[15,23,42],.16);
+   var key=hd.join(',')+dark;if(H.__vcK===key)return;H.__vcK=key;
+   H.style.setProperty('--vc-hd','rgb('+hd.join(',')+')');H.style.setProperty('--vc-ink',dark?'#eef2f7':'#1d2b3a');
+   H.style.setProperty('--vc-line',dark?'rgba(255,255,255,.16)':'rgba(15,23,42,.14)');H.style.setProperty('--vc-veil','rgba('+ve.join(',')+',.76)')}catch(_){}}
+ function isVis(e){return !!(e&&(e.offsetWidth||e.offsetHeight))}
+ function heads(){try{var ovs=document.querySelectorAll(OSEL),n=0;
+   for(var i=0;i<ovs.length&&n<12;i++){var o=ovs[i];if(!isVis(o)||o.closest('#vmPanel,#vpPanel'))continue;var ps;try{ps=W.getComputedStyle(o).position}catch(_){continue}
+    if(ps!=='fixed'&&ps!=='absolute'&&!o.matches('[role=dialog],dialog'))continue;n++;
+    var hs=o.querySelectorAll(HSEL);
+    for(var j=0;j<hs.length&&j<14;j++){var h=hs[j];if(h.__vch||h.closest('.vc-hd'))continue;if(!isVis(h)||h.offsetHeight>170||h.offsetWidth<180){continue}
+     var c=bgOf(h);h.__vch=1;if(!c||lum(c)>0.42)continue;
+     /* 深色頁（頁面本身就深）就不用改：它的表頭深色是對的 */
+     if(lum(pageBg())<0.45)continue;
+     h.classList.add('vc-hd');ink(h)}}}catch(_){}}
+ function ink(h){try{var all=h.querySelectorAll('*'),k=0;paint(h,h);for(var i=0;i<all.length&&k<120;i++,k++)paint(all[i],h)}catch(_){}}
+ function paint(e,h){try{ /* 原本是白字／淺色字 → 改深色字；自己有深色底的小按鈕（例如實心的關閉鈕）保留原樣 */
+   if(e!==h){for(var p=e;p&&p!==h;p=p.parentElement){var b=bgOf(p);if(b&&lum(b)<0.5)return;if(b)break}}
+   var cs=W.getComputedStyle(e),c=rgb(cs.color);if(c&&lum(c)>0.62)e.classList.add('vc-ink');
+   var bc=rgb(cs.borderTopColor);if(e!==h&&bc&&parseFloat(cs.borderTopWidth)>0&&lum(bc)>0.7)e.classList.add('vc-ink2')}catch(_){}}
+ var ct=0;
+ function cards(){if(ct)return;ct=setTimeout(function(){ct=0;try{vars();
+   var els=document.querySelectorAll(CSEL),n=0;
+   for(var i=0;i<els.length&&n<500;i++){var e=els[i];if(e.__vc3)continue;
+    var w=e.offsetWidth,hh=e.offsetHeight;if(!w&&!hh)continue;   /* 還沒顯示的下次再看 */
+    e.__vc3=1;n++;if(w<70||hh<36)continue;if(e.closest('#vmPanel,#vpPanel,#vmBox,#kn-foot,#kn-chips'))continue;
+    var cs=W.getComputedStyle(e);if(cs.position==='fixed'||cs.display==='inline'||cs.display==='contents')continue;
+    var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';if(!hasImg&&(!c||c[3]<0.4))continue;
+    var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
+    e.classList.add('vc3');if(!hasImg)e.classList.add('vc3-g');if(dk)e.classList.add('vc3-d');
+    /* 原本有一邊粗的色條（例如左邊 4px 的分類色）：邊線顏色不動 */
+    if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
+    /* 小張、裡面沒有輸入框／表格／影片的，才加按壓動作 */
+    if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
+   heads()}catch(_){}},180)}
+ function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
+  cards();setInterval(function(){if(!document.hidden){H.__vcK='';cards()}},3000);
+  try{new MutationObserver(cards).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
+  /* 手機：要有 touchstart 監聽，:active 才會出現；手指移開（開始捲動）就放開 */
+  try{document.addEventListener('touchstart',function(){},{passive:true})}catch(_){}}
+ W.vrtCard3d={refresh:function(){H.__vcK='';cards()}};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
