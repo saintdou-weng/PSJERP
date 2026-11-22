@@ -2616,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.7';
+const APP_VER='1.7.8';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6248,6 +6248,27 @@ init();
 
 /* v1.7.7：🎵 放鬆音樂改成各平台共用的 music.js（上方 ON/OFF 撥動開關），見檔案結尾的 <script src="music.js"> */
 
+/* ===== v1.7.8（2026-11-22）🖼️ 自訂背景圖（跟 PSJHR 一樣，放在 🎨 背景顏色面板裡）=====
+   圖片縮到最長邊 1920 後只存在這台裝置的瀏覽器（IndexedDB），不上傳雲端；遮罩可調，字才看得清楚。只加樣式，不改版面。 */
+(function(){
+ if(window.__PSJ_BG)return;window.__PSJ_BG=1;
+ const Lx=(z,e,k)=>tt(z,e,k);
+ const st=document.createElement('style');st.id='psj-bgimg';st.textContent=`:root[data-bgimg] body{background-image:var(--bgimg)!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;background-attachment:fixed!important}
+:root[data-bgimg] body::before{content:"";position:fixed;inset:0;background:var(--bg,#F0F2F5);opacity:var(--bgveil,.55);pointer-events:none;z-index:-1}
+.bg-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;width:100%}`;document.head.appendChild(st);
+ let BG=null;
+ const apply=()=>{const d=document.documentElement;d.style.setProperty('--bgveil',String((+LS.get('psjerp_bgveil',55)||0)/100));if(BG){d.style.setProperty('--bgimg','url("'+BG+'")');d.dataset.bgimg='1'}else{d.style.removeProperty('--bgimg');delete d.dataset.bgimg}};
+ const ready=async()=>{ if(!IDB._db){ try{await IDB.open()}catch(e){} } };
+ const shrink=async file=>{let bmp;try{bmp=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){bmp=await createImageBitmap(file)}const k=Math.min(1,1920/Math.max(bmp.width,bmp.height)),w=Math.max(1,Math.round(bmp.width*k)),h=Math.max(1,Math.round(bmp.height*k)),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(bmp,0,0,w,h);return c.toDataURL('image/jpeg',0.82)};
+ const refresh=()=>{const p=document.getElementById('tintPop');if(p){p.remove();tintPop()}if(CUR==='settings')rerender()};
+ window.bgPick=function(){const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;try{const d=await shrink(f);await ready();const ok=await IDB.set('ui_bgimg',d);BG=d;apply();refresh();toast(ok?Lx('背景圖已設定（只存在這台裝置）','Background image set (this device only)','បានកំណត់រូបផ្ទៃខាងក្រោយ'):Lx('背景圖已套用，但這台裝置沒辦法記住','Applied, but this device could not save it','បានប្រើ ប៉ុន្តែមិនអាចរក្សាទុក'))}catch(e){toast(Lx('這個檔案不能當背景圖','This file can’t be used as a background','ឯកសារនេះមិនអាចប្រើបាន'))}};inp.click()};
+ window.bgClear=async function(){await ready();await IDB.set('ui_bgimg',null);BG=null;apply();refresh();toast(Lx('已移除背景圖','Background image removed','បានដករូបផ្ទៃខាងក្រោយចេញ'))};
+ window.bgVeil=function(v){LS.set('psjerp_bgveil',+v);apply();const o=document.getElementById('bgVeilV');if(o)o.textContent=v+'%'};
+ window.bgCtlHTML=function(){const v=+LS.get('psjerp_bgveil',55)||0;return `<div class="bg-row"><button class="btn sm" onclick="bgPick()">🖼️ ${Lx('自訂背景圖','Custom background image','រូបផ្ទៃខាងក្រោយ')}</button>${BG?`<button class="btn sm" onclick="bgClear()">✕ ${Lx('移除背景圖','Remove image','ដករូបចេញ')}</button><label class="small muted" style="display:flex;gap:6px;align-items:center">${Lx('遮罩','Veil','ស្រទាប់')} <input type="range" min="0" max="90" step="5" value="${v}" oninput="bgVeil(this.value)"> <span id="bgVeilV" class="mono">${v}%</span></label>`:''}</div><div class="small muted" style="margin-top:4px;width:100%">${Lx('圖片只存在這台裝置的瀏覽器，不會上傳雲端；換裝置要重新設定。遮罩越高字越清楚。','The image stays in this browser only (never uploaded). A higher veil keeps text easier to read.','រូបនៅតែក្នុងកម្មវិធីរុករកនេះ មិនផ្ទុកឡើងទេ។')}</div>`};
+ const _tp=window.tintPop; if(typeof _tp==='function')window.tintPop=function(ev){ const had=!!document.getElementById('tintPop'); const r=_tp.apply(this,arguments); if(!had){ const p=document.getElementById('tintPop'); if(p&&!p.querySelector('.bg-row'))p.insertAdjacentHTML('beforeend',bgCtlHTML()) } return r };
+ (async()=>{ try{ await ready(); BG=await IDB.get('ui_bgimg') }catch(e){ BG=null } apply() })();
+})();
+
 /* ===== v1.7.3 UI 動效（2026-11-22）：懸停回饋／游標聚光／3D 傾斜／導覽列捲動樣式／回到頂部 =====
    只加樣式和滑鼠、捲動監聽（都用 requestAnimationFrame 節流），不改資料、不改版面位置、不碰既有事件。
    觸控裝置與「減少動態效果」設定下，1–3 項自動不啟用。按鈕用「上移」，KPI 卡用「傾斜」，兩者不會同時作用在同一個元件。 */
@@ -6308,7 +6329,7 @@ init();
 })();
 
 </script>
-<script src="music.js?v=1.0.2" defer></script>
+<script src="music.js?v=1.0.3" defer></script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
 <script src="https://saintdou-weng.github.io/ac-admin/shared/swipe-tabs.js" defer></script>
 <!-- 2026-11-22 主頁摘要輪播（同 Admin OS 首頁瀏覽方式：分類標籤、彩色卡、左右滑、每格可點進頁面） -->
