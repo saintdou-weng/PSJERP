@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v2.2（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v2.3（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -66,7 +66,7 @@
  '#vmTip{position:fixed;left:50%;top:40px;transform:translateX(-50%);z-index:9993;background:#14213d;color:#fff;padding:7px 12px;border-radius:9px;font:12px system-ui;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}#vmTip.on{opacity:.96}'+
  '#vmBox.nar #vmMore{display:none}'+
  '#vmBox.bl{left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));top:auto;right:auto;z-index:44;opacity:.92;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}#vmBox.bl #vmMore{background:#14213d;color:#fff;opacity:.9}'+
- '@media print{#vmBox,#vmPanel,#vmTip,#vpPanel,#vpTint,#vpImg{display:none!important}}';
+ '@media print{#vmBox,#vmPanel,#vmTip,#vpPanel,#vpTint,#vpImg,#vpWp{display:none!important}}';
  var box,sw,more,panel,dot,T0=Date.now();
  function draw(volOnly){ if(sw){sw.classList.toggle('on',on);sw.setAttribute('aria-checked',on?'true':'false');sw.title=(on?'音樂：開 Music ON':'音樂：關 Music OFF')+'　·　音量 Volume '+st.v+'%（滾輪可調 scroll to adjust）';sw.lastChild.textContent=on?'ON':'OFF'}
   if(dot)dot.classList.toggle('on',on);
@@ -173,15 +173,30 @@
  function hx2(h){h=(h||'#ffffff').replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
  function mixHex(a,b){var x=hx2(a),y=hx2(b);return '#'+[0,1,2].map(function(i){return ('0'+Math.round((x[i]+y[i])/2).toString(16)).slice(-2)}).join('')}
  function colOf(k){return COL.filter(function(x){return x[0]===k})[0]||null}
- var st={c:'',c2:'',veil:70},BG=null,mixMode=false;
- function load(){try{var j=JSON.parse(localStorage.getItem('vrt_pal')||'null');st={c:'',c2:'',veil:70};if(j){if(COL.some(function(x){return x[0]===j.c}))st.c=j.c;if(j.c2&&COL.some(function(x){return x[0]===j.c2}))st.c2=j.c2;if(j.veil>=0&&j.veil<=95)st.veil=+j.veil}}catch(e){}}
+ var st={c:'',c2:'',veil:70,wp:''},BG=null,mixMode=false;
+ /* 🧱 壁紙（2026-11-23 Paul）：除了兩色混合，還可以再疊一層花紋——可以「兩色＋壁紙」或「一色＋壁紙」，也可以只用壁紙。
+    做法跟色片一樣：最上層蓋一層不擋滑鼠的淡花紋（multiply），不動各平台的 CSS／資料；深色頁花紋會自動變成淺色線條。 */
+ function svgU(w,h,body){return 'url("data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+body+'</svg>')+'")'}
+ var INK='rgb(30,41,59)';
+ var WPS=[['','無 None'],['grid','格子 Grid'],['dots','圓點 Dots'],['stars','星星 Stars'],['diamond','菱形 Diamond'],['clover','四葉草 Clover'],['stone','石壁 Stone'],['brick','磚牆 Brick'],['metal','金屬 Metal']];
+ function wpCss(k,a){a=a||1;var o=function(v){return (v*a).toFixed(3)};
+  if(k==='grid')return {i:'linear-gradient(rgba(30,41,59,'+o(.10)+') 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,'+o(.10)+') 1px,transparent 1px)',s:'30px 30px'};
+  if(k==='dots')return {i:'radial-gradient(circle,rgba(30,41,59,'+o(.16)+') 2.6px,transparent 3.2px),radial-gradient(circle,rgba(30,41,59,'+o(.16)+') 2.6px,transparent 3.2px)',s:'28px 28px',p:'0 0,14px 14px'};
+  if(k==='stars'){var sp='M0-9 2.6-2.8 9.5-2.8 4 1.5 6 8.5 0 4.4-6 8.5-4 1.5-9.5-2.8-2.6-2.8Z';return {i:svgU(72,72,'<g fill="'+INK+'" fill-opacity="'+o(.13)+'"><path transform="translate(18 20)" d="'+sp+'"/><path transform="translate(54 56) scale(.62) rotate(18)" d="'+sp+'"/></g>'),s:'72px 72px'}}
+  if(k==='diamond')return {i:svgU(44,44,'<path d="M22 3 41 22 22 41 3 22Z" fill="'+INK+'" fill-opacity="'+o(.045)+'" stroke="'+INK+'" stroke-opacity="'+o(.15)+'" stroke-width="1"/>'),s:'44px 44px'};
+  if(k==='clover'){var cl='<g fill="'+INK+'" fill-opacity="'+o(.12)+'"><circle cx="-4.6" cy="-4.6" r="5"/><circle cx="4.6" cy="-4.6" r="5"/><circle cx="-4.6" cy="4.6" r="5"/><circle cx="4.6" cy="4.6" r="5"/></g><path d="M1 3q3 8 8 11" fill="none" stroke="'+INK+'" stroke-opacity="'+o(.16)+'" stroke-width="1.6" stroke-linecap="round"/>';return {i:svgU(84,84,'<g transform="translate(22 22) rotate(-12)">'+cl+'</g><g transform="translate(62 62) rotate(20) scale(.7)">'+cl+'</g>'),s:'84px 84px'}}
+  if(k==='stone')return {i:svgU(260,260,'<filter id="f" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".035 .05" numOctaves="4" seed="7" stitchTiles="stitch"/><feDiffuseLighting lighting-color="#fff" surfaceScale="3.2" diffuseConstant="1.05"><feDistantLight azimuth="225" elevation="52"/></feDiffuseLighting></filter><rect width="260" height="260" filter="url(#f)" opacity="'+o(.55)+'"/>'),s:'260px 260px'};
+  if(k==='brick')return {i:svgU(96,56,'<filter id="n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .12  0 0 0 0 .16  0 0 0 0 .23  0 0 0 '+o(.11)+' 0"/></filter><g fill="'+INK+'"><rect x="2" y="2" width="92" height="24" rx="2" fill-opacity="'+o(.055)+'"/><rect x="-46" y="30" width="92" height="24" rx="2" fill-opacity="'+o(.08)+'"/><rect x="50" y="30" width="92" height="24" rx="2" fill-opacity="'+o(.04)+'"/><rect x="2" y="23" width="92" height="3" fill-opacity="'+o(.09)+'"/><rect x="-46" y="51" width="92" height="3" fill-opacity="'+o(.09)+'"/><rect x="50" y="51" width="92" height="3" fill-opacity="'+o(.09)+'"/></g><rect width="96" height="56" filter="url(#n)"/>'),s:'96px 56px'};
+  if(k==='metal')return {i:'repeating-linear-gradient(90deg,rgba(30,41,59,'+o(.055)+') 0 1px,transparent 1px 3px,rgba(30,41,59,'+o(.03)+') 3px 4px,transparent 4px 7px),linear-gradient(115deg,rgba(30,41,59,'+o(.10)+') 0%,rgba(255,255,255,0) 22%,rgba(30,41,59,'+o(.08)+') 45%,rgba(255,255,255,0) 62%,rgba(30,41,59,'+o(.12)+') 100%)',s:'7px 100%,100% 100%'};
+  return null}
+ function load(){try{var j=JSON.parse(localStorage.getItem('vrt_pal')||'null');st={c:'',c2:'',veil:70,wp:''};if(j){if(j.wp&&WPS.some(function(x){return x[0]===j.wp}))st.wp=j.wp;if(COL.some(function(x){return x[0]===j.c}))st.c=j.c;if(j.c2&&COL.some(function(x){return x[0]===j.c2}))st.c2=j.c2;if(j.veil>=0&&j.veil<=95)st.veil=+j.veil}}catch(e){}}
  function save(){try{localStorage.setItem('vrt_pal',JSON.stringify(st))}catch(e){}}
  function idb(mode,fn){return new Promise(function(res){try{var rq=indexedDB.open('vrt_pal',1);rq.onupgradeneeded=function(){rq.result.createObjectStore('kv')};rq.onerror=function(){res(null)};rq.onsuccess=function(){try{var tx=rq.result.transaction('kv',mode),r=fn(tx.objectStore('kv'));tx.oncomplete=function(){res(r&&r.result)};tx.onerror=tx.onabort=function(){res(null)}}catch(e){res(null)}}}catch(e){res(null)}})}
  function lum(c){var m=String(c||'').match(/\d+(\.\d+)?/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return null;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255}
  function nativeDark(){var h=document.documentElement,was=h.classList.contains('vp-dark');if(was)h.classList.remove('vp-dark');var L=null;try{L=lum(getComputedStyle(document.body).backgroundColor);if(L==null)L=lum(getComputedStyle(h).backgroundColor)}catch(e){}if(was)h.classList.add('vp-dark');return L!=null&&L<0.4}
  var CARDCSS='html.vp-on .vp-card{box-shadow:0 12px 26px rgba(15,23,42,.24),0 3px 7px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important;border-color:rgba(15,23,42,.26)!important;background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
   'html.vp-acc .cmp-acts button:not(.err):not(.gh),html.vp-acc .gip-btn.pri,html.vp-acc .ic-btn.pri,html.vp-acc .pc-btn.pri,html.vp-acc #kn-foot button:not(:disabled),html.vp-acc .kn-chip.on,html.vp-acc .kn-cc button.on{background:var(--vp-acc)!important;border-color:var(--vp-acc)!important;color:#fff!important}';
- var css='#vpTint,#vpImg{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
+ var css='#vpTint,#vpImg,#vpWp{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpPanel .wp{display:flex;flex-wrap:wrap;gap:8px}#vpPanel .wp button{width:46px;border:0;background:none;padding:0;font:inherit;font-size:10.5px;color:inherit;cursor:pointer;text-align:center}#vpPanel .wp i{display:block;width:34px;height:34px;margin:0 auto 3px;border-radius:9px;border:2px solid #cbd5e1;background-color:#fff}#vpPanel .wp button.on i{border-color:#22a35a;box-shadow:0 0 0 3px rgba(34,163,90,.25)}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
   'html.vp-dark{filter:invert(1) hue-rotate(180deg);background:#fff!important}html.vp-dark img,html.vp-dark video,html.vp-dark picture,html.vp-dark canvas.vp-keep,html.vp-dark #vpImg,html.vp-dark #vpPanel .sw i{filter:invert(1) hue-rotate(180deg)}html.vp-dark #kn-box,html.vp-dark .pkn-box{outline:2px solid #000;outline-offset:-1px}'+
   CARDCSS+
   '#vpPanel .mx{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:11.5px}#vpPanel .mx button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;color:inherit}#vpPanel .mx button.on{background:#14213d;border-color:#14213d;color:#fff}#vpPanel .mx i{display:inline-block;width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;vertical-align:middle}'+
@@ -189,7 +204,7 @@
   '#vpPanel{position:fixed;z-index:2147483100;width:min(296px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow-y:auto;background:#fff;color:#14202b;border:1px solid #d5dde5;border-radius:12px;box-shadow:0 14px 34px rgba(2,6,23,.24);padding:10px 12px;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}'+
   '#vpPanel b.h{display:block;margin-bottom:8px}#vpPanel .sw{display:flex;flex-wrap:wrap;gap:8px}#vpPanel .swl{font-size:11px;opacity:.65;margin:10px 0 6px}#vpPanel .sw button{width:46px;border:0;background:none;padding:0;font:inherit;font-size:10.5px;color:inherit;cursor:pointer;text-align:center}#vpPanel .sw i{display:block;width:34px;height:34px;margin:0 auto 3px;border-radius:50%;border:2px solid #cbd5e1}#vpPanel .sw button.on i{border-color:#22a35a;box-shadow:0 0 0 3px rgba(34,163,90,.25)}'+
   '#vpPanel .im{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #e5eaf0}#vpPanel .im button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;color:inherit}#vpPanel .im label{display:flex;align-items:center;gap:6px;font-size:12px;width:100%}#vpPanel .im input{flex:1;accent-color:#22a35a}#vpPanel small{display:block;opacity:.65;font-size:10.5px;margin-top:6px}';
- var tint,img,btn,panel;
+ var tint,img,btn,panel,wpEl;
  function apply(){ if(!document.body)return;
   var c=COL.filter(function(x){return x[0]===st.c})[0]||COL[0],dark=!!c[4],h=document.documentElement,ov=dark?c[3]:(c[0]?c[2]:'');
   /* 兩色混合：同一組（淺配淺、深配深）各取一半 */
@@ -198,7 +213,9 @@
   if(dark&&nativeDark()){dark=false;ov=''}
   var acc=(ov||dark)?(c2&&c2[0]&&ACC[c2[0]]?mixHex(ACC[c[0]],ACC[c2[0]]):ACC[c[0]]):'';if(acc)h.style.setProperty('--vp-acc',acc);else h.style.removeProperty('--vp-acc');h.classList.toggle('vp-acc',!!acc);
   if(ov){if(!tint){tint=document.createElement('div');tint.id='vpTint';tint.setAttribute('aria-hidden','true')}tint.style.background=ov;if(tint.parentNode!==document.body)document.body.appendChild(tint)}else if(tint&&tint.parentNode)tint.parentNode.removeChild(tint);
-  h.classList.toggle('vp-dark',dark);h.classList.toggle('vp-on',!!(ov||dark||BG));cards();
+  var wc=st.wp?wpCss(st.wp,1):null;
+  if(wc){if(!wpEl){wpEl=document.createElement('div');wpEl.id='vpWp';wpEl.setAttribute('aria-hidden','true')}wpEl.style.backgroundImage=wc.i;wpEl.style.backgroundSize=wc.s;wpEl.style.backgroundPosition=wc.p||'0 0';if(wpEl.parentNode!==document.body)document.body.appendChild(wpEl)}else if(wpEl&&wpEl.parentNode)wpEl.parentNode.removeChild(wpEl);
+  h.classList.toggle('vp-dark',dark);h.classList.toggle('vp-on',!!(ov||dark||BG||wc));cards();
 
   if(BG){if(!img){img=document.createElement('div');img.id='vpImg';img.setAttribute('aria-hidden','true')}var v=(st.veil/100).toFixed(2);img.style.backgroundImage='linear-gradient(rgba(255,255,255,'+v+'),rgba(255,255,255,'+v+')),url("'+BG+'")';if(img.parentNode!==document.body)document.body.appendChild(img)}else if(img&&img.parentNode)img.parentNode.removeChild(img) }
  /* 換了底色／背景圖後，卡片要「浮起來」：加影子、邊線、一點金屬光澤（Paul 11/23：不然卡片跟背景黏在一起）。
@@ -221,6 +238,7 @@
  function draw(){ if(!panel||panel.hidden)return;
   panel.innerHTML='<b class="h">🎨 背景顏色 Background（這台裝置會記住）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+(PROD?'<div class="swl">明暗 Light / Dark（生產平台原本的）</div><div class="mx" style="margin-top:0"><button data-a="th-light">☀️ 淡色 Light</button><button data-a="th-dark">🌙 深色 Dark</button>'+(document.getElementById('themeBtn')?'<button data-a="oldbg">原本的背景選單</button>':'')+'</div>':'<div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>')+
    '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:'+mixHex(colOf(st.c)[2],colOf(st.c2)[2])+'"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
+   '<div class="swl">🧱 壁紙 Wallpaper（可以跟顏色、混色一起用 · works on top of any colour or mix）</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],2.4):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.replace(/"/g,"&quot;")+';background-size:'+w.s+(w.p?';background-position:'+w.p:''):'')+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+
    '<div class="im"><button data-a="pick">🖼️ 自訂背景圖 Image</button>'+(BG?'<button data-a="clear">✕ 移除 Remove</button><label>遮罩 Veil <input type="range" min="30" max="95" step="5" value="'+st.veil+'"><span>'+st.veil+'%</span></label>':'')+'</div><small>圖片只存在這台裝置，不會上傳。遮罩越高，圖越淡、字越清楚。<br>The image stays on this device. Higher veil = fainter image.</small>';
   var b=(btn.offsetWidth?btn:document.getElementById('vmBox')).getBoundingClientRect(),w=Math.min(296,innerWidth-16),hh=panel.offsetHeight||260,up=b.bottom+6+hh>innerHeight-4&&b.top>hh;panel.style.top=(up?Math.max(6,b.top-hh-6):b.bottom+6)+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.right-w))+'px' }
  function shrink(file){return (window.createImageBitmap?createImageBitmap(file):Promise.reject()).then(function(bmp){var k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(bmp.width*k));c.height=Math.max(1,Math.round(bmp.height*k));c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.8)})}
@@ -232,6 +250,7 @@
   btn.addEventListener('click',function(e){e.stopPropagation();panel.hidden=!panel.hidden;draw()});
   panel.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.a==='th-light'||b.dataset.a==='th-dark'){var tv=b.dataset.a==='th-dark'?'dark':'light';try{if(typeof window.setTheme==='function'&&document.getElementById('themeBtn'))window.setTheme(tv);else if(window.VRTTheme)window.VRTTheme.set(tv)}catch(_){}setTimeout(function(){apply();draw()},60);return}
    if(b.dataset.a==='oldbg'){panel.hidden=true;var tb=document.getElementById('themeBtn');if(tb)setTimeout(function(){tb.click()},0);return}
+   if(b.dataset.w!=null){st.wp=b.dataset.w;save();apply();draw();return}
    if(b.dataset.a==='mix'){mixMode=!mixMode;draw();return}if(b.dataset.a==='unmix'){st.c2='';mixMode=false;save();apply();draw();return}
    if(b.dataset.c!=null){var k=b.dataset.c,a0=colOf(st.c),a1=colOf(k);if(mixMode&&st.c&&k&&k!==st.c&&a0&&a1&&!!a0[4]===!!a1[4]){st.c2=k}else{st.c=k;st.c2=''}mixMode=false;save();apply();draw()}else if(b.dataset.a==='pick')pick();else if(b.dataset.a==='clear'){BG=null;apply();draw();idb('readwrite',function(s){return s.delete('bg')});try{localStorage.setItem('vrt_pal_img',String(Date.now()))}catch(e){}}});
   panel.addEventListener('input',function(e){if(e.target.type==='range'){st.veil=+e.target.value;save();apply();var sp=panel.querySelector('label span');if(sp)sp.textContent=st.veil+'%'}});
