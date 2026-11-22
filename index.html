@@ -6134,6 +6134,8 @@ init();
    if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f&&f.wip){PW.d=f.wip;PW.date=day;PW.err=''} }
   }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip')rerender() } }
  const _rw=RENDER.wip;
+ /* 「月報列表／比較」檢視原本走 renderPeriodView（沒有期間指標就顯示「還沒有真實資料」）→ 真實資料模式的 WIP 一律走這一頁 */
+ const _rpvW=window.renderPeriodView; if(typeof _rpvW==='function')window.renderPeriodView=function(k){ if(k==='wip'&&!isDemo())return RENDER.wip(); return _rpvW.apply(this,arguments) };
  window.wipSet=function(k,v){ V[k]=v; if(k!=='lim')V.lim=60; const y=window.scrollY; rerender(); if(k==='lim'||k==='q')window.scrollTo(0,y) };
  RENDER.wip=function(){
   if(isDemo())return _rw.apply(this,arguments);
