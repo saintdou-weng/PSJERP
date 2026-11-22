@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1.9（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v2.0（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -241,4 +241,44 @@
  function start(){load();apply();readImg();var n=0,iv=setInterval(function(){if(mount()||++n>40)clearInterval(iv)},250);mount();
   window.addEventListener('storage',function(e){if(e.key==='vrt_pal'){load();apply();draw()}else if(e.key==='vrt_pal_img')readImg()})}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+
+/* ===== 💡 深色頁的滑鼠燈光 v1（2026-11-23）=====
+   Paul：深色的平台選單／分頁，滑鼠要自帶一點燈光（像 GASCheck 入口那樣），有立體感跟層次，不要單調。
+   · 游標所在位置的底色是深色時，跟著一圈柔光；滑到卡片／按鈕上，那一張的邊會亮起來。淺色頁不出現。
+   · 手機沒有滑鼠：手指點到深色區域時，那一點亮一下再淡掉。
+   · 每一頁（包含嵌在裡面的分頁）各自跑；只畫一層不擋滑鼠的光，不動資料、不改各頁排版。PSJERP 有自己的聚光燈，這裡跳過。 */
+(function(){
+ if(window.__VRT_GLOW)return; window.__VRT_GLOW=1;
+ if(/^\/psjerp\//i.test(location.pathname||''))return;
+ try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return}catch(e){}
+ var H=document.documentElement,glow=null,lit=null,raf=0,px=0,py=0,cache=typeof WeakMap==='function'?new WeakMap():null,hideT=0;
+ var LSEL='.kpi,.card,.tile,.panel,.box,.sbox,.module,.mod,.hub-card,.hd-tile,.hd-card,.ctab,.tab,[class*="-card"],[class*="card-"],[class*="module"],[class*="tile"],a[class*="mod"],button';
+ function inv(){return H.classList.contains('vp-dark')||H.classList.contains('vrt-inv')}
+ function lumOf(e){ /* 往上找第一個有底色的，回傳亮度 0~1 */
+  for(var n=e,i=0;n&&n.nodeType===1&&i<12;n=n.parentElement,i++){var v=cache&&cache.get(n);
+   if(v===undefined||v===null){var c=getComputedStyle(n),m=c.backgroundColor.match(/[\d.]+/g)||[];v=(m.length>=3&&(m.length<4||+m[3]>0.5))?(0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255:(c.backgroundImage!=='none'&&/gradient/.test(c.backgroundImage)?(function(g){var q=g.match(/rgba?\(([^)]+)\)/);if(!q)return -1;var t=q[1].split(',').map(parseFloat);return (0.2126*t[0]+0.7152*t[1]+0.0722*t[2])/255})(c.backgroundImage):-1);if(cache)cache.set(n,v)}
+   if(v>=0)return v}
+  return 1}
+ function ensure(){ if(glow||!document.body)return;
+  var st=document.createElement('style');st.id='vrt-glow-css';st.textContent='#vgGlow{position:fixed;left:0;top:0;width:520px;height:520px;margin:-260px 0 0 -260px;border-radius:50%;pointer-events:none;z-index:2147482500;opacity:0;transition:opacity .28s ease;will-change:transform,opacity;background:radial-gradient(circle,rgba(255,255,255,.17) 0%,rgba(255,255,255,.07) 34%,rgba(255,255,255,0) 66%);mix-blend-mode:screen}'+
+   '#vgGlow.inv{background:radial-gradient(circle,rgba(0,0,0,.20) 0%,rgba(0,0,0,.08) 34%,rgba(0,0,0,0) 66%);mix-blend-mode:multiply}'+
+   '.vg-lit{outline:1.5px solid rgba(255,255,255,.42)!important;outline-offset:-1px;box-shadow:0 0 0 1px rgba(255,255,255,.10),0 14px 34px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.22)!important;transition:outline-color .2s ease,box-shadow .25s ease}'+
+   'html.vp-dark .vg-lit,html.vrt-inv .vg-lit{outline-color:rgba(0,0,0,.45)!important;box-shadow:0 0 0 1px rgba(0,0,0,.10),0 14px 34px rgba(255,255,255,.30),inset 0 1px 0 rgba(0,0,0,.20)!important}'+
+   '@media print{#vgGlow{display:none!important}}';
+  (document.head||H).appendChild(st);glow=document.createElement('div');glow.id='vgGlow';glow.setAttribute('aria-hidden','true');document.body.appendChild(glow)}
+ function unlit(){if(lit){lit.classList.remove('vg-lit');lit=null}}
+ function frame(){raf=0;ensure();if(!glow)return;var e=document.elementFromPoint(px,py);if(!e||e===glow){return}
+  var iv=inv(),L=lumOf(e),dark=iv?L>0.5:L<0.52;
+  glow.classList.toggle('inv',iv);glow.style.transform='translate3d('+px+'px,'+py+'px,0)';glow.style.opacity=dark?'1':'0';
+  var c=dark&&e.closest?e.closest(LSEL):null;
+  if(dark&&!c){for(var n=e,i=0;n&&n.nodeType===1&&n!==document.body&&i<6;n=n.parentElement,i++){try{if(getComputedStyle(n).cursor==='pointer'){c=n}else if(c)break}catch(_){break}}}   /* 沒有常見卡片類名的：找「可以點」的那一塊（取最外層） */if(c&&(c.offsetWidth<60||c.offsetHeight<28||c.offsetWidth>innerWidth*0.96&&c.offsetHeight>innerHeight*0.7))c=null;
+  if(c&&c.closest('#vmBox,#vmPanel,#vpPanel'))c=null;
+  if(c!==lit){unlit();if(c){c.classList.add('vg-lit');lit=c}}}
+ function move(x,y){px=x;py=y;if(!raf)raf=requestAnimationFrame(frame)}
+ document.addEventListener('pointermove',function(e){if(e.pointerType==='touch')return;move(e.clientX,e.clientY)},{passive:true});
+ document.addEventListener('pointerleave',function(){if(glow)glow.style.opacity='0';unlit()},{passive:true});
+ document.documentElement.addEventListener('mouseleave',function(){if(glow)glow.style.opacity='0';unlit()},{passive:true});
+ /* 手機：點到深色區域亮一下 */
+ document.addEventListener('touchstart',function(e){var t=e.touches&&e.touches[0];if(!t)return;move(t.clientX,t.clientY);clearTimeout(hideT);hideT=setTimeout(function(){if(glow)glow.style.opacity='0';unlit()},650)},{passive:true});
 })();
