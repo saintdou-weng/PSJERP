@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1.1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v1.1.1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -11,8 +11,8 @@
   {k:'jazz',ic:'🎷',t:'輕爵士電台 Jazz radio',note:'Radio Swiss Jazz',urls:['https://stream.srg-ssr.ch/srgssr/rsj/mp3/128','https://stream.srg-ssr.ch/srgssr/rsj/aac/96']},
   {k:'pop',ic:'🎤',t:'抒情流行電台 Soft pop radio',note:'Radio Swiss Pop',urls:['https://stream.srg-ssr.ch/srgssr/rsp/mp3/128','https://stream.srg-ssr.ch/srgssr/rsp/aac/96']},
   {k:'hitz',ic:'🇲🇾',t:'馬來西亞 HITZ',note:'HITZ Malaysia',urls:['https://stream.rcs.revma.com/488kt4sbv4uvv','https://n10.rcs.revma.com/488kt4sbv4uvv']},
-  {k:'bcc',ic:'🇹🇼',t:'台灣 中廣音樂網 Mandarin',note:'中廣音樂網 i radio',urls:['https://n03.rcs.revma.com/ndk05tyy2tzuv','https://stream.rcs.revma.com/ndk05tyy2tzuv']},
-  {k:'bccpop',ic:'🎙️',t:'台灣 中廣流行網 Mandarin pop',note:'中廣流行網 i like',urls:['https://n03.rcs.revma.com/aw9uqyxy2tzuv','https://stream.rcs.revma.com/aw9uqyxy2tzuv']},
+  {k:'ufo',ic:'🇹🇼',t:'台灣 飛碟電台 UFO Radio',note:'飛碟聯播網',urls:['https://n10.rcs.revma.com/em90w4aeewzuv','https://stream.rcs.revma.com/em90w4aeewzuv']},
+  {k:'best',ic:'📻',t:'台灣 好事聯播網 Best Radio',note:'港都 983／好事 989',urls:['https://n10.rcs.revma.com/q2m07dc59duvv','https://stream.rcs.revma.com/q2m07dc59duvv','https://n01.rcs.revma.com/fkdywbc59duvv']},
   {k:'khmer',ic:'🇰🇭',t:'柬語電台 Khmer radio',note:'Sweet FM 88',urls:['https://n12.rcs.revma.com/whn9hqwstk3vv','https://stream.rcs.revma.com/whn9hqwstk3vv']}];
  var st={src:'rain',v:40};
  try{ var j=JSON.parse(localStorage.getItem('vrt_music')||'null'); if(!j){ var o=JSON.parse(localStorage.getItem('psj_music')||'null'); if(o)j={src:o.src,v:o.vol==='s'?20:o.vol==='l'?75:40} } if(j&&SRC.some(function(x){return x.k===j.src}))st.src=j.src; if(j&&j.v>=0&&j.v<=100)st.v=+j.v }catch(e){}
@@ -49,6 +49,7 @@
  function setSrc(k){st.src=k;save();if(on)play();else draw()}
  var css='#vmBox{display:inline-flex;align-items:center;gap:3px;font:600 10px/1 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;flex:none;-webkit-user-select:none;user-select:none}'+
  '#vmBox.float{position:fixed;z-index:9990}'+
+ '#vmBox.float{gap:12px}#vmBox.float #vmMore{width:26px;height:24px;font-size:11px}#vmBox.float.sm{gap:9px}'+
  '#vmSw{position:relative;width:46px;height:22px;border-radius:11px;border:0;padding:0;cursor:pointer;background:#9aa4b2;box-shadow:inset 0 1px 2px rgba(0,0,0,.28);transition:background .2s ease;color:#fff;font:inherit;letter-spacing:.3px;overflow:hidden}'+
  '#vmSw i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;color:#64748b;display:grid;place-items:center;font:700 11px/1 system-ui;font-style:normal;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .2s ease,color .2s ease}'+
  '#vmSw b{position:absolute;top:0;bottom:0;right:5px;display:grid;place-items:center;font-weight:700;font-size:9px;transition:opacity .15s}'+
@@ -127,7 +128,7 @@
  function nativeDark(){var h=document.documentElement,was=h.classList.contains('vp-dark');if(was)h.classList.remove('vp-dark');var L=null;try{L=lum(getComputedStyle(document.body).backgroundColor);if(L==null)L=lum(getComputedStyle(h).backgroundColor)}catch(e){}if(was)h.classList.add('vp-dark');return L!=null&&L<0.4}
  var css='#vpTint,#vpImg{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
   'html.vp-dark{filter:invert(1) hue-rotate(180deg);background:#fff!important}html.vp-dark img,html.vp-dark video,html.vp-dark picture,html.vp-dark canvas.vp-keep,html.vp-dark #vpImg,html.vp-dark #vpPanel .sw i{filter:invert(1) hue-rotate(180deg)}'+
-  '#vpBtn{border:0;background:none;padding:0 1px;font-size:15px;line-height:1;cursor:pointer}'+
+  '#vpBtn{border:0;background:rgba(127,127,127,.18);border-radius:8px;width:30px;height:26px;padding:0;margin-left:4px;font-size:16px;line-height:1;cursor:pointer}'+
   '#vpPanel{position:fixed;z-index:2147483100;width:min(272px,calc(100vw - 16px));background:#fff;color:#14202b;border:1px solid #d5dde5;border-radius:12px;box-shadow:0 14px 34px rgba(2,6,23,.24);padding:10px 12px;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}'+
   '#vpPanel b.h{display:block;margin-bottom:8px}#vpPanel .sw{display:flex;flex-wrap:wrap;gap:8px}#vpPanel .sw button{width:52px;border:0;background:none;padding:0;font:inherit;font-size:10.5px;color:inherit;cursor:pointer;text-align:center}#vpPanel .sw i{display:block;width:34px;height:34px;margin:0 auto 3px;border-radius:50%;border:2px solid #cbd5e1}#vpPanel .sw button.on i{border-color:#22a35a;box-shadow:0 0 0 3px rgba(34,163,90,.25)}'+
   '#vpPanel .im{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #e5eaf0}#vpPanel .im button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;color:inherit}#vpPanel .im label{display:flex;align-items:center;gap:6px;font-size:12px;width:100%}#vpPanel .im input{flex:1;accent-color:#22a35a}#vpPanel small{display:block;opacity:.65;font-size:10.5px;margin-top:6px}';
