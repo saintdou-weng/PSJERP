@@ -89,15 +89,15 @@
   return true}
  function place(){ if(!box)return; if(box.classList.contains('bl')){box.style.top=box.style.left=box.style.right=''}else if(box.classList.contains('float')){var l=document.getElementById('vrtLangSw');if(l){var r=l.getBoundingClientRect();box.style.top=Math.max(1,r.top)+'px';box.style.left=(r.right+6)+'px';box.style.right='auto'}else{
    /* Paul 11/23：上方角落有空間就放「完整的」（撥動開關＋▾＋🎨）；不夠放「開關＋▾」；真的都放不下才縮成小圓點。每次檢查都先試大的，空間空出來就自動變回開關。 */
-   var prev=box.classList.contains('mini')?'mini':box.classList.contains('pill')?'pill':'full',cur0=box.getBoundingClientRect(),ok0=box._ok,modes=['full','pill','mini'],done=false,best=null,xx,yy,bw,bh,mi,m;
+   var VW=Math.min(innerWidth,document.documentElement.clientWidth||innerWidth);/* 扣掉捲軸，不要壓在捲軸上 */var prev=box.classList.contains('mini')?'mini':box.classList.contains('pill')?'pill':'full',cur0=box.getBoundingClientRect(),ok0=box._ok,modes=['full','pill','mini'],done=false,best=null,xx,yy,bw,bh,mi,m;
    for(mi=0;mi<3&&!done;mi++){m=modes[mi];box.classList.toggle('pill',m==='pill');box.classList.toggle('mini',m==='mini');bw=box.offsetWidth||24;bh=box.offsetHeight||22;
-    if(m===prev&&ok0&&cur0.width&&cur0.right<=innerWidth&&freeAt(cur0.left,cur0.top,bw,bh)){done=true;break}
+    if(m===prev&&ok0&&cur0.width&&cur0.right<=VW&&freeAt(cur0.left,cur0.top,bw,bh)){done=true;break}
     best=null;
     /* 只找角落附近：右邊 1/3、左邊 1/5；中間不放 */
-    for(xx=innerWidth-bw-6;xx>=innerWidth*0.66&&!best;xx-=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
+    for(xx=VW-bw-6;xx>=innerWidth*0.66&&!best;xx-=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
     for(xx=4;xx+bw<=Math.max(innerWidth*0.2,bw+8)&&!best;xx+=10)if(freeAt(xx,3,bw,bh))best=[xx,3];
-    if(!best&&m==='mini'){for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(innerWidth-bw-4,yy,bw,bh))best=[innerWidth-bw-4,yy];
-     for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(4,yy,bw,bh))best=[4,yy];if(!best)best=[innerWidth-bw-4,3]}
+    if(!best&&m==='mini'){for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(VW-bw-4,yy,bw,bh))best=[VW-bw-4,yy];
+     for(yy=14;yy<=260&&!best;yy+=12)if(freeAt(4,yy,bw,bh))best=[4,yy];if(!best)best=[VW-bw-4,3]}
     if(best){box.style.left=best[0]+'px';box.style.top=best[1]+'px';box.style.right='auto';box._ok=1;done=true}}}}
   if(panel&&!panel.hidden){var b=box.getBoundingClientRect(),w=Math.min(264,innerWidth-16),h=panel.offsetHeight||300,up=b.bottom+6+h>innerHeight-4;panel.style.top=Math.max(8,Math.min(innerHeight-h-8,up?b.top-h-6:b.bottom+6))+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.left<innerWidth/2?b.left:b.right-w))+'px'} }
  function mount(){ if(document.getElementById('vmBox')||!document.body)return true;
