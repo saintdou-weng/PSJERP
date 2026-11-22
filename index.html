@@ -6126,7 +6126,7 @@ init();
 (function(){
  if(typeof RENDER==='undefined'||!RENDER.wip)return;
  const Lx=(z,e)=>tt(z,e), ks=s=>keyN(s).replace(/[^A-Z0-9]+/g,''), n0=v=>{v=Number(v);return isFinite(v)?v:0};
- const V=window.WIPV=Object.assign({tab:'cust',q:'',lim:60},window.WIPV||{});
+ const V=window.WIPV=Object.assign({tab:'cust',q:'',lim:60,f:''},window.WIPV||{});
  const PW={at:0,busy:false,d:null,date:'',err:''};
  async function prodWip(){ if(PW.busy||Date.now()-PW.at<30*60e3)return; PW.busy=true;
   try{ const post=b=>fetch(window.PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b),redirect:'follow'}).then(r=>r.json()).then(j=>j.data||j);
@@ -6161,20 +6161,27 @@ init();
   const byOd=new Map(live(DB.orders).map(o=>[String(o.od_no||'').trim().toUpperCase(),o]));
   const hit=r=>byOd.get(String(r.orderNo||'').trim().toUpperCase())||null;
   const miss=rows.filter(r=>!hit(r)), over=rows.filter(r=>n0(r.orderQty)>0&&n0(r.wipQty)>n0(r.orderQty)*1.05), neg=rows.filter(r=>n0(r.wipQty)<0||n0(r.wipAmount)<0);
-  const chk=(ok,txt)=>`<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line-2)"><span>${ok?'✅':'⚠️'}</span><span style="flex:1">${txt}</span></div>`;
+  const closedAll=new Map(); live(DB.orders).forEach(o=>{const k=String(o.od_no||'').trim().toUpperCase(); closedAll.set(k,(closedAll.has(k)?closedAll.get(k):true)&&o.status==='closed')});
+  const A$=a=>money(sum(a,r=>n0(r.wipAmount)),0), yr0=asof.getFullYear()-3;
+  const clo=rows.filter(r=>n0(r.wipQty)>0&&closedAll.get(String(r.orderNo||'').trim().toUpperCase())===true), old=rows.filter(r=>{const y=+String(r.orderDate||'').slice(0,4);return y&&y<=yr0}), shp=rows.filter(r=>n0(r.orderQty)>0&&n0(r.shippedQty)>=n0(r.orderQty)&&n0(r.wipQty)>0);
+  const FL={miss,over,neg,clo,old,shp}, FN={miss:Lx('ERP 對不上','not in ERP'),over:Lx('WIP 大於訂單量','WIP above order qty'),neg:Lx('負數 WIP','negative WIP'),clo:Lx('ERP 已結案仍有 WIP','closed in ERP, still WIP'),old:Lx('3 年以上舊單','orders 3+ years old'),shp:Lx('已出完貨仍有 WIP','fully shipped, still WIP')};
+  const chk=(ok,txt,f)=>`<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line-2)${f&&!ok?';cursor:pointer':''}" ${f&&!ok?`onclick="WIPV.tab='detail';wipSet('f','${f}')" title="${Lx('點一下看這幾張','Tap to list them')}"`:''}><span>${ok?'✅':'⚠️'}</span><span style="flex:1">${txt}${f&&!ok?' <span class="small muted">›</span>':''}</span></div>`;
   h+=`<div class="grid2 mt"><div class="panel"><h2>🔗 ${Lx('資料有沒有接上','Is the data linked?')}</h2>
    ${chk(true,Lx('會計 WIP：','Accounting WIP: ')+months[0]+' → '+months[months.length-1]+Lx('，共 ',' · ')+months.length+Lx(' 個月',' months'))}
    ${chk(!miss.length,Lx('對回 ERP 訂單：','Matched to ERP orders: ')+'<b>'+fmt(rows.length-miss.length)+' / '+fmt(rows.length)+'</b>'+(miss.length?Lx('　對不上：','　not found: ')+miss.slice(0,4).map(r=>esc(r.orderNo||'—')).join('、')+(miss.length>4?' …':''):''))}
-   ${chk(!over.length,Lx('WIP 件數大於訂單量：','WIP pcs above order qty: ')+'<b>'+fmt(over.length)+'</b>'+Lx(' 張',' orders')+(over.length?'　'+over.slice(0,3).map(r=>esc(r.orderNo||'')).join('、'):''))}
-   ${chk(!neg.length,Lx('負數的 WIP：','Negative WIP: ')+'<b>'+fmt(neg.length)+'</b>'+Lx(' 張',' orders'))}
+   ${chk(!over.length,Lx('WIP 件數大於訂單量：','WIP pcs above order qty: ')+'<b>'+fmt(over.length)+'</b>'+Lx(' 張',' orders')+(over.length?'　'+over.slice(0,3).map(r=>esc(r.orderNo||'')).join('、'):''),'over')}
+   ${chk(!neg.length,Lx('負數的 WIP：','Negative WIP: ')+'<b>'+fmt(neg.length)+'</b>'+Lx(' 張',' orders'),'neg')}
+   ${chk(!clo.length,Lx('ERP 已結案、會計還有 WIP：','Closed in ERP but still in WIP: ')+'<b>'+fmt(clo.length)+'</b>'+Lx(' 張・',' orders · ')+A$(clo),'clo')}
+   ${chk(!shp.length,Lx('出貨量已滿訂單量、還有 WIP：','Fully shipped but still WIP: ')+'<b>'+fmt(shp.length)+'</b>'+Lx(' 張・',' orders · ')+A$(shp),'shp')}
+   ${chk(!old.length,Lx('3 年以上的舊單還在 WIP：','Orders 3+ years old still in WIP: ')+'<b>'+fmt(old.length)+'</b>'+Lx(' 張・',' orders · ')+A$(old),'old')}
    ${chk(!!pw,Lx('生產平台已裁未縫：','Production cut-not-sewn: ')+(pw?fmt(pw.cutNotSewn)+' '+t('pcs')+'（'+esc(PW.date)+'）':Lx('還沒讀到','not loaded')))}
    <p class="small muted" style="margin:8px 0 0">${Lx('ERP 的 W_COD690 沒有裁剪量，所以「ERP 推算 WIP」算不出來，這頁不顯示它。','ERP W_COD690 has no cutting qty, so an ERP-derived WIP cannot be computed and is not shown.')}</p></div>
    <div class="panel"><h2>📈 ${Lx('會計 WIP 金額（每月月結）','Accounting WIP value (month-end)')}</h2><p class="hint">ACC Flow · USD</p>${(()=>{const ms=months.slice(-12);return barChart(ms.map(m=>sum(all.filter(r=>r.period===m),r=>n0(r.wipAmount))),ms.map(m=>m.slice(2)),'USD',{hl:ms.map(m=>m===use)})})()}</div></div>`;
   /* ── 分頁 ── */
   const tabs=[['cust','🏢',Lx('依客戶','By customer')],['style','👕',Lx('依款式','By style')],['detail','📋',Lx('訂單明細','Order detail')]];
   h+=`<div class="panel mt"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div class="seg">${tabs.map(x=>`<button class="${V.tab===x[0]?'on':''}" onclick="wipSet('tab','${x[0]}')">${x[1]} ${esc(x[2])}</button>`).join('')}</div>
-   <input type="search" style="flex:1;min-width:160px;max-width:320px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit" placeholder="🔍 ${Lx('找訂單號／款式／客戶','Search order / style / customer')}" value="${esc(V.q)}" onchange="wipSet('q',this.value)">${V.q?`<button class="btn sm" onclick="wipSet('q','')">✕ ${Lx('清除','Clear')}</button>`:''}<span class="small muted">${esc(use)}</span></div>`;
-  const q=keyN(V.q||''); const F=q?rows.filter(r=>keyN([r.orderNo,r.style,r.customer,r.selfKey].join(' ')).includes(q)):rows;
+   <input type="search" style="flex:1;min-width:160px;max-width:320px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit" placeholder="🔍 ${Lx('找訂單號／款式／客戶','Search order / style / customer')}" value="${esc(V.q)}" onchange="wipSet('q',this.value)">${V.q?`<button class="btn sm" onclick="wipSet('q','')">✕ ${Lx('清除','Clear')}</button>`:''}${V.f&&FN[V.f]?`<button class="btn sm" onclick="wipSet('f','')">⚠️ ${esc(FN[V.f])} ✕</button>`:''}<span class="small muted">${esc(use)}</span></div>`;
+  const q=keyN(V.q||''); const base=V.f&&FL[V.f]?FL[V.f]:rows; const F=q?base.filter(r=>keyN([r.orderNo,r.style,r.customer,r.selfKey].join(' ')).includes(q)):base;
   const grp=(key)=>{const m=new Map();F.forEach(r=>{const k=key(r)||'—';const g=m.get(k)||{k,amt:0,qty:0,n:0,style:r.style};g.amt+=n0(r.wipAmount);g.qty+=n0(r.wipQty);g.n++;m.set(k,g)});return [...m.values()].sort((a,b)=>b.amt-a.amt)};
   if(V.tab==='cust'){ const G=grp(r=>r.customer), mx=Math.max(...G.map(g=>g.amt),1);
    h+=G.slice(0,V.lim).map(g=>`<div class="meter" style="cursor:pointer" onclick="WIPV.tab='detail';wipSet('q',${JSON.stringify(String(g.k)).replace(/"/g,'&quot;')})"><span title="${esc(g.k)}">${esc(g.k)}</span><div class="trk"><div class="fill" style="width:${Math.max(1,g.amt/mx*100)}%"></div></div><span class="val">${money(g.amt,0)} · ${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</span></div>`).join('')||`<div class="note">${esc(t('no_data'))}</div>`;
