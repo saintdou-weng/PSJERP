@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v1.8（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v1.9（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -161,7 +161,8 @@
 (function(){
  if(window.__VRT_PAL)return; window.__VRT_PAL=1;
  var P=(location.pathname||'').toLowerCase();
- if(/^\/(psjerp|psjhr|psjgas|vrt-prod|ac-gascheck)\//.test(P))return;
+ if(/^\/(psjerp|psjhr|psjgas|ac-gascheck)\//.test(P))return;
+ var PROD=/^\/vrt-prod\//.test(P);   /* 生產平台：2026-11-23 起也用這個調色盤（原本入口頁的 🎨 收進來）；明暗沿用它自己的 ☀️／🌙（vrt-theme），這裡不另外做深色 */
  try{if(window.top!==window&&window.top.location.origin===location.origin)return}catch(e){}
  /* [key, 名稱, 色票顏色, 蓋上去的色片（深色系＝整頁反相後再蓋這個色，算好會剛好變成色票那個顏色）, 是否深色] */
  var COL=[['','白色 White','#ffffff'],['ivory','象牙 Ivory','#F5EFDC'],['beige','米色 Beige','#E6DACA'],['yellow','淡黃 Yellow','#F0E4BC'],['orange','淡橘 Orange','#F7D9B5'],
@@ -178,10 +179,11 @@
  function idb(mode,fn){return new Promise(function(res){try{var rq=indexedDB.open('vrt_pal',1);rq.onupgradeneeded=function(){rq.result.createObjectStore('kv')};rq.onerror=function(){res(null)};rq.onsuccess=function(){try{var tx=rq.result.transaction('kv',mode),r=fn(tx.objectStore('kv'));tx.oncomplete=function(){res(r&&r.result)};tx.onerror=tx.onabort=function(){res(null)}}catch(e){res(null)}}}catch(e){res(null)}})}
  function lum(c){var m=String(c||'').match(/\d+(\.\d+)?/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return null;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255}
  function nativeDark(){var h=document.documentElement,was=h.classList.contains('vp-dark');if(was)h.classList.remove('vp-dark');var L=null;try{L=lum(getComputedStyle(document.body).backgroundColor);if(L==null)L=lum(getComputedStyle(h).backgroundColor)}catch(e){}if(was)h.classList.add('vp-dark');return L!=null&&L<0.4}
+ var CARDCSS='html.vp-on .vp-card{box-shadow:0 12px 26px rgba(15,23,42,.24),0 3px 7px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important;border-color:rgba(15,23,42,.26)!important;background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
+  'html.vp-acc .cmp-acts button:not(.err):not(.gh),html.vp-acc .gip-btn.pri,html.vp-acc .ic-btn.pri,html.vp-acc .pc-btn.pri,html.vp-acc #kn-foot button:not(:disabled),html.vp-acc .kn-chip.on,html.vp-acc .kn-cc button.on{background:var(--vp-acc)!important;border-color:var(--vp-acc)!important;color:#fff!important}html.vp-acc .ic-h,html.vp-acc .pc-h{background:var(--vp-acc)!important}';
  var css='#vpTint,#vpImg{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:multiply;z-index:2147483000}#vpImg{background-position:center;background-size:cover;background-repeat:no-repeat}'+
   'html.vp-dark{filter:invert(1) hue-rotate(180deg);background:#fff!important}html.vp-dark img,html.vp-dark video,html.vp-dark picture,html.vp-dark canvas.vp-keep,html.vp-dark #vpImg,html.vp-dark #vpPanel .sw i{filter:invert(1) hue-rotate(180deg)}html.vp-dark #kn-box,html.vp-dark .pkn-box{outline:2px solid #000;outline-offset:-1px}'+
-  'html.vp-on .vp-card{box-shadow:0 12px 26px rgba(15,23,42,.24),0 3px 7px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important;border-color:rgba(15,23,42,.26)!important;background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
-  'html.vp-acc .cmp-acts button:not(.err):not(.gh),html.vp-acc .gip-btn.pri,html.vp-acc .ic-btn.pri,html.vp-acc .pc-btn.pri,html.vp-acc #kn-foot button:not(:disabled),html.vp-acc .kn-chip.on,html.vp-acc .kn-cc button.on{background:var(--vp-acc)!important;border-color:var(--vp-acc)!important;color:#fff!important}html.vp-acc .ic-h,html.vp-acc .pc-h{background:var(--vp-acc)!important}'+
+  CARDCSS+
   '#vpPanel .mx{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:11.5px}#vpPanel .mx button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer;color:inherit}#vpPanel .mx button.on{background:#14213d;border-color:#14213d;color:#fff}#vpPanel .mx i{display:inline-block;width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;vertical-align:middle}'+
   '#vpBtn{border:0;background:rgba(127,127,127,.18);border-radius:8px;width:30px;height:26px;padding:0;margin-left:4px;font-size:16px;line-height:1;cursor:pointer}'+
   '#vpPanel{position:fixed;z-index:2147483100;width:min(296px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow-y:auto;background:#fff;color:#14202b;border:1px solid #d5dde5;border-radius:12px;box-shadow:0 14px 34px rgba(2,6,23,.24);padding:10px 12px;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}'+
@@ -192,6 +194,7 @@
   var c=COL.filter(function(x){return x[0]===st.c})[0]||COL[0],dark=!!c[4],h=document.documentElement,ov=dark?c[3]:(c[0]?c[2]:'');
   /* 兩色混合：同一組（淺配淺、深配深）各取一半 */
   var c2=st.c2&&c[0]?colOf(st.c2):null;if(c2&&c2[0]&&!!c2[4]===!!c[4]&&c2[0]!==c[0])ov=mixHex(ov||'#ffffff',(dark?c2[3]:c2[2])||'#ffffff');
+  if(PROD){if(dark){dark=false;ov=''}if(h.classList.contains('vrt-inv')||h.getAttribute('data-theme')==='dark')ov=''}
   if(dark&&nativeDark()){dark=false;ov=''}
   var acc=(ov||dark)?(c2&&c2[0]&&ACC[c2[0]]?mixHex(ACC[c[0]],ACC[c2[0]]):ACC[c[0]]):'';if(acc)h.style.setProperty('--vp-acc',acc);else h.style.removeProperty('--vp-acc');h.classList.toggle('vp-acc',!!acc);
   if(ov){if(!tint){tint=document.createElement('div');tint.id='vpTint';tint.setAttribute('aria-hidden','true')}tint.style.background=ov;if(tint.parentNode!==document.body)document.body.appendChild(tint)}else if(tint&&tint.parentNode)tint.parentNode.removeChild(tint);
@@ -201,26 +204,35 @@
  /* 換了底色／背景圖後，卡片要「浮起來」：加影子、邊線、一點金屬光澤（Paul 11/23：不然卡片跟背景黏在一起）。
     只加在原本沒有漸層圖的卡片上，不改它原本的底色；關掉調色（白色、沒背景圖）就全部拿掉。 */
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]',ct=0;
+ /* 連嵌在裡面的分頁（同網域 iframe，最多兩層）一起處理：色片本來就蓋得到，卡片的影子／按鈕顏色要另外送進去 */
+ function docsAll(){var out=[document];try{[].forEach.call(document.querySelectorAll('iframe'),function(f){try{var d=f.contentDocument;if(d&&d.documentElement&&d.body){out.push(d);[].forEach.call(d.querySelectorAll('iframe'),function(g){try{var e=g.contentDocument;if(e&&e.documentElement&&e.body)out.push(e)}catch(_){}})}}catch(_){}})}catch(_){}return out}
  function cards(){ if(ct)return; ct=setTimeout(function(){ct=0;try{
-   var on=document.documentElement.classList.contains('vp-on'),els=document.querySelectorAll(on?CSEL:'.vp-card'),n=0;
-   for(var i=0;i<els.length&&n<600;i++){var e=els[i];if(!on){e.classList.remove('vp-card');continue}if(e.classList.contains('vp-card')||e.__vpc)continue;n++;
-    if(e.closest('#vmPanel,#vpPanel,#vmBox'))continue;var w=e.offsetWidth,hh=e.offsetHeight;if(w<70||hh<36){continue}
-    var cs=getComputedStyle(e);e.__vpc=1;if(cs.backgroundImage!=='none'||cs.position==='fixed')continue;var bg=cs.backgroundColor.match(/[\d.]+/g)||[];if(bg.length>3&&+bg[3]<0.4)continue;
-    e.classList.add('vp-card')}}catch(_){}},160)}
+   var H=document.documentElement,on=H.classList.contains('vp-on'),acc=H.classList.contains('vp-acc')?H.style.getPropertyValue('--vp-acc'):'';
+   docsAll().forEach(function(d){try{var h=d.documentElement;
+    if(d!==document){if(on&&!d.getElementById('vrt-pal-card')){var s2=d.createElement('style');s2.id='vrt-pal-card';s2.textContent=CARDCSS;(d.head||h).appendChild(s2)}
+     h.classList.toggle('vp-on',on);h.classList.toggle('vp-acc',!!acc);if(acc)h.style.setProperty('--vp-acc',acc);else h.style.removeProperty('--vp-acc')}
+    var els=d.querySelectorAll(on?CSEL:'.vp-card'),n=0,w0=d.defaultView;
+    for(var i=0;i<els.length&&n<600;i++){var e=els[i];if(!on){e.classList.remove('vp-card');e.__vpc=0;continue}if(e.classList.contains('vp-card')||e.__vpc)continue;n++;
+     if(e.closest('#vmPanel,#vpPanel,#vmBox'))continue;var w=e.offsetWidth,hh=e.offsetHeight;if(w<70||hh<36){continue}
+     var cs=w0.getComputedStyle(e);e.__vpc=1;if(cs.backgroundImage!=='none'||cs.position==='fixed')continue;var bg=cs.backgroundColor.match(/[\d.]+/g)||[];if(bg.length>3&&+bg[3]<0.4)continue;
+     e.classList.add('vp-card')}}catch(_){}})}catch(_){}},160)}
+ setInterval(function(){if(!document.hidden&&document.documentElement.classList.contains('vp-on'))cards()},2500);
  try{new MutationObserver(function(){if(document.documentElement.classList.contains('vp-on'))cards()}).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
  function draw(){ if(!panel||panel.hidden)return;
-  panel.innerHTML='<b class="h">🎨 背景顏色 Background（這台裝置會記住）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div><div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+
+  panel.innerHTML='<b class="h">🎨 背景顏色 Background（這台裝置會記住）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+(PROD?'<div class="swl">明暗 Light / Dark（生產平台原本的）</div><div class="mx" style="margin-top:0"><button data-a="th-light">☀️ 淡色 Light</button><button data-a="th-dark">🌙 深色 Dark</button>'+(document.getElementById('themeBtn')?'<button data-a="oldbg">原本的背景選單</button>':'')+'</div>':'<div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>')+
    '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:'+mixHex(colOf(st.c)[2],colOf(st.c2)[2])+'"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
    '<div class="im"><button data-a="pick">🖼️ 自訂背景圖 Image</button>'+(BG?'<button data-a="clear">✕ 移除 Remove</button><label>遮罩 Veil <input type="range" min="30" max="95" step="5" value="'+st.veil+'"><span>'+st.veil+'%</span></label>':'')+'</div><small>圖片只存在這台裝置，不會上傳。遮罩越高，圖越淡、字越清楚。<br>The image stays on this device. Higher veil = fainter image.</small>';
   var b=(btn.offsetWidth?btn:document.getElementById('vmBox')).getBoundingClientRect(),w=Math.min(296,innerWidth-16),hh=panel.offsetHeight||260,up=b.bottom+6+hh>innerHeight-4&&b.top>hh;panel.style.top=(up?Math.max(6,b.top-hh-6):b.bottom+6)+'px';panel.style.left=Math.max(8,Math.min(innerWidth-w-8,b.right-w))+'px' }
  function shrink(file){return (window.createImageBitmap?createImageBitmap(file):Promise.reject()).then(function(bmp){var k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(bmp.width*k));c.height=Math.max(1,Math.round(bmp.height*k));c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.8)})}
  function pick(){var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;shrink(f).then(function(d){BG=d;apply();draw();idb('readwrite',function(s){return s.put(d,'bg')});try{localStorage.setItem('vrt_pal_img',String(Date.now()))}catch(e){}}).catch(function(){})};inp.click()}
  function mount(){ var box=document.getElementById('vmBox'); if(!box||btn)return !!btn;
-  var s=document.createElement('style');s.id='vrt-pal-css';s.textContent=css;document.head.appendChild(s);
+  var s=document.createElement('style');s.id='vrt-pal-css';s.textContent=css+(PROD?'#themeBtn{display:none!important}':'');document.head.appendChild(s);
   btn=document.createElement('button');btn.id='vpBtn';btn.type='button';btn.title='背景顏色／背景圖 Background';btn.setAttribute('aria-label','Background colour');btn.textContent='🎨';box.appendChild(btn);
   panel=document.createElement('div');panel.id='vpPanel';panel.hidden=true;document.body.appendChild(panel);
   btn.addEventListener('click',function(e){e.stopPropagation();panel.hidden=!panel.hidden;draw()});
-  panel.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.a==='mix'){mixMode=!mixMode;draw();return}if(b.dataset.a==='unmix'){st.c2='';mixMode=false;save();apply();draw();return}
+  panel.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.a==='th-light'||b.dataset.a==='th-dark'){var tv=b.dataset.a==='th-dark'?'dark':'light';try{if(typeof window.setTheme==='function'&&document.getElementById('themeBtn'))window.setTheme(tv);else if(window.VRTTheme)window.VRTTheme.set(tv)}catch(_){}setTimeout(function(){apply();draw()},60);return}
+   if(b.dataset.a==='oldbg'){panel.hidden=true;var tb=document.getElementById('themeBtn');if(tb)setTimeout(function(){tb.click()},0);return}
+   if(b.dataset.a==='mix'){mixMode=!mixMode;draw();return}if(b.dataset.a==='unmix'){st.c2='';mixMode=false;save();apply();draw();return}
    if(b.dataset.c!=null){var k=b.dataset.c,a0=colOf(st.c),a1=colOf(k);if(mixMode&&st.c&&k&&k!==st.c&&a0&&a1&&!!a0[4]===!!a1[4]){st.c2=k}else{st.c=k;st.c2=''}mixMode=false;save();apply();draw()}else if(b.dataset.a==='pick')pick();else if(b.dataset.a==='clear'){BG=null;apply();draw();idb('readwrite',function(s){return s.delete('bg')});try{localStorage.setItem('vrt_pal_img',String(Date.now()))}catch(e){}}});
   panel.addEventListener('input',function(e){if(e.target.type==='range'){st.veil=+e.target.value;save();apply();var sp=panel.querySelector('label span');if(sp)sp.textContent=st.veil+'%'}});
   document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&e.target!==btn&&!(e.target.closest&&e.target.closest('#vmPanel .pal')))panel.hidden=true},true);
