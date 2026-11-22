@@ -1,4 +1,4 @@
-/* VRT 🎵 放鬆音樂開關 v2.0（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* VRT 🎵 放鬆音樂開關 v2.1（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -261,10 +261,10 @@
    if(v>=0)return v}
   return 1}
  function ensure(){ if(glow||!document.body)return;
-  var st=document.createElement('style');st.id='vrt-glow-css';st.textContent='#vgGlow{position:fixed;left:0;top:0;width:520px;height:520px;margin:-260px 0 0 -260px;border-radius:50%;pointer-events:none;z-index:2147482500;opacity:0;transition:opacity .28s ease;will-change:transform,opacity;background:radial-gradient(circle,rgba(255,255,255,.17) 0%,rgba(255,255,255,.07) 34%,rgba(255,255,255,0) 66%);mix-blend-mode:screen}'+
-   '#vgGlow.inv{background:radial-gradient(circle,rgba(0,0,0,.20) 0%,rgba(0,0,0,.08) 34%,rgba(0,0,0,0) 66%);mix-blend-mode:multiply}'+
-   '.vg-lit{outline:1.5px solid rgba(255,255,255,.42)!important;outline-offset:-1px;box-shadow:0 0 0 1px rgba(255,255,255,.10),0 14px 34px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.22)!important;transition:outline-color .2s ease,box-shadow .25s ease}'+
-   'html.vp-dark .vg-lit,html.vrt-inv .vg-lit{outline-color:rgba(0,0,0,.45)!important;box-shadow:0 0 0 1px rgba(0,0,0,.10),0 14px 34px rgba(255,255,255,.30),inset 0 1px 0 rgba(0,0,0,.20)!important}'+
+  var st=document.createElement('style');st.id='vrt-glow-css';st.textContent='#vgGlow{position:fixed;left:0;top:0;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;pointer-events:none;z-index:2147482500;opacity:0;transition:opacity .28s ease;will-change:transform,opacity;background:radial-gradient(circle,rgba(255,255,255,.085) 0%,rgba(255,255,255,.035) 40%,rgba(255,255,255,0) 70%);mix-blend-mode:screen}'+
+   '#vgGlow.inv{background:radial-gradient(circle,rgba(0,0,0,.10) 0%,rgba(0,0,0,.04) 40%,rgba(0,0,0,0) 70%);mix-blend-mode:multiply}'+
+   '.vg-lit{outline:1px solid rgba(255,255,255,.26)!important;outline-offset:-1px;box-shadow:0 8px 20px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.14)!important;transition:outline-color .2s ease,box-shadow .25s ease}'+
+   'html.vp-dark .vg-lit,html.vrt-inv .vg-lit{outline-color:rgba(0,0,0,.28)!important;box-shadow:0 8px 20px rgba(255,255,255,.22),inset 0 1px 0 rgba(0,0,0,.12)!important}'+
    '@media print{#vgGlow{display:none!important}}';
   (document.head||H).appendChild(st);glow=document.createElement('div');glow.id='vgGlow';glow.setAttribute('aria-hidden','true');document.body.appendChild(glow)}
  function unlit(){if(lit){lit.classList.remove('vg-lit');lit=null}}
