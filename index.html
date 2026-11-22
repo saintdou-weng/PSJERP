@@ -2616,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.3';
+const APP_VER='1.7.4';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6114,6 +6114,83 @@ init();
   return h };
  if(!window.STY_TABS.some(x=>x[0]==='cutpack')){const i=window.STY_TABS.findIndex(x=>x[0]==='bomcmp')+1||window.STY_TABS.length;window.STY_TABS.splice(i,0,['cutpack','📦',['裁剪・裝箱','Cut & pack']])}
  window.PSJ_CUTPACK={load,hit,_reset:()=>{DATA.packing=null;DATA.cutdetail=null}};
+})();
+
+/* ===== v1.7.4（2026-11-22）在製 WIP 真實資料版 =====
+   原本的 WIP 頁在「真實資料」模式只看 ERP W_COD690 的裁剪量（一直是 0）→ 永遠顯示「還沒有真實資料」，沒有去接已經有的資料。
+   現在改接三個現成來源（都唯讀、不改任何資料）：
+   · 會計 WIP：ACC Flow 每月 WIP 明細（每張 ERP 訂單的 WIP 件數、金額、布料、輔料）
+   · 生產 WIP：生產平台最新日報的「已裁未縫」
+   · ERP：用 ERP 訂單號把會計 WIP 對回 ERP 訂單（對得上幾張、對不上幾張）
+   示範資料模式照舊用原本的畫面。 */
+(function(){
+ if(typeof RENDER==='undefined'||!RENDER.wip)return;
+ const Lx=(z,e)=>tt(z,e), ks=s=>keyN(s).replace(/[^A-Z0-9]+/g,''), n0=v=>{v=Number(v);return isFinite(v)?v:0};
+ const V=window.WIPV=Object.assign({tab:'cust',q:'',lim:60},window.WIPV||{});
+ const PW={at:0,busy:false,d:null,date:'',err:''};
+ async function prodWip(){ if(PW.busy||Date.now()-PW.at<30*60e3)return; PW.busy=true;
+  try{ const post=b=>fetch(window.PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b),redirect:'follow'}).then(r=>r.json()).then(j=>j.data||j);
+   const li=await post({action:'dailyReportList',limit:30}); const day=(li.index||[]).map(x=>x.date).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d)).sort().pop();
+   if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f&&f.wip){PW.d=f.wip;PW.date=day;PW.err=''} }
+  }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip')rerender() } }
+ const _rw=RENDER.wip;
+ window.wipSet=function(k,v){ V[k]=v; if(k!=='lim')V.lim=60; const y=window.scrollY; rerender(); if(k==='lim'||k==='q')window.scrollTo(0,y) };
+ RENDER.wip=function(){
+  if(isDemo())return _rw.apply(this,arguments);
+  const A=window.ACC_CACHE||{};
+  if(!A.state&&!A._wipAsk){ A._wipAsk=1; accLoad(false).then(()=>{ if(CUR==='wip')rerender() }) }
+  if(!PW.at&&!PW.busy)prodWip();
+  const st=S('wip'), R=rangeOf(st), asof=asOfDate(R), ym=ymd(asof).slice(0,7);
+  const all=accRows('wip').filter(r=>/^\d{4}-\d\d$/.test(r.period)); const months=[...new Set(all.map(r=>r.period))].sort();
+  let h=pageHead('wip')+pnav('wip',{snapshot:true,asof:ymd(asof)});
+  if(!months.length){ return h+`<div class="panel empty"><h2>⏳ ${A.loading?Lx('正在讀會計 WIP…','Loading accounting WIP…'):Lx('還讀不到會計 WIP','Accounting WIP not available yet')}</h2><p class="small muted">${A.err?esc(A.err):Lx('資料來自 ACC Flow 每月 WIP 檔；讀到後這頁會自動顯示。','Data comes from the monthly ACC Flow WIP file; this page fills in automatically once loaded.')}</p></div>` }
+  const use=months.includes(ym)?ym:(months.filter(m=>m<=ym).pop()||months[months.length-1]);
+  const rows=all.filter(r=>r.period===use), pi=months.indexOf(use), prev=pi>0?all.filter(r=>r.period===months[pi-1]):[];
+  const T=a=>({amt:sum(a,r=>n0(r.wipAmount)),qty:sum(a,r=>n0(r.wipQty)),fab:sum(a,r=>n0(r.fabricAmount)),trim:sum(a,r=>n0(r.trimAmount))});
+  const t1=T(rows), t0=T(prev);
+  const dl=(a,b)=>!b?'':`<span class="${a-b>0?'diff-pos':'diff-neg'}">${a-b>0?'▲':'▼'} ${fmt(Math.abs((a-b)/b*100),1)}%</span> ${Lx('比上月','vs prev')}`;
+  const custs=new Set(rows.map(r=>r.customer).filter(Boolean)), stys=new Set(rows.map(r=>ks(r.style)).filter(Boolean));
+  if(use!==ym)h+=`<p class="note info small">📅 ${esc(ym)} ${Lx('還沒有會計 WIP（會計每月結帳後才有），先顯示最近一個月：','has no accounting WIP yet (it arrives after month-end closing); showing the latest month:')} <b>${esc(use)}</b></p>`;
+  /* ── KPI ── */
+  const pw=PW.d&&PW.d.cutNotSewn!=null?PW.d:null;
+  h+=`<div class="kpis">${kpi('💰 '+Lx('會計 WIP 金額','Accounting WIP value'),money(t1.amt,0),'',dl(t1.amt,t0.amt)||Lx('月結 ','Month-end ')+esc(use))}${kpi('🧵 '+Lx('會計 WIP 件數','Accounting WIP pcs'),fmt(t1.qty),t('pcs'),dl(t1.qty,t0.qty))}${kpi('🧾 '+Lx('在製訂單','Orders in WIP'),fmt(rows.length),'',fmt(custs.size)+Lx(' 個客戶・',' customers · ')+fmt(stys.size)+Lx(' 款',' styles'))}${kpi('🧶 '+Lx('布料／輔料','Fabric / trims'),money(t1.fab,0),'',Lx('輔料 ','Trims ')+money(t1.trim,0))}${kpi('✂️ '+Lx('生產：已裁未縫','Production: cut, not sewn'),pw?fmt(pw.cutNotSewn):'—',pw?t('pcs'):'',pw?Lx('生產日報 ','Daily report ')+esc(PW.date):(PW.busy?Lx('讀取中…','Loading…'):Lx('生產日報還沒有這個數字','not in the daily report yet')))}</div>
+  <p class="small muted" style="margin:6px 2px 0">${Lx('金額和件數分開看，不相加。會計 WIP＝ACC Flow 月結檔；已裁未縫＝生產平台日報，兩個日期不同，不直接相減。','Value and pieces are shown separately. Accounting WIP = ACC Flow month-end file; cut-not-sewn = production daily report. Different dates, so not subtracted.')}</p>`;
+  /* ── 資料連動檢查 ── */
+  const byOd=new Map(live(DB.orders).map(o=>[String(o.od_no||'').trim().toUpperCase(),o]));
+  const hit=r=>byOd.get(String(r.orderNo||'').trim().toUpperCase())||null;
+  const miss=rows.filter(r=>!hit(r)), over=rows.filter(r=>n0(r.orderQty)>0&&n0(r.wipQty)>n0(r.orderQty)*1.05), neg=rows.filter(r=>n0(r.wipQty)<0||n0(r.wipAmount)<0);
+  const chk=(ok,txt)=>`<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line-2)"><span>${ok?'✅':'⚠️'}</span><span style="flex:1">${txt}</span></div>`;
+  h+=`<div class="grid2 mt"><div class="panel"><h2>🔗 ${Lx('資料有沒有接上','Is the data linked?')}</h2>
+   ${chk(true,Lx('會計 WIP：','Accounting WIP: ')+months[0]+' → '+months[months.length-1]+Lx('，共 ',' · ')+months.length+Lx(' 個月',' months'))}
+   ${chk(!miss.length,Lx('對回 ERP 訂單：','Matched to ERP orders: ')+'<b>'+fmt(rows.length-miss.length)+' / '+fmt(rows.length)+'</b>'+(miss.length?Lx('　對不上：','　not found: ')+miss.slice(0,4).map(r=>esc(r.orderNo||'—')).join('、')+(miss.length>4?' …':''):''))}
+   ${chk(!over.length,Lx('WIP 件數大於訂單量：','WIP pcs above order qty: ')+'<b>'+fmt(over.length)+'</b>'+Lx(' 張',' orders')+(over.length?'　'+over.slice(0,3).map(r=>esc(r.orderNo||'')).join('、'):''))}
+   ${chk(!neg.length,Lx('負數的 WIP：','Negative WIP: ')+'<b>'+fmt(neg.length)+'</b>'+Lx(' 張',' orders'))}
+   ${chk(!!pw,Lx('生產平台已裁未縫：','Production cut-not-sewn: ')+(pw?fmt(pw.cutNotSewn)+' '+t('pcs')+'（'+esc(PW.date)+'）':Lx('還沒讀到','not loaded')))}
+   <p class="small muted" style="margin:8px 0 0">${Lx('ERP 的 W_COD690 沒有裁剪量，所以「ERP 推算 WIP」算不出來，這頁不顯示它。','ERP W_COD690 has no cutting qty, so an ERP-derived WIP cannot be computed and is not shown.')}</p></div>
+   <div class="panel"><h2>📈 ${Lx('會計 WIP 金額（每月月結）','Accounting WIP value (month-end)')}</h2><p class="hint">ACC Flow · USD</p>${(()=>{const ms=months.slice(-12);return barChart(ms.map(m=>sum(all.filter(r=>r.period===m),r=>n0(r.wipAmount))),ms.map(m=>m.slice(2)),'USD',{hl:ms.map(m=>m===use)})})()}</div></div>`;
+  /* ── 分頁 ── */
+  const tabs=[['cust','🏢',Lx('依客戶','By customer')],['style','👕',Lx('依款式','By style')],['detail','📋',Lx('訂單明細','Order detail')]];
+  h+=`<div class="panel mt"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div class="seg">${tabs.map(x=>`<button class="${V.tab===x[0]?'on':''}" onclick="wipSet('tab','${x[0]}')">${x[1]} ${esc(x[2])}</button>`).join('')}</div>
+   <input type="search" style="flex:1;min-width:160px;max-width:320px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit" placeholder="🔍 ${Lx('找訂單號／款式／客戶','Search order / style / customer')}" value="${esc(V.q)}" onchange="wipSet('q',this.value)">${V.q?`<button class="btn sm" onclick="wipSet('q','')">✕ ${Lx('清除','Clear')}</button>`:''}<span class="small muted">${esc(use)}</span></div>`;
+  const q=keyN(V.q||''); const F=q?rows.filter(r=>keyN([r.orderNo,r.style,r.customer,r.selfKey].join(' ')).includes(q)):rows;
+  const grp=(key)=>{const m=new Map();F.forEach(r=>{const k=key(r)||'—';const g=m.get(k)||{k,amt:0,qty:0,n:0,style:r.style};g.amt+=n0(r.wipAmount);g.qty+=n0(r.wipQty);g.n++;m.set(k,g)});return [...m.values()].sort((a,b)=>b.amt-a.amt)};
+  if(V.tab==='cust'){ const G=grp(r=>r.customer), mx=Math.max(...G.map(g=>g.amt),1);
+   h+=G.slice(0,V.lim).map(g=>`<div class="meter" style="cursor:pointer" onclick="WIPV.tab='detail';wipSet('q',${JSON.stringify(String(g.k)).replace(/"/g,'&quot;')})"><span title="${esc(g.k)}">${esc(g.k)}</span><div class="trk"><div class="fill" style="width:${Math.max(1,g.amt/mx*100)}%"></div></div><span class="val">${money(g.amt,0)} · ${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</span></div>`).join('')||`<div class="note">${esc(t('no_data'))}</div>`;
+   if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>` }
+  else if(V.tab==='style'){ const G=grp(r=>ks(r.style));
+   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">`+G.slice(0,V.lim).map(g=>`<div class="vz-card" style="border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;background:var(--surface)" onclick="WIPV.tab='detail';wipSet('q','${esc(g.k)}')"><div style="aspect-ratio:4/3;background:var(--surface-2);border-radius:7px;display:grid;place-items:center;overflow:hidden;font-size:26px">👕<img data-sk="${esc(g.k)}" alt="" style="width:100%;height:100%;object-fit:cover;display:none" onload="this.style.display='block';this.previousSibling&&(this.parentNode.firstChild.textContent='')"></div><div class="mono" style="font-weight:700;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.style||g.k)}">${esc(g.style||g.k)}</div><div class="small">${money(g.amt,0)}</div><div class="small muted">${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</div></div>`).join('')+`</div>`;
+   if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>`;
+   setTimeout(()=>{try{window.fillImgs&&fillImgs(document.getElementById('page')||document)}catch(e){}},60) }
+  else { const D=F.slice().sort((a,b)=>n0(b.wipAmount)-n0(a.wipAmount));
+   h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${Lx('ERP 訂單號','ERP order')}</th><th>${esc(t('style'))}</th><th>${Lx('客戶','Customer')}</th><th class="r">${esc(t('order_qty'))}</th><th class="r">${Lx('已出貨','Shipped')}</th><th class="r">WIP ${t('pcs')}</th><th class="r">WIP US$</th><th class="r">${Lx('布料','Fabric')}</th><th class="r">${Lx('輔料','Trims')}</th><th>ERP</th></tr></thead><tbody>${D.slice(0,V.lim).map(r=>{const o=hit(r);return `<tr class="${o?'click':''}" ${o?`onclick="openOrder('${o.id}')"`:''}><td class="lead mono" data-l="${Lx('ERP 訂單號','ERP order')}">${esc(r.orderNo||'—')}</td><td class="mono" data-l="${esc(t('style'))}">${esc(r.style||'')}</td><td data-l="${Lx('客戶','Customer')}">${esc(r.customer||'')}</td><td class="r" data-l="${esc(t('order_qty'))}">${fmt(n0(r.orderQty))}</td><td class="r" data-l="${Lx('已出貨','Shipped')}">${fmt(n0(r.shippedQty))}</td><td class="r" data-l="WIP ${t('pcs')}"><b>${fmt(n0(r.wipQty))}</b></td><td class="r" data-l="WIP US$"><b>${money(n0(r.wipAmount),0)}</b></td><td class="r" data-l="${Lx('布料','Fabric')}">${money(n0(r.fabricAmount),0)}</td><td class="r" data-l="${Lx('輔料','Trims')}">${money(n0(r.trimAmount),0)}</td><td data-l="ERP">${o?stChip('good',Lx('有','found')):stChip('warn',Lx('對不上','not found'))}</td></tr>`}).join('')}</tbody></table></div>`;
+   if(!D.length)h+=`<div class="note">${esc(t('no_data'))}</div>`;
+   if(D.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(D.length-V.lim)}）</button></p>` }
+  h+=`</div>`;
+  /* ── 生產平台：已裁未縫最多的款 ── */
+  if(pw&&Array.isArray(pw.top)&&pw.top.length){ const tp=pw.top.slice(0,10).map(x=>({k:x.style||x.sk||x.k||x.name||'—',v:n0(x.wip!=null?x.wip:x.cutNotSewn!=null?x.cutNotSewn:x.qty!=null?x.qty:x.pcs)})).filter(x=>x.v>0), mx=Math.max(...tp.map(x=>x.v),1);
+   if(tp.length)h+=`<div class="panel mt"><h2>✂️ ${Lx('生產：已裁未縫最多的款','Production: most cut-not-sewn styles')}</h2><p class="hint">${Lx('生產平台日報 ','Production daily report ')}${esc(PW.date)}</p>${tp.map(x=>meterRow(x.k,x.v,mx,fmt(x.v))).join('')}</div>` }
+  return h;
+ };
 })();
 
 /* ===== v1.7.3 UI 動效（2026-11-22）：懸停回饋／游標聚光／3D 傾斜／導覽列捲動樣式／回到頂部 =====
