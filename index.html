@@ -6133,6 +6133,8 @@ init();
    const li=await post({action:'dailyReportList',limit:30}); const day=(li.index||[]).map(x=>x.date).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d)).sort().pop();
    if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f){PW.f=f;PW.d=f.wip||null;PW.date=day;PW.err=''} }
   }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip'||CUR==='production'||CUR==='dashboard')rerender() } }
+ /* 照片：款號完全一樣的優先；沒有就找「同款系列」（照片款號是這個款號的開頭，至少 4 碼，例：W154-SP-RC 用 W154 的照片） */
+ let PHK=null; const phK=k=>{ if(!k||hasImg(k))return k; if(!PHK){ PHK=[]; try{ imgList().then(L=>{ PHK=[...L.keys()].filter(x=>x.length>=4).sort((a,b)=>b.length-a.length); if(CUR==='wip'&&V.tab==='style')rerender() }) }catch(e){} return k } const m=PHK.find(x=>k.startsWith(x)); return m||k };
  const _rw=RENDER.wip;
  /* 「月報列表／比較」檢視原本走 renderPeriodView（沒有期間指標就顯示「還沒有真實資料」）→ 真實資料模式的 WIP 一律走這一頁 */
  const _rpvW=window.renderPeriodView; if(typeof _rpvW==='function')window.renderPeriodView=function(k){ if(k==='wip'&&!isDemo())return RENDER.wip(); if(k==='production'&&!isDemo())return RENDER.production(); return _rpvW.apply(this,arguments) };
@@ -6187,7 +6189,7 @@ init();
    h+=G.slice(0,V.lim).map(g=>`<div class="meter" style="cursor:pointer" onclick="WIPV.tab='detail';wipSet('q',${JSON.stringify(String(g.k)).replace(/"/g,'&quot;')})"><span title="${esc(g.k)}">${esc(g.k)}</span><div class="trk"><div class="fill" style="width:${Math.max(1,g.amt/mx*100)}%"></div></div><span class="val">${money(g.amt,0)} · ${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</span></div>`).join('')||`<div class="note">${esc(t('no_data'))}</div>`;
    if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>` }
   else if(V.tab==='style'){ const G=grp(r=>ks(r.style));
-   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">`+G.slice(0,V.lim).map(g=>`<div class="vz-card" style="border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;background:var(--surface)" onclick="WIPV.tab='detail';wipSet('q','${esc(g.k)}')"><div class="wipv-ph">👕<img data-sk="${esc(g.k)}" alt="" loading="lazy"></div><div class="mono" style="font-weight:700;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.style||g.k)}">${esc(g.style||g.k)}</div><div class="small">${money(g.amt,0)}</div><div class="small muted">${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</div></div>`).join('')+`</div>`;
+   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">`+G.slice(0,V.lim).map(g=>`<div class="vz-card" style="border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;background:var(--surface)" onclick="WIPV.tab='detail';wipSet('q','${esc(g.k)}')"><div class="wipv-ph">👕<img data-sk="${esc(phK(g.k))}" alt="" loading="lazy"></div><div class="mono" style="font-weight:700;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.style||g.k)}">${esc(g.style||g.k)}</div><div class="small">${money(g.amt,0)}</div><div class="small muted">${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</div></div>`).join('')+`</div>`;
    if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>`;
    setTimeout(()=>{try{window.fillImgs&&fillImgs(document.getElementById('page')||document)}catch(e){}},60) }
   else { const D=F.slice().sort((a,b)=>n0(b.wipAmount)-n0(a.wipAmount));
@@ -6224,7 +6226,7 @@ init();
   if(!isDemo()&&RENDER[k]&&/class="panel empty"/.test(String(h))){ try{ const d=String(RENDER[k]()); if(!/class="panel empty"/.test(d)&&d.length>400)return d }catch(e){} } return h };
  /* Telegram 摘要：WIP／生產 兩頁原本用示範資料的算法（真實模式會發出「在製 0 件」）→ 改用頁面上同一批數字 */
  const _st=window.summaryText; if(typeof _st==='function')window.summaryText=function(k,id){
-  if(!isDemo()&&(k==='wip'||k==='production')){ try{ const d=TODAY, head=`🏭 <b>VRT ERP — ${pad(d.getMonth()+1)}/${pad(d.getDate())}</b>\n${modIcon(k)} <b>${esc(t(k))}</b>\n━━━━━━━━━━━━\n`; const L=[];
+  if(!isDemo()&&(k==='wip'||k==='production')){ try{ const d=TODAY, head=`🏭 <b>VRT ERP — ${pad(d.getMonth()+1)}/${pad(d.getDate())}</b>\n${k==='wip'?'⏳':'🏭'} <b>${esc(t(k))}</b>\n━━━━━━━━━━━━\n`; const L=[];
     if(k==='wip'){ const all=accRows('wip').filter(r=>/^\d{4}-\d\d$/.test(r.period)), ms=[...new Set(all.map(r=>r.period))].sort(), use=ms[ms.length-1];
      if(use){ const rows=all.filter(r=>r.period===use), pv=ms.length>1?all.filter(r=>r.period===ms[ms.length-2]):[], A=a=>sum(a,r=>n0(r.wipAmount)), Q=a=>sum(a,r=>n0(r.wipQty)), ch=(x,y)=>y?(x-y>0?' ▲':' ▼')+fmt(Math.abs((x-y)/y*100),1)+'%':'';
       L.push(`💰 ${Lx('會計 WIP 金額','Accounting WIP')}　${money(A(rows),0)}${ch(A(rows),A(pv))}（${use} ${Lx('月結','month-end')}）`);
