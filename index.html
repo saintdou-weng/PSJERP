@@ -2616,7 +2616,7 @@ async function init(){
 }
 
 /* ===================== v0.6.0 (2026-10-07) — all ERP exports, global drop, templates, coverage, export ===================== */
-const APP_VER='1.7.4';
+const APP_VER='1.7.5';
 Object.assign(T,{
  sub_purchase:['W_CPU350 主料／W_CPU340 副料 採購資料：採購量、進貨量、差異、單價、金額','W_CPU350 / W_CPU340 purchases: ordered, received, short, price, amount'],
  pprice:['採購單價','Purchase prices','តម្លៃទិញ'], stockmove:['主副料進耗存','Material movement','ចលនាសម្ភារៈ'], fgstock:['成品庫存','FG stock','ស្តុកផលិតផលសម្រេច'], labor:['人工彙總','Labour summary','សង្ខេបកម្លាំងពលកម្ម'],
@@ -6132,7 +6132,7 @@ init();
   try{ const post=b=>fetch(window.PROD_GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b),redirect:'follow'}).then(r=>r.json()).then(j=>j.data||j);
    const li=await post({action:'dailyReportList',limit:30}); const day=(li.index||[]).map(x=>x.date).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d)).sort().pop();
    if(day){ const g=await post({action:'dailyReportGet',date:day}); const f=g&&g.report&&g.report.facts; if(f){PW.f=f;PW.d=f.wip||null;PW.date=day;PW.err=''} }
-  }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip'||CUR==='production')rerender() } }
+  }catch(e){ PW.err=String(e&&e.message||e) } finally{ PW.busy=false; PW.at=Date.now(); if(CUR==='wip'||CUR==='production'||CUR==='dashboard')rerender() } }
  const _rw=RENDER.wip;
  /* 「月報列表／比較」檢視原本走 renderPeriodView（沒有期間指標就顯示「還沒有真實資料」）→ 真實資料模式的 WIP 一律走這一頁 */
  const _rpvW=window.renderPeriodView; if(typeof _rpvW==='function')window.renderPeriodView=function(k){ if(k==='wip'&&!isDemo())return RENDER.wip(); if(k==='production'&&!isDemo())return RENDER.production(); return _rpvW.apply(this,arguments) };
@@ -6180,7 +6180,7 @@ init();
    h+=G.slice(0,V.lim).map(g=>`<div class="meter" style="cursor:pointer" onclick="WIPV.tab='detail';wipSet('q',${JSON.stringify(String(g.k)).replace(/"/g,'&quot;')})"><span title="${esc(g.k)}">${esc(g.k)}</span><div class="trk"><div class="fill" style="width:${Math.max(1,g.amt/mx*100)}%"></div></div><span class="val">${money(g.amt,0)} · ${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</span></div>`).join('')||`<div class="note">${esc(t('no_data'))}</div>`;
    if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>` }
   else if(V.tab==='style'){ const G=grp(r=>ks(r.style));
-   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">`+G.slice(0,V.lim).map(g=>`<div class="vz-card" style="border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;background:var(--surface)" onclick="WIPV.tab='detail';wipSet('q','${esc(g.k)}')"><div style="aspect-ratio:4/3;background:var(--surface-2);border-radius:7px;display:grid;place-items:center;overflow:hidden;font-size:26px">👕<img data-sk="${esc(g.k)}" alt="" style="width:100%;height:100%;object-fit:cover;display:none" onload="this.style.display='block';this.previousSibling&&(this.parentNode.firstChild.textContent='')"></div><div class="mono" style="font-weight:700;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.style||g.k)}">${esc(g.style||g.k)}</div><div class="small">${money(g.amt,0)}</div><div class="small muted">${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</div></div>`).join('')+`</div>`;
+   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">`+G.slice(0,V.lim).map(g=>`<div class="vz-card" style="border:1px solid var(--line);border-radius:10px;padding:8px;cursor:pointer;background:var(--surface)" onclick="WIPV.tab='detail';wipSet('q','${esc(g.k)}')"><div class="wipv-ph">👕<img data-sk="${esc(g.k)}" alt="" loading="lazy"></div><div class="mono" style="font-weight:700;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.style||g.k)}">${esc(g.style||g.k)}</div><div class="small">${money(g.amt,0)}</div><div class="small muted">${fmt(g.qty)} ${t('pcs')} · ${fmt(g.n)} ${Lx('張','ord.')}</div></div>`).join('')+`</div>`;
    if(G.length>V.lim)h+=`<p style="text-align:center;margin:10px 0 0"><button class="btn sm" onclick="wipSet('lim',${V.lim+60})">▼ ${Lx('再看更多','Show more')}（${fmt(G.length-V.lim)}）</button></p>`;
    setTimeout(()=>{try{window.fillImgs&&fillImgs(document.getElementById('page')||document)}catch(e){}},60) }
   else { const D=F.slice().sort((a,b)=>n0(b.wipAmount)-n0(a.wipAmount));
@@ -6210,6 +6210,26 @@ init();
   if(ln.length){ const mx=Math.max(...ln.map(x=>x.eff),1); h+=`<div class="panel mt"><h2>🏁 ${Lx('各組效率','Efficiency by line')}</h2><p class="hint">${esc(PW.date)}</p>${ln.map(x=>meterRow(String(x.line||''),x.eff,mx,fmt(x.eff,1)+'%'+(x.pieces!=null?' · '+fmt(x.pieces)+' '+t('pcs'):''))).join('')}</div>` }
   return h;
  };
+ /* 款式卡的照片框：圖片先透明、載到才顯示（不能用 display:none，不然「看得到才載入」永遠不會觸發） */
+ try{ const stx=document.createElement('style'); stx.textContent='.wipv-ph{position:relative;aspect-ratio:4/3;background:var(--surface-2);border-radius:7px;display:grid;place-items:center;overflow:hidden;font-size:26px}.wipv-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s}.wipv-ph img.has{opacity:1}'; document.head.appendChild(stx) }catch(e){}
+ /* 通用保險：任何一頁在「月報列表／比較」檢視顯示「還沒有真實資料」，但同一頁的明細畫面其實有資料 → 直接顯示明細畫面（成本分析就是這樣空掉的） */
+ const _rpvG=window.renderPeriodView; if(typeof _rpvG==='function')window.renderPeriodView=function(k){ const h=_rpvG.apply(this,arguments);
+  if(!isDemo()&&RENDER[k]&&/class="panel empty"/.test(String(h))){ try{ const d=String(RENDER[k]()); if(!/class="panel empty"/.test(d)&&d.length>400)return d }catch(e){} } return h };
+ /* Telegram 摘要：WIP／生產 兩頁原本用示範資料的算法（真實模式會發出「在製 0 件」）→ 改用頁面上同一批數字 */
+ const _st=window.summaryText; if(typeof _st==='function')window.summaryText=function(k,id){
+  if(!isDemo()&&(k==='wip'||k==='production')){ try{ const d=TODAY, head=`🏭 <b>VRT ERP — ${pad(d.getMonth()+1)}/${pad(d.getDate())}</b>\n${modIcon(k)} <b>${esc(t(k))}</b>\n━━━━━━━━━━━━\n`; const L=[];
+    if(k==='wip'){ const all=accRows('wip').filter(r=>/^\d{4}-\d\d$/.test(r.period)), ms=[...new Set(all.map(r=>r.period))].sort(), use=ms[ms.length-1];
+     if(use){ const rows=all.filter(r=>r.period===use), pv=ms.length>1?all.filter(r=>r.period===ms[ms.length-2]):[], A=a=>sum(a,r=>n0(r.wipAmount)), Q=a=>sum(a,r=>n0(r.wipQty)), ch=(x,y)=>y?(x-y>0?' ▲':' ▼')+fmt(Math.abs((x-y)/y*100),1)+'%':'';
+      L.push(`💰 ${Lx('會計 WIP 金額','Accounting WIP')}　${money(A(rows),0)}${ch(A(rows),A(pv))}（${use} ${Lx('月結','month-end')}）`);
+      L.push(`🧵 ${Lx('會計 WIP 件數','WIP pcs')}　${fmt(Q(rows))} ${t('pcs')}${ch(Q(rows),Q(pv))}・${fmt(rows.length)} ${Lx('張訂單','orders')}`);
+      L.push(`🧶 ${Lx('布料','Fabric')} ${money(sum(rows,r=>n0(r.fabricAmount)),0)}・${Lx('輔料','Trims')} ${money(sum(rows,r=>n0(r.trimAmount)),0)}`) } }
+    const f=PW.f; if(f){ const s2=f.sewing||{}, w=f.wip||{}, q=f.qc||{}, pl=f.plan||{};
+     if(k==='production'){ if(s2.pieces!=null)L.push(`🧵 ${Lx('車縫','Sewing')}　${fmt(s2.pieces)} ${t('pcs')}${s2.eff!=null?'・'+Lx('效率 ','eff. ')+fmt(s2.eff,1)+'%':''}`); if((f.cutting||{}).pieces>0)L.push(`✂️ ${Lx('裁剪','Cutting')}　${fmt(f.cutting.pieces)} ${t('pcs')}`); if(q.reports)L.push(`🔍 QC　${Lx('退修率 ','reject ')}${fmt(q.rate,1)}%`); if(pl.planQty)L.push(`📅 ${Lx('本月排單','Month plan')}　${fmt(pl.completion||0,0)}%（${fmt(pl.mtd)} / ${fmt(pl.planQty)}）`) }
+     if(w.cutNotSewn!=null)L.push(`📦 ${Lx('已裁未縫','Cut, not sewn')}　${fmt(w.cutNotSewn)} ${t('pcs')}（${Lx('生產日報 ','daily report ')}${PW.date}）`) }
+    if(L.length)return head+L.join('\n') }catch(e){} }
+  return _st.apply(this,arguments) };
+ /* 總覽頁「生產 WIP 分段」：真實模式沒有 DB.production → 用生產日報的已裁未縫（沒有就不顯示數字，不顯示 0） */
+ const _ws=window.wipStages; if(typeof _ws==='function')window.wipStages=function(){ if(isDemo())return _ws.apply(this,arguments); if(!PW.at&&!PW.busy)prodWip(); const w=PW.d; return w&&w.cutNotSewn!=null?[[Lx('已裁未縫（生產日報 ','Cut, not sewn (daily report ')+PW.date+'）',w.cutNotSewn]]:[] };
 })();
 
 /* ===== v1.7.3 UI 動效（2026-11-22）：懸停回饋／游標聚光／3D 傾斜／導覽列捲動樣式／回到頂部 =====
