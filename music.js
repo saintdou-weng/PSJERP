@@ -400,10 +400,11 @@
   '.vc3.vc3-d.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.11) 0%,rgba(255,255,255,0) 30%,rgba(0,0,0,.10) 58%,rgba(255,255,255,.06) 74%,rgba(0,0,0,.18) 100%)!important}'+
   /* 按壓：平常微微浮起 → 按下去往下沉、影子收掉、裡面出現一圈壓痕，放開彈回來 */
   'html .vc3.vc3-p{transition:transform .13s cubic-bezier(.3,.7,.4,1),box-shadow .13s ease,filter .13s ease;-webkit-tap-highlight-color:transparent}'+
-  '@media(hover:hover){html .vc3.vc3-p:hover{transform:translateY(-2px);box-shadow:0 18px 34px rgba(15,23,42,.24),0 4px 9px rgba(15,23,42,.15),inset 0 1px 0 rgba(255,255,255,.98),inset 0 -2px 0 rgba(15,23,42,.10)!important}'+
-  'html .vc3.vc3-p.vc3-d:hover{box-shadow:0 18px 34px rgba(0,0,0,.52),0 4px 9px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.24),inset 0 -2px 0 rgba(0,0,0,.36)!important}}'+
-  'html .vc3.vc3-p:active,html .vc3.vc3-p.vc3-dn{transform:translateY(2px) scale(.988);box-shadow:0 1px 2px rgba(15,23,42,.28),inset 0 3px 7px rgba(15,23,42,.24),inset 0 -1px 0 rgba(255,255,255,.65)!important;filter:brightness(.965)}'+
-  'html .vc3.vc3-p.vc3-d:active,html .vc3.vc3-p.vc3-d.vc3-dn{box-shadow:0 1px 2px rgba(0,0,0,.5),inset 0 3px 8px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12)!important;filter:brightness(.92)}'+
+  /* v2.6：只有「可以按」的卡片（滑鼠移上去時由下面的 clk() 判斷）才浮起／下沉；不能按的卡片不動，金屬質感照舊 */
+  'html .vc3.vc3-p.vc-hov{transform:translateY(-2px);filter:none;box-shadow:0 18px 34px rgba(15,23,42,.24),0 4px 9px rgba(15,23,42,.15),inset 0 1px 0 rgba(255,255,255,.98),inset 0 -2px 0 rgba(15,23,42,.10)!important}'+
+  'html .vc3.vc3-p.vc3-d.vc-hov{box-shadow:0 18px 34px rgba(0,0,0,.52),0 4px 9px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.24),inset 0 -2px 0 rgba(0,0,0,.36)!important}'+
+  'html .vc3.vc3-p.vc-dn{transform:translateY(2px) scale(.988);box-shadow:0 1px 2px rgba(15,23,42,.28),inset 0 3px 7px rgba(15,23,42,.24),inset 0 -1px 0 rgba(255,255,255,.65)!important;filter:brightness(.965)!important}'+
+  'html .vc3.vc3-p.vc3-d.vc-dn{box-shadow:0 1px 2px rgba(0,0,0,.5),inset 0 3px 8px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12)!important;filter:brightness(.92)!important}'+
   /* ③（v2.4）選了顏色／壁紙以後，沒有框線的選項（分頁、切換鈕、下拉）補一圈細線，才看得出每一個的邊界 */
   'html.vp-on .vc-opt:not(:focus-visible){outline:1px solid rgba(71,85,105,.36);outline-offset:-1px}html.vp-on .vc-opt-d:not(:focus-visible){outline:1px solid rgba(255,255,255,.36);outline-offset:-1px}'+
   /* 選了壁紙：卡片的邊再清楚一點（花紋上面要分得出哪一塊是卡片） */
@@ -411,23 +412,33 @@
   /* v2.5 深色調色（整頁反相）：原本的亮邊／影子反相後看不出來，卡片變成一塊平的黑。
      這裡給「反相前」的值：卡片蓋一層灰色光澤帶（反相後＝深灰的金屬漸層）、深色的上緣線（反相後＝亮邊）、白色的外影（反相後＝黑影）。 */
   'html.vp-inv .vc3:not(.vc3-d){background-image:linear-gradient(150deg,rgba(15,23,42,.24) 0%,rgba(15,23,42,.09) 28%,rgba(15,23,42,.19) 56%,rgba(15,23,42,.07) 74%,rgba(15,23,42,.22) 100%)!important;box-shadow:0 0 0 1px rgba(15,23,42,.42),inset 0 1px 0 rgba(15,23,42,.6),inset 0 -2px 0 rgba(255,255,255,.9),0 12px 24px rgba(255,255,255,.95)!important}'+
-  'html.vp-inv .vc3.vc3-p:not(.vc3-d):hover{box-shadow:0 0 0 1px rgba(15,23,42,.6),inset 0 1px 0 rgba(15,23,42,.75),0 16px 30px rgba(255,255,255,.98)!important}'+
-  'html.vp-inv .vc3.vc3-p:not(.vc3-d):active{box-shadow:0 0 0 1px rgba(15,23,42,.5),inset 0 3px 8px rgba(255,255,255,.9)!important}'+
+  'html.vp-inv .vc3.vc3-p.vc-hov:not(.vc3-d){box-shadow:0 0 0 1px rgba(15,23,42,.6),inset 0 1px 0 rgba(15,23,42,.75),0 16px 30px rgba(255,255,255,.98)!important}'+
+  'html.vp-inv .vc3.vc3-p.vc-dn:not(.vc3-d){box-shadow:0 0 0 1px rgba(15,23,42,.5),inset 0 3px 8px rgba(255,255,255,.9)!important}'+
   /* v2.5 可以按的東西：滑鼠移上去／手指按下去，底色略變、微微浮起；按下去往下沉。列表的列也一樣（整列一起）。 */
-  '.vc-hov:not(tr){filter:brightness(.955) saturate(1.06);box-shadow:0 5px 12px rgba(15,23,42,.20),inset 0 1px 0 rgba(255,255,255,.55)!important;transition:box-shadow .12s ease,filter .12s ease}'+
-  '.vc-hov.vc-hd2:not(tr){filter:brightness(1.14) saturate(1.05)}'+
-  '.vc-hov.vc-ht:not(tr){filter:none;background-image:linear-gradient(rgba(100,116,139,.16),rgba(100,116,139,.16));box-shadow:0 3px 8px rgba(15,23,42,.14),inset 0 1px 0 rgba(255,255,255,.5)!important}'+
+  '.vc-hov:not(tr):not(.vc-bk):not(.vc3){filter:brightness(.955) saturate(1.06);box-shadow:0 5px 12px rgba(15,23,42,.20),inset 0 1px 0 rgba(255,255,255,.55)!important;transition:box-shadow .12s ease,filter .12s ease}'+
+  '.vc-hov.vc-hd2:not(tr):not(.vc-bk){filter:brightness(1.14) saturate(1.05)}'+
+  '.vc-hov.vc-ht:not(tr):not(.vc-bk){filter:none;background-image:linear-gradient(rgba(100,116,139,.16),rgba(100,116,139,.16));box-shadow:0 3px 8px rgba(15,23,42,.14),inset 0 1px 0 rgba(255,255,255,.5)!important}'+
   'tr.vc-hov>td,tr.vc-hov>th{background-image:linear-gradient(rgba(79,70,229,.075),rgba(79,70,229,.075))!important;transition:background-image .12s ease}tr.vc-hov{box-shadow:0 4px 10px rgba(15,23,42,.20),inset 0 1px 0 rgba(255,255,255,.7);position:relative;z-index:1}'+
-  '.vc-dn:not(tr){filter:brightness(.92)!important;box-shadow:inset 0 2px 6px rgba(15,23,42,.28)!important}.vc-dn.vc-dt:not(tr){transform:translateY(1px)}'+
+  '.vc-dn:not(tr):not(.vc-bk):not(.vc3-p){filter:brightness(.92)!important;box-shadow:inset 0 2px 6px rgba(15,23,42,.28)!important}.vc-dn.vc-dt:not(tr):not(.vc-bk):not(.vc3){transform:translateY(1px)}'+
   'tr.vc-dn>td,tr.vc-dn>th{background-image:linear-gradient(rgba(79,70,229,.15),rgba(79,70,229,.15))!important}tr.vc-dn{box-shadow:inset 0 2px 5px rgba(15,23,42,.22)}'+
+  /* v2.6 按鈕＝石磚（跟卡片的金屬不一樣）：四邊倒角（上／左亮、下／右暗）＋底下一道厚邊＋表面石頭的粗粒；按下去厚邊收掉、整塊陷下去 */
+  '.vc-bk{box-shadow:inset 0 1px 0 rgba(255,255,255,.62),inset 1px 0 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 2px 0 rgba(15,23,42,.34),0 4px 6px rgba(15,23,42,.20)!important;transition:transform .09s ease,box-shadow .09s ease,filter .09s ease;-webkit-tap-highlight-color:transparent}'+
+  '.vc-bk.vc-bk-t{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,0) 45%,rgba(15,23,42,.10))!important;background-size:96px 96px,100% 100%!important}'+
+  '.vc-bk.vc-bk-c{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.50),rgba(226,232,240,.34) 55%,rgba(148,163,184,.30))!important;background-size:96px 96px,100% 100%!important}'+
+  '.vc-bk.vc-hov{filter:brightness(1.05) saturate(1.06)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 1px 0 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 3px 0 rgba(15,23,42,.34),0 6px 9px rgba(15,23,42,.24)!important}'+
+  '.vc-bk.vc-hov.vc-bk-c{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.62),rgba(199,210,254,.36) 55%,rgba(129,140,248,.26))!important}'+
+  '.vc-bk.vc-dn,.vc-bk:active{filter:brightness(.93)!important;box-shadow:inset 0 2px 5px rgba(15,23,42,.38),inset 0 -1px 0 rgba(255,255,255,.35),0 0 0 rgba(15,23,42,0)!important}.vc-bk.vc-dn.vc-dt,.vc-bk.vc-dt:active{transform:translateY(2px)}'+
+  'html.vp-inv .vc-bk{box-shadow:inset 0 1px 0 rgba(15,23,42,.45),inset 0 -2px 0 rgba(255,255,255,.55),0 0 0 1px rgba(15,23,42,.30)!important}html.vp-inv .vc-bk.vc-dn{box-shadow:inset 0 2px 5px rgba(255,255,255,.8)!important}'+
+  '@media print{.vc-bk{box-shadow:none!important}}'+
   /* ② 卡片上方：不用黑色 */
   '.vc-hd{background:var(--vc-hd,#e8ecf1)!important;background-image:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0))!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14))!important;text-shadow:none!important}'+
   '.vc-hd .vc-ink{color:var(--vc-ink,#1d2b3a)!important;text-shadow:none!important}.vc-hd .vc-ink2{border-color:var(--vc-line,rgba(15,23,42,.2))!important}'+
   '.gip-ov,#kn-mask,.cmp-mask,.pkn-mask,.vc-veil{background:var(--vc-veil,rgba(214,221,230,.74))!important;-webkit-backdrop-filter:blur(7px) saturate(1.05);backdrop-filter:blur(7px) saturate(1.05)}'+
   '.gip-panel,#kn-box,.pkn-box,.cmp-drawer,.cmp-sheet{box-shadow:0 26px 64px rgba(15,23,42,.30),0 4px 12px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.9)!important;border:1px solid rgba(15,23,42,.16)}'+
   /* 每頁最上面「回平台選單」那一條：原本黑底白字 → 跟底色同色系、細一點 */
+  '#fx-homebar{background:var(--vc-hd,#e8ecf1)!important;box-shadow:0 1px 0 rgba(15,23,42,.14)!important}'+
   '#fx-home{background:var(--vc-hd,#e8ecf1)!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14));padding-top:5px!important;padding-bottom:5px!important;font-size:12px!important}'+
-  '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p:hover,html .vc3.vc3-p:active{transform:none}}'+
+  '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p.vc-hov,html .vc3.vc3-p.vc-dn,.vc-bk.vc-dn{transform:none}}'+
   '@media print{.vc3{box-shadow:none!important;background-image:none!important}}';
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.summary-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,.gip-kpi,.gcpt,.gcpt-kpi,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]';
  var HSEL='.ic-h,.pc-h,.mh,.dh,.modal-head,.modal-header,.m-head,.gc-modal-head,.cmp-dh,.gip-top,#kn-head,.pkn-head,.drawer-head,.dlg-head,.sheet-head,[class*="-head"],[class*="-hd"],[class*="-top"],[class$="-h"],header';
@@ -469,7 +480,19 @@
     if(o.closest('#vmPanel,#vpPanel,#vmBox'))continue;var s2=W.getComputedStyle(o);
     var bw=parseFloat(s2.borderTopWidth)||0,bc=rgb(s2.borderTopColor);if(bw>0&&bc&&bc[3]>0.15&&s2.borderTopStyle!=='none')continue;   /* 本來就有框 */
     if(s2.boxShadow!=='none'||s2.outlineStyle!=='none'&&parseFloat(s2.outlineWidth)>0)continue;
-    var tc=rgb(s2.color);o.classList.add(tc&&lum(tc)>0.72?'vc-opt-d':'vc-opt')}}catch(_){}}
+    var tc=rgb(s2.color);o.classList.add(tc&&lum(tc)>0.72?'vc-opt-d':'vc-opt')}
+   bricks()}catch(_){}}
+ /* v2.6 哪些算按鈕：button／.btn 類／role=button／分頁。太小的（<24×22）、開關、列表裡整列的那種、已經是卡片的不算。 */
+ var BSEL='button,input[type=button],input[type=submit],[role=button],[role=tab],a[class*="btn"],label[class*="btn"],label.cursor-pointer,.btn,.tab,.chip,.kn-chip';
+ function bricks(){try{var bs=document.querySelectorAll(BSEL),m=0,vw=W.innerWidth;
+   for(var j=0;j<bs.length&&m<600;j++){var o=bs[j];if(o.__vcb)continue;var w=o.offsetWidth,h=o.offsetHeight;if(!w)continue;o.__vcb=1;m++;
+    if(w<24||h<22||h>110||(w>vw*.9&&h>70))continue;
+    if(o.classList.contains('vc3')||o.matches('.kn-br,[role=switch],[data-nobrick],.kn-n')||o.closest('#vmBox,#vmPanel,#vpPanel,[data-nobrick],td,th,.leaflet-container'))continue;
+    var cs=W.getComputedStyle(o);if(cs.display==='inline'||cs.display==='contents')continue;
+    var c=rgb(cs.backgroundColor),img=cs.backgroundImage!=='none',clear=!img&&(!c||c[3]<0.15);
+    if(clear&&(h<24||w<34))continue;   /* 沒底色的小字連結不變成磚 */
+    o.classList.add('vc-bk');o.classList.remove('vc-opt','vc-opt-d');if(clear)o.classList.add('vc-bk-c');else if(!img)o.classList.add('vc-bk-t');
+    if(cs.transform==='none'&&cs.position!=='fixed'&&cs.position!=='sticky')o.classList.add('vc-dt')}}catch(_){}}
  function tag(e,cs,w,hh){var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';
     var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
     e.classList.add('vc3');if(!hasImg)e.classList.add('vc3-g');if(dk)e.classList.add('vc3-d');
@@ -501,6 +524,7 @@
    if(e&&e.tagName!=='TR'&&e!==document.body){if(e.disabled||e.getAttribute('aria-disabled')==='true')return null;}
    else{e=null;if(tr&&tr.parentElement&&tr.parentElement.tagName==='TBODY'&&tr.cells.length>=2){var pc=false;try{pc=W.getComputedStyle(tr).cursor==='pointer'}catch(_){}if(pc||tr.hasAttribute('onclick')||/\b(kn-able|pkn-row|r)\b/.test(tr.className))e=tr}
     if(!e){var c=null;for(var n=t,i=0;n&&n.nodeType===1&&n!==document.body&&i<5;n=n.parentElement,i++){var cp=false;try{cp=W.getComputedStyle(n).cursor==='pointer'}catch(_){}if(cp)c=n;else if(c)break}e=c}}
+   if(!e&&typeof W.acKnCardOf==='function'){try{e=W.acKnCardOf(t)||null}catch(_){e=null}}
    if(!e)return null;var w=e.offsetWidth,h=e.offsetHeight;if(!w||w>W.innerWidth*.96&&h>W.innerHeight*.6)return null;return e}catch(_){return null}}
  function mark(e){if(e.tagName==='TR'||e.__vch2)return;e.__vch2=1;try{var cs=W.getComputedStyle(e),c=rgb(cs.backgroundColor),img=cs.backgroundImage!=='none';
    if(!img&&(!c||c[3]<0.15))e.classList.add('vc-ht');else{var g=c&&c[3]>=0.15?c:bgOf(e);if(g&&lum(g)<0.45)e.classList.add('vc-hd2')}
