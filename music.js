@@ -614,3 +614,63 @@
  W.vrtCard3d={refresh:function(){H.__vcK='';cards()}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
+
+/* ===== 🎨 同平台同色 v1（2026-11-23，music.js 2.11.0）=====
+   Paul：調色盤選了一個顏色，同一個平台每一頁都要是那個顏色；不能這頁藍、那頁紅、那頁綠（例：HRA 合約試用頁）。
+   原因：每一頁有自己原本的主色（合約＝藍、產假＝桃紅、行事曆＝綠、考勤＝藍綠），調色盤只是蓋一層淡色，主色還在。
+   做法：選了顏色時，找出這一頁樣式表裡「最常用的主色」，把同色相的顏色（按鈕、選到的分頁、表頭、淡色底）
+        換成調色盤那個顏色的色相（深淺不變）。紅／橘／綠這些代表「警示、通過」的狀態色、寫在資料上的顏色都不動。
+   只在 HRA Portal、HRA-PAY 生效；沒選顏色（白色）就完全還原。只動顏色，不動排版和資料。 */
+(function(){try{
+ var P=(location.pathname||'').toLowerCase(),PLAT=P.split('/')[1]||'';
+ if(!/^(ac-hra-portal|ac-hra-pay)$/.test(PLAT))return;
+ var H=document.documentElement,st=null,sig='';
+ var SKIP=/ok\b|good|success|pass|danger|warn|err|bad|badge|status|legend|holiday|\bdot\b|pill|alert|toast|kn-|vp|vm|vc-|vc3|acpl|row-|rate/i;
+ var PROP=/^--|color|background|border|fill|stroke|outline|shadow|caret|decoration/i;
+ function hsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,h=0,s=0,d=mx-mn;if(d){s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60}return [h,s,l]}
+ function rgb(h,s,l){h=((h%360)+360)%360/360;function f(p,q,t){if(t<0)t+=1;if(t>1)t-=1;return t<1/6?p+(q-p)*6*t:t<1/2?q:t<2/3?p+(q-p)*(2/3-t)*6:p}
+  var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;return [Math.round(f(p,q,h+1/3)*255),Math.round(f(p,q,h)*255),Math.round(f(p,q,h-1/3)*255)]}
+ function hexRgb(x){x=x.replace('#','');if(x.length===3||x.length===4)x=x.split('').map(function(c){return c+c}).join('');return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16),x.slice(6,8)]}
+ function hx(n){return ('0'+n.toString(16)).slice(-2)}
+ var RE=/#([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b|rgba?\(\s*(\d{1,3})(\s*,\s*|\s+)(\d{1,3})(\s*,\s*|\s+)(\d{1,3})/gi;
+ function near(h,c,w){var d=Math.abs(h-c)%360;if(d>180)d=360-d;return d<=w}
+ function each(fn){[].forEach.call(document.styleSheets,function(ss){var o=ss.ownerNode;if(o&&(o.id==='vpTone'||/^(vp|vm|vc|kn|acpl|tf|fx)/i.test(o.id||'')))return;var rs;try{rs=ss.cssRules}catch(e){return}if(!rs)return;
+   (function walk(rs,wrap){for(var i=0;i<rs.length;i++){var r=rs[i];if(r.type===1){fn(r,wrap)}else if((r.type===4||r.type===12)&&r.cssRules){walk(r.cssRules,wrap.concat([(r.type===4?'@media ':'@supports ')+(r.conditionText||(r.media&&r.media.mediaText)||'all')]))}}})(rs,[])})}
+ function brand(){var bins={},sum={},tot=0;
+  each(function(r){var s=r.style;for(var i=0;i<s.length;i++){var n=s[i];if(!/^background/.test(n))continue;var v=s.getPropertyValue(n),m;RE.lastIndex=0;
+    while((m=RE.exec(v))){var c=m[1]?hexRgb(m[1]):[+m[2],+m[4],+m[6]],q=hsl(c[0],c[1],c[2]);if(q[1]>.35&&q[2]>.15&&q[2]<.62){var b=Math.floor(q[0]/20);bins[b]=(bins[b]||0)+1;sum[b]=(sum[b]||0)+q[0];tot++}}}});
+  var best=-1,bn=0;for(var k in bins)if(bins[k]>bn){bn=bins[k];best=k}
+  return bn>=3?sum[best]/bn:null}
+ function off(){if(st&&st.parentNode)st.parentNode.removeChild(st);st=null;sig='';H.classList.remove('vp-tone');ink()}
+ function nat(){try{var bs=getComputedStyle(document.body),m=(bs.backgroundImage.match(/rgba?\([^)]+\)/g)||[bs.backgroundColor]).pop().match(/[\d.]+/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return false;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255<0.4}catch(e){return false}}
+ function run(){try{
+  var acc=H.classList.contains('vp-acc')?(H.style.getPropertyValue('--vp-acc')||'').trim():'';
+  if(!acc||!document.body||(!H.classList.contains('vp-tone')&&nat())){if(st)off();return}
+  var n=0;[].forEach.call(document.styleSheets,function(ss){try{if(ss.ownerNode&&ss.ownerNode.id==='vpTone')return;n+=ss.cssRules.length}catch(e){}});
+  var sg=acc+'|'+n;if(sg===sig)return;sig=sg;
+  var a=hexRgb(acc),ah=hsl(a[0],a[1],a[2]),B=brand();if(B==null){if(st)off();sig=sg;return}
+  if(near(ah[0],B,12)&&ah[1]>.3){if(st)off();sig=sg;return}      /* 本來就是同一個色相，不用換 */
+  var sk=Math.max(.3,Math.min(1,ah[1]/.5)),out=[];
+  function map(v){var hit=false;RE.lastIndex=0;var nv=v.replace(RE,function(all,h6,r,s1,g,s2,b){var c=h6?hexRgb(h6):[+r,+g,+b],q=hsl(c[0],c[1],c[2]);
+    if(q[1]<.12||!near(q[0],B,30))return all;hit=true;var t=rgb(ah[0],q[1]*sk,q[2]);return h6?'#'+hx(t[0])+hx(t[1])+hx(t[2])+(c[3]||''):all.replace(/\d{1,3}(\s*,\s*|\s+)\d{1,3}(\s*,\s*|\s+)\d{1,3}$/,t[0]+s1+t[1]+s2+t[2])});return hit?nv:null}
+  each(function(r,wrap){var sel=r.selectorText||'';if(!sel||SKIP.test(sel))return;var s=r.style,d='';
+   for(var i=0;i<s.length;i++){var p=s[i];if(!PROP.test(p))continue;var v=s.getPropertyValue(p);if(!v||v.length>900||!/#|rgb/i.test(v))continue;var nv=map(v);if(nv)d+=p+':'+nv+'!important;'}
+   /* 換完色後底是深色的（選到的分頁、主要按鈕、深色表頭）→ 字一律白色，蓋過石磚按鈕的深色字 */
+   var bg=s.getPropertyValue('background-color')||s.getPropertyValue('background-image')||s.getPropertyValue('background'),dk=false;
+   if(bg){RE.lastIndex=0;var m0=RE.exec(bg);if(m0){var c0=m0[1]?hexRgb(m0[1]):[+m0[2],+m0[4],+m0[6]],q0=hsl(c0[0],c0[1],c0[2]);dk=q0[1]>=.12&&near(q0[0],B,30)&&(0.2126*c0[0]+0.7152*c0[1]+0.0722*c0[2])/255<.5;if(dk&&!m0[1]){var tail=bg.slice(m0.index+m0[0].length,bg.indexOf(')',m0.index)+1),am=tail.match(/[,\/]\s*(0?\.\d+|0|1(\.0+)?)\s*\)/);if(am&&parseFloat(am[1])<.6)dk=false}if(dk&&m0[1]&&c0[3]&&parseInt(c0[3],16)<153)dk=false}}
+   var open=wrap.join('{')+(wrap.length?'{':''),close=wrap.map(function(){return '}'}).join('');
+   if(d)out.push(open+sel+'{'+d+'}'+close);
+   void dk});
+  if(!st){st=document.createElement('style');st.id='vpTone'}
+  st.textContent=out.join('\n')+'\nhtml.vp-tone body{background-color:#fff!important;background-image:none}html.vp-tone:not(#_):not(#_) .fx-hdr{background-image:none!important}html.vp-tone:not(#_):not(#_) .vt-w,html.vp-tone:not(#_):not(#_) .vt-w *{color:#fff!important;text-shadow:none!important}';
+  (document.head||H).appendChild(st);H.classList.add('vp-tone');ink();
+ }catch(e){}}
+ /* 換色後底變深的石磚按鈕（選到的分頁、主要按鈕）：字改白色；底是淺色的不動 */
+ function ink(){try{var on=H.classList.contains('vp-tone'),inv=H.classList.contains('vp-inv');function lm(c){var m=String(c).match(/[\d.]+/g);return m&&m.length>=3&&(m.length<4||+m[3]>.6)?(0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255:null}
+  [].forEach.call(document.querySelectorAll('button,[role=tab],a.btn,.btn,.tab,.tab-btn,.vt-w'),function(e){var w=false;if(on&&!inv&&e.offsetParent){var cs=getComputedStyle(e),b=lm(cs.backgroundColor);if(b==null&&/gradient/.test(cs.backgroundImage)){var gm=cs.backgroundImage.match(/rgba?\([^)]+\)/g)||[],gl=gm.map(lm).filter(function(x){return x!=null});if(gl.length&&gl.length>=gm.length-1)b=gl.reduce(function(a,x){return a+x},0)/gl.length}if(b!=null&&b<.42){w=e.classList.contains('vt-w')||(lm(cs.color)||0)<.55}}if(w!==e.classList.contains('vt-w'))e.classList.toggle('vt-w',w)})}catch(e){}}
+ var tm=0;function later(){clearTimeout(tm);tm=setTimeout(run,120)}
+ try{new MutationObserver(later).observe(H,{attributes:true,attributeFilter:['class','style']})}catch(e){}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',later);else later();
+ setInterval(function(){if(!document.hidden){run();ink()}},3000);
+ document.addEventListener('click',function(){setTimeout(ink,180)},true);
+}catch(e){}})();
