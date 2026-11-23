@@ -81,7 +81,7 @@
     return load().then(function (ok) {
       if (!ok) return { ok: false };
       return present(o.from, o.to).then(function (pr) {
-        var line = lineOf(o.line), out = { ok: true, line: line, from: o.from, to: o.to, nDays: pr.nDays, files: pr.files, cats: {} };
+        var line = lineOf(o.line), last = FILES.reduce(function (m, f) { var e = f.range[1] || f.range[0]; return e > m ? e : m; }, ''), out = { ok: true, line: line, from: o.from, to: o.to, nDays: pr.nDays, files: pr.files, cats: {}, last: last };
         Object.keys(pr.P).forEach(function (no) {
           var e = EMP[no] || { no: no, name: '', grp: '', pos: '' }, c = catOf(e.grp, e.pos);
           if (c === 'line') { if (!line || lineOf(e.grp) !== line) { if (line) return; } }
@@ -121,6 +121,7 @@
     el.innerHTML = '<div class="pl-bx"><div class="pl-hd"><b><span class="pl-tt"></span><small class="pl-sub"></small></b><button class="pl-x" type="button" aria-label="close">✕</button></div><div class="pl-bd"></div></div>';
     el.addEventListener('click', function (e) {
       if (e.target === el || e.target.closest('.pl-x')) { el.classList.remove('on'); return; }
+      var j = e.target.closest('[data-jump]'); if (j && LAST) { var d = j.getAttribute('data-jump'); open({ line: LAST.line, from: d, to: d, ops: null }); return; }
       var b = e.target.closest('[data-go]'); if (b) { var t = el.querySelector('#pl-' + b.getAttribute('data-go')); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
     doc.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el.classList.contains('on')) el.classList.remove('on'); });
@@ -140,7 +141,8 @@
       '<div class="pl-n"><i>📅 ' + E(L('有出勤資料的天數', 'Days with attendance')) + '</i><b>' + r.nDays + '</b></div></div>';
     h += '<div class="pl-note" style="margin:0 0 8px">' + E(L('人數＝這段時間有刷卡上班的人（PSJHR）。點一條直接跳到那一群人，往下滑會一路接下去。', 'Headcount = people who clocked in during this period (PSJHR). Tap a bar to jump; keep scrolling to go through all.')) + '</div>';
     have.forEach(function (c) { var n = r.cats[c].length, C = CATS[c]; h += '<button type="button" class="pl-bar" data-go="' + c + '"><span>' + C[0] + ' ' + E(c === 'line' && r.line ? r.line : L(C[1], C[2])) + '</span><span class="t"><i style="width:' + Math.max(3, Math.round(n / mx * 100)) + '%"></i></span><span class="v">' + n + ' ' + E(L('人', 'ppl')) + '</span></button>'; });
-    if (!have.length) h += '<div class="pl-note">' + E(L('這段時間 PSJHR 沒有出勤資料（可能還沒匯入那個月的出勤）。', 'No attendance in PSJHR for this period (that month may not be imported yet).')) + '</div>';
+    if (!have.length) { h += '<div class="pl-note">' + E(L('這段時間 PSJHR 還沒有出勤資料', 'No PSJHR attendance for this period yet')) + (r.last ? E(L('（PSJHR 出勤目前匯入到 ', ' (PSJHR attendance is imported up to ') + r.last + L('）', ')')) : '') + '。</div>';
+      if (r.last && r.last < o.from) h += '<button type="button" class="pl-bar" data-jump="' + E(r.last) + '" style="margin-top:8px"><span>👉 ' + E(L('看最近有出勤的那一天 ', 'Show the latest day with attendance ') + r.last) + '</span><span></span><span class="v">›</span></button>'; }
     h += '</div>';
     have.forEach(function (c) {
       var C = CATS[c];
@@ -157,8 +159,9 @@
     var io = 'IntersectionObserver' in g ? new IntersectionObserver(function (es) { es.forEach(function (x) { if (x.isIntersecting) { io.unobserve(x.target); photo(x.target.getAttribute('data-ph'), x.target); } }); }, { root: B, rootMargin: '200px' }) : null;
     ph.forEach(function (n) { if (io) io.observe(n); else photo(n.getAttribute('data-ph'), n); });
   }
+  var LAST = null;
   function open(o) {
-    o = o || {}; if (!o.from) return; o.to = o.to || o.from;
+    o = o || {}; if (!o.from) return; o.to = o.to || o.from; LAST = o;
     ensure(); el.classList.add('on');
     el.querySelector('.pl-tt').textContent = (o.title || ((lineOf(o.line) || L('全廠', 'Factory')) + ' · ' + period(o))) + ' · ' + L('出勤人員', 'Staff present');
     el.querySelector('.pl-sub').textContent = L('資料來源：PSJHR（這台裝置上的出勤與員工資料）', 'Source: PSJHR attendance and staff on this device');
