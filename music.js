@@ -1,4 +1,6 @@
-/* v2.15（2026-11-23 晚）：調色盤分頁（背景／字與樣式／音樂）；加字型 Times New Roman、新細明體、Comic Sans、Calibri；字的設定不套在各平台的選單頁和 PSJ 左邊選單；手機轉向改用重力感應（<45° 微歪、>45° 多歪、90° 歪更多再擺正，永遠直立）。
+/* v2.16（2026-11-23 夜）：照片改成鋪在最後面當背景（跟壁紙一樣，不蓋住選單、卡片、字）；混色改成斜向漸層，兩個顏色都看得到；字可以調大小（90–110%）；
+   字色跟底色太接近時自動換成看得清楚的顏色；音樂：手機休眠或離開畫面超過 30 分鐘自動停，回來再接著播（到設定的關閉時間或離開為止）。
+   v2.15（2026-11-23 晚）：調色盤分頁（背景／字與樣式／音樂）；加字型 Times New Roman、新細明體、Comic Sans、Calibri；字的設定不套在各平台的選單頁和 PSJ 左邊選單；手機轉向改用重力感應（<45° 微歪、>45° 多歪、90° 歪更多再擺正，永遠直立）。
    v2.14（2026-11-23 晚）：每個平台各自可以設 字的顏色（同底色系＋10 色）、字的深淺、字型（10 種常見字型）、按鈕／卡片要不要立體、頁面亮度、卡片透明度。
    v2.13（2026-11-23 晚）：拿掉會動的壁紙；深色湊到 10 色、壁紙 10 種、自己的照片最多 10 張；顏色／壁紙／音樂各自可以「每小時／每天／每週自動換」；
    音樂可以設每天幾點自動開、幾點關；有壁紙時卡片稍微透明（看得到一點背景）；手機轉橫的位置修正。
@@ -168,6 +170,13 @@
    if(st.at&&hm===st.at&&fired!==day+' on '+hm){try{localStorage.setItem('vrt_music_fired',day+' on '+hm)}catch(_){}if(!on){play();tip('⏰ '+hm+' 音樂開了 · Music on')}}
    if(st.ao&&hm===st.ao&&fired!==day+' off '+hm){try{localStorage.setItem('vrt_music_fired',day+' off '+hm)}catch(_){}if(on){stop();tip('⏰ '+hm+' 音樂關了 · Music off')}}}catch(e){}}
  setInterval(clockTick,20000);setTimeout(autoRot,1500);
+ /* v2.16 休眠／離開畫面超過 30 分鐘：音樂自動停；回到畫面再接著播（到設定的關閉時間或離開頁面為止） */
+ var hidAt=0,slept=false,slT=0;
+ function pastOff(){if(!st.ao)return false;var t=new Date(),hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);return st.at&&st.at<st.ao?(hm>=st.ao||hm<st.at):false}
+ document.addEventListener('visibilitychange',function(){try{
+   if(document.hidden){hidAt=Date.now();clearTimeout(slT);if(on)slT=setTimeout(function(){if(document.hidden&&on){stop();slept=true}},30*60e3)}
+   else{clearTimeout(slT);if(on&&hidAt&&Date.now()-hidAt>=30*60e3){stop();slept=true}
+    if(slept){slept=false;if(!pastOff()){play();tip('▶️ 歡迎回來，音樂繼續 · Music resumed')}}hidAt=0}}catch(e){}});
  window.vrtMusic={place:function(){place()},toggle:function(){on?stop():play()},set:setSrc,vol:setVol,state:function(){return {on:on,src:st.src,v:st.v,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio,wait:waitGesture}}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();
@@ -198,7 +207,7 @@
  function hx2(h){h=(h||'#ffffff').replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
  function mixHex(a,b){var x=hx2(a),y=hx2(b);return '#'+[0,1,2].map(function(i){return ('0'+Math.round((x[i]+y[i])/2).toString(16)).slice(-2)}).join('')}
  function colOf(k){return COL.filter(function(x){return x[0]===k})[0]||null}
- var st={c:'',c2:'',veil:70,wp:'',img:'',rc:[],rci:'off',rw:[],rwi:'off',fc:'',fw:'',ff:'',b3:1,c3:1,br:100,co:85},BG=null,IMGS=[],mixMode=false;
+ var st={c:'',c2:'',veil:70,wp:'',img:'',rc:[],rci:'off',rw:[],rwi:'off',fc:'',fw:'',ff:'',fz:100,b3:1,c3:1,br:100,co:85},BG=null,IMGS=[],mixMode=false;
  /* v2.14 字與樣式（每個平台各記各的） */
  var FCS=[['','原本 Default',''],['bg','同底色 Match',''],['k','黑 Black','#111827'],['dg','深灰 Charcoal','#374151'],['g','灰 Grey','#6b7280'],['nb','深藍 Navy','#1e3a8a'],['sb','海藍 Sea','#0f4c75'],['gn','深綠 Green','#14532d'],['br','咖啡 Brown','#5b3a29'],['wn','酒紅 Wine','#7f1d1d'],['pp','深紫 Purple','#4c1d95'],['w','白 White','#ffffff']];
  var FFS=[['','原本 Default',''],['sys','系統 System','system-ui,-apple-system,"Segoe UI",Roboto,sans-serif'],['jh','微軟正黑 JhengHei','"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",sans-serif'],['noto','思源黑體 Noto Sans','"Noto Sans TC","Noto Sans CJK TC","Source Han Sans TC","PingFang TC",sans-serif'],['ping','蘋方 PingFang','"PingFang TC","Heiti TC","Microsoft JhengHei",sans-serif'],['pming','新細明體 PMingLiU','"PMingLiU","新細明體","MingLiU","Noto Serif TC","Songti TC",serif'],['ming','宋體 Song','"Noto Serif TC","Songti TC","STSong","SimSun","PMingLiU",serif'],['kai','楷體 Kai','"DFKai-SB","標楷體","BiauKai","Kaiti TC","KaiTi",serif'],['arial','Arial','Arial,"Helvetica Neue",Helvetica,"Microsoft JhengHei",sans-serif'],['times','Times New Roman','"Times New Roman",Times,"PMingLiU",serif'],['georgia','Georgia','Georgia,"Times New Roman","PMingLiU",serif'],['calibri','Calibri','Calibri,Carlito,"Segoe UI","Microsoft JhengHei",sans-serif'],['comic','Comic Sans','"Comic Sans MS","Comic Neue","Chalkboard SE","Microsoft JhengHei",cursive'],['verdana','Verdana','Verdana,Tahoma,"Microsoft JhengHei",sans-serif'],['mono','等寬 Mono','"Cascadia Mono",Consolas,"Courier New",monospace']];
@@ -245,7 +254,12 @@
     b+='<rect x="'+(rx-2)+'" y="'+(ry-rh2*.4).toFixed(0)+'" width="5" height="'+(rh2*.4+8).toFixed(0)+'" fill="#6b4a32" fill-opacity=".8"/><circle cx="'+rx+'" cy="'+(ry-rh2*.6).toFixed(0)+'" r="'+(rh2*.32).toFixed(0)+'" fill="'+(R()<.5?'#4f9a58':'#77b96b')+'" fill-opacity=".85"/>'}
    sky='linear-gradient(180deg,rgba(186,220,240,0) 30%,rgba(186,220,240,.36) 72%,rgba(160,208,236,.44) 100%)'}
   return SCN[key]={i:[svgU(W0,H0,b),sky],s:['auto 44vh','100% 100%'],p:['center bottom','0 0'],r:['repeat-x','no-repeat'],a:['fixed','fixed'],pv:1}}
+ var BGD={};   /* 深色模式用：照片先反相好，整頁反相後剛好變回原圖 */
+ function bgDark(src,id){if(BGD[id])return BGD[id];BGD[id]='pending';var im=new Image();im.onload=function(){try{var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;var x=cv.getContext('2d');x.drawImage(im,0,0);var d=x.getImageData(0,0,cv.width,cv.height),a=d.data,M=[[-0.574,1.43,0.144],[0.426,0.43,0.144],[0.426,1.43,-0.856]];
+   for(var i=0;i<a.length;i+=4){var r=a[i],g=a[i+1],b=a[i+2];a[i]=255-(M[0][0]*r+M[0][1]*g+M[0][2]*b);a[i+1]=255-(M[1][0]*r+M[1][1]*g+M[1][2]*b);a[i+2]=255-(M[2][0]*r+M[2][1]*g+M[2][2]*b)}x.putImageData(d,0,0);BGD[id]=cv.toDataURL('image/jpeg',.85);apply()}catch(e){BGD[id]='fail'}};im.src=src;return 'pending'}
  function wpCss(k,dark){
+  if(/^__photo/.test(k)){if(!BG)return null;var vd=document.documentElement.classList.contains('vp-dark'),src=BG;if(vd){var dd=bgDark(BG,st.img||'x');if(dd&&dd!=='pending'&&dd!=='fail')src=dd}var v=(st.veil/100).toFixed(2),vc=(dark?'rgba(0,0,0,':'rgba(255,255,255,')+v+')';
+   return {i:['linear-gradient('+vc+','+vc+')','url("'+src+'")'],s:['auto','cover'],p:['0 0','center center'],r:['repeat','no-repeat'],a:['scroll','fixed']}}
   if(k==='town'||k==='night'||k==='forest'||k==='river')return scene(k,dark);
   var dk=dark?1.9:1,hl=dark?.22:1;
   function D(a){return 'fill="#0f172a" fill-opacity="'+Math.min(.9,a*dk).toFixed(3)+'"'}
@@ -287,13 +301,13 @@
    return one(svgU(240,120,wl),240,120)}
   return null}
  var GCMAP={green:'green',yellow:'yellow',blue:'blue',pink:'pink',beige:'beige',navy:'navy',forest:'dgreen',black:'dark',wine:'wine',purple:'dpurple',white:''};
- function load(){try{var own=localStorage.getItem(KEY),j=JSON.parse(own||(WPONLY||GCK?'null':localStorage.getItem('vrt_pal'))||'null');st={c:'',c2:'',veil:70,wp:'',img:'',rc:[],rci:'off',rw:[],rwi:'off',fc:'',fw:'',ff:'',b3:1,c3:1,br:100,co:85};
+ function load(){try{var own=localStorage.getItem(KEY),j=JSON.parse(own||(WPONLY||GCK?'null':localStorage.getItem('vrt_pal'))||'null');st={c:'',c2:'',veil:70,wp:'',img:'',rc:[],rci:'off',rw:[],rwi:'off',fc:'',fw:'',ff:'',fz:100,b3:1,c3:1,br:100,co:85};
    /* GASCheck 第一次：把它原本選的顏色帶過來（之後就由這個調色盤管） */
    if(GCK&&!own){try{var g=window.GCTheme&&window.GCTheme.choice&&window.GCTheme.choice();if(g&&GCMAP[g.key]!=null){st.c=GCMAP[g.key];localStorage.setItem(KEY,JSON.stringify(st));if(window.GCTheme.apply)window.GCTheme.apply()}}catch(_){}return}
    if(j){if(WPONLY){j.c='';j.c2=''}if(j.wp&&WPS.some(function(x){return x[0]===j.wp}))st.wp=j.wp;if(COL.some(function(x){return x[0]===j.c}))st.c=j.c;if(j.c2&&COL.some(function(x){return x[0]===j.c2}))st.c2=j.c2;if(j.veil>=0&&j.veil<=95)st.veil=+j.veil;if(typeof j.img==='string')st.img=j.img;
     if(Array.isArray(j.rc))st.rc=j.rc.filter(function(x){var q=String(x).split('|');return colOf(q[0])&&(!q[1]||colOf(q[1]))}).slice(0,20);if(/^(off|h|d|w)$/.test(j.rci||''))st.rci=j.rci;
     if(Array.isArray(j.rw))st.rw=j.rw.filter(function(x){return /^img:/.test(x)||WPS.some(function(w){return w[0]&&w[0]===x})}).slice(0,20);if(/^(off|h|d|w)$/.test(j.rwi||''))st.rwi=j.rwi;
-    if(FCS.some(function(x){return x[0]===j.fc}))st.fc=j.fc;if(/^(|l|d)$/.test(j.fw||''))st.fw=j.fw||'';if(FFS.some(function(x){return x[0]===j.ff}))st.ff=j.ff;if(j.b3===0)st.b3=0;if(j.c3===0)st.c3=0;if(j.br>=60&&j.br<=140)st.br=+j.br;if(j.co>=40&&j.co<=100)st.co=+j.co}}catch(e){}}
+    if(FCS.some(function(x){return x[0]===j.fc}))st.fc=j.fc;if(/^(|l|d)$/.test(j.fw||''))st.fw=j.fw||'';if(FFS.some(function(x){return x[0]===j.ff}))st.ff=j.ff;if(j.b3===0)st.b3=0;if(j.c3===0)st.c3=0;if(j.br>=60&&j.br<=140)st.br=+j.br;if([90,95,100,105,110].indexOf(+j.fz)>=0)st.fz=+j.fz;if(j.co>=40&&j.co<=100)st.co=+j.co}}catch(e){}}
  function save(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}if(GCK){try{window.GCTheme&&window.GCTheme.apply&&window.GCTheme.apply()}catch(_){}}}
  function idb(mode,fn){return new Promise(function(res){try{var rq=indexedDB.open('vrt_pal',1);rq.onupgradeneeded=function(){rq.result.createObjectStore('kv')};rq.onerror=function(){res(null)};rq.onsuccess=function(){try{var tx=rq.result.transaction('kv',mode),r=fn(tx.objectStore('kv'));tx.oncomplete=function(){res(r&&r.result)};tx.onerror=tx.onabort=function(){res(null)}}catch(e){res(null)}}}catch(e){res(null)}})}
  function lum(c){var m=String(c||'').match(/\d+(\.\d+)?/g);if(!m||m.length<3||(m.length>3&&+m[3]===0))return null;return (0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255}
@@ -317,7 +331,8 @@
   '#vpPanel .ptb{display:flex;gap:4px;margin:-2px 0 10px;position:sticky;top:-10px;background:#fff;padding:6px 0;z-index:1;border-bottom:1px solid #e5eaf0}#vpPanel .ptb button{flex:1;border:1px solid #d5dde5;background:#f8fafc;border-radius:8px;padding:6px 2px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;color:inherit;white-space:nowrap}#vpPanel .ptb button.on{background:#14213d;border-color:#14213d;color:#fff}'+
   '#vpPanel .ty{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 6px;font-size:11.5px}#vpPanel .ty button{border:1px solid #d5dde5;background:#fff;border-radius:8px;padding:4px 8px;font:inherit;font-size:11.5px;cursor:pointer;color:inherit}#vpPanel .ty button.on{background:#14213d;border-color:#14213d;color:#fff}#vpPanel .ty .fc{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid #cbd5e1;font-size:9px}#vpPanel .ty .fc.on{border-color:#22a35a;box-shadow:0 0 0 2px #22a35a66;background-clip:padding-box;color:inherit}#vpPanel .ty select{font:inherit;font-size:12px;padding:4px;border-radius:7px;border:1px solid #d5dde5;max-width:100%}#vpPanel .ty label{display:flex;align-items:center;gap:6px;width:100%}#vpPanel .ty input[type=range]{flex:1;accent-color:#22a35a}';
  var tint,img,btn,panel,wpEl,bri;
- var STYCSS='#vpBri{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:2147482900}'+
+ var STYCSS='html.vp-fz body>*:not(#vpPanel):not(#vmPanel):not(#vmBox):not(#vmTip):not(#vpBtn):not(#vpTint):not(#vpBri):not(#vpWp):not(script):not(style){zoom:var(--vp-fz)}'+
+  '#vpBri{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:2147482900}'+
   'html.vp-ff body,html.vp-ff body *:not(i):not(svg):not(svg *):not([class*="fa-"]):not([class*="icon"]):not([class*="material"]):not(#vpPanel):not(#vmPanel):not(#vmBox):not(#vpPanel *):not(#vmPanel *):not(nav):not(nav *):not(aside):not(aside *){font-family:var(--vp-ff)!important}'+
   'html.vp-fwl body *:not(b):not(strong):not(h1):not(h2):not(h3):not(th):not(#vpPanel):not(#vmPanel):not(#vmBox):not(#vpPanel *):not(#vmPanel *):not(nav):not(nav *):not(aside):not(aside *){font-weight:300!important}html.vp-fwd body{-webkit-text-stroke:.35px currentColor}html.vp-fwd nav,html.vp-fwd aside{-webkit-text-stroke:0}html.vp-fwd #vpPanel,html.vp-fwd #vmPanel{-webkit-text-stroke:0}'+
   'html.vp-flatb button:not(#vpPanel):not(#vmPanel):not(#vmBox):not(#vpPanel *):not(#vmPanel *):not(#vmBox *),html.vp-flatb .btn,html.vp-flatb [role=button]{box-shadow:none!important;background-image:none!important;text-shadow:none!important;filter:none!important;border-bottom-width:1px!important;transform:none!important}'+
@@ -356,7 +371,7 @@
    wpCovers(d,w0).forEach(function(e){tg.push(e)});
    old.forEach(function(e){if(tg.indexOf(e)<0)wpClear(e)});
    tg.forEach(function(e){wpSet(e,k,w0)})}catch(_){}}
- function wpAll(){try{var k=st.wp||'';docsAll().forEach(function(d){wpDoc(d,k)})}catch(_){}}
+ function wpAll(){try{var k=(BG&&!WPONLY)?'__photo:'+(st.img||'x')+':'+st.veil+':'+(document.documentElement.classList.contains('vp-dark')?1:0)+':'+(BGD[st.img||'x']&&BGD[st.img||'x'].length>20?1:0):(st.wp||'');docsAll().forEach(function(d){wpDoc(d,k)})}catch(_){}}
  function apply(){ if(!document.body)return;
   if(WPONLY){st.c='';st.c2=''}
   var c=COL.filter(function(x){return x[0]===st.c})[0]||COL[0],dark=!!c[4],h=document.documentElement,ov=dark?c[3]:(c[0]?c[2]:'');
@@ -365,19 +380,20 @@
   if(PROD){if(dark){dark=false;ov=''}if(h.classList.contains('vrt-inv')||h.getAttribute('data-theme')==='dark')ov=''}
   if(dark&&nativeDark()){dark=false;ov=''}
   var acc=(ov||dark)?(c2&&c2[0]&&ACC[c2[0]]?mixHex(ACC[c[0]],ACC[c2[0]]):ACC[c[0]]):'';if(acc)h.style.setProperty('--vp-acc',acc);else h.style.removeProperty('--vp-acc');h.classList.toggle('vp-acc',!!acc);
-  if(ov){if(!tint){tint=document.createElement('div');tint.id='vpTint';tint.setAttribute('aria-hidden','true')}tint.style.background=ov;if(tint.parentNode!==document.body)document.body.appendChild(tint)}else if(tint&&tint.parentNode)tint.parentNode.removeChild(tint);
-  var wc=!!st.wp;
+  var grd='';if(c2&&c2[0]&&!!c2[4]===!!c[4]&&c2[0]!==c[0]){var ca=dark?c[3]:c[2],cb=dark?c2[3]:c2[2];grd='linear-gradient(135deg,'+ca+' 0%,'+ca+' 18%,'+mixHex(ca,cb)+' 50%,'+cb+' 82%,'+cb+' 100%)'}
+  if(ov){if(!tint){tint=document.createElement('div');tint.id='vpTint';tint.setAttribute('aria-hidden','true')}tint.style.background=grd||ov;if(tint.parentNode!==document.body)document.body.appendChild(tint)}else if(tint&&tint.parentNode)tint.parentNode.removeChild(tint);
+  var wc=!!st.wp||!!(BG&&!WPONLY);
   /* v2.14 字色：同底色＝底色那一系的深色；深色模式整頁反相，先算好反相前的值 */
   var fcv='';if(st.fc==='bg')fcv=ACC[st.c]?(dark?ACC[st.c]:ACC[st.c]):(dark?'#e5e7eb':'#1f2937');else{var fx=FCS.filter(function(x){return x[0]===st.fc})[0];if(fx&&fx[2])fcv=dark?preInv(fx[2]):fx[2]}
   if(st.fc==='bg'&&dark&&!ACC[st.c])fcv=preInv('#e5e7eb');
   var ffv=(FFS.filter(function(x){return x[0]===st.ff})[0]||FFS[0])[2];
   if(fcv)h.style.setProperty('--vp-fc',fcv);else h.style.removeProperty('--vp-fc');if(ffv)h.style.setProperty('--vp-ff',ffv);else h.style.removeProperty('--vp-ff');
-  TCL={ff:!!ffv,fwl:st.fw==='l',fwd:st.fw==='d'};h.classList.toggle('vp-ff',TCL.ff&&!MENU);h.classList.toggle('vp-fwl',TCL.fwl&&!MENU);h.classList.toggle('vp-fwd',TCL.fwd&&!MENU);h.classList.toggle('vp-flatb',!st.b3);h.classList.toggle('vp-flatc',!st.c3);
-  var ts=!!(fcv||ffv||st.fw||!st.b3||!st.c3||st.br!==100||st.co<85);
+  TCL={ff:!!ffv,fwl:st.fw==='l',fwd:st.fw==='d',fz:st.fz};h.style.setProperty('--vp-fz',String(st.fz/100));h.classList.toggle('vp-fz',st.fz!==100&&!MENU);h.classList.toggle('vp-ff',TCL.ff&&!MENU);h.classList.toggle('vp-fwl',TCL.fwl&&!MENU);h.classList.toggle('vp-fwd',TCL.fwd&&!MENU);h.classList.toggle('vp-flatb',!st.b3);h.classList.toggle('vp-flatc',!st.c3);
+  var ts=!!(fcv||ffv||st.fw||st.fz!==100||!st.b3||!st.c3||st.br!==100||st.co<85);
   if(st.br!==100){if(!bri){bri=document.createElement('div');bri.id='vpBri';bri.setAttribute('aria-hidden','true')}var bk=st.br<100;bri.style.background=bk?'rgba(0,0,0,'+((100-st.br)/100*1.1).toFixed(3)+')':'rgba(255,255,255,'+((st.br-100)/100*1.1).toFixed(3)+')';bri.style.mixBlendMode=bk?'normal':'screen';if(bri.parentNode!==document.body)document.body.appendChild(bri)}else if(bri&&bri.parentNode)bri.parentNode.removeChild(bri);
   h.classList.toggle('vp-dark',dark);h.classList.toggle('vp-inv',dark);h.classList.toggle('vp-on',!!(ov||dark||BG||wc||ts));wpAll();cards();
 
-  if(BG&&!WPONLY){if(!img){img=document.createElement('div');img.id='vpImg';img.setAttribute('aria-hidden','true')}var v=(st.veil/100).toFixed(2);img.style.backgroundImage='linear-gradient(rgba(255,255,255,'+v+'),rgba(255,255,255,'+v+')),url("'+BG+'")';if(img.parentNode!==document.body)document.body.appendChild(img)}else if(img&&img.parentNode)img.parentNode.removeChild(img) }
+  if(false){if(!img){img=document.createElement('div');img.id='vpImg';img.setAttribute('aria-hidden','true')}var v=(st.veil/100).toFixed(2);img.style.backgroundImage='linear-gradient(rgba(255,255,255,'+v+'),rgba(255,255,255,'+v+')),url("'+BG+'")';if(img.parentNode!==document.body)document.body.appendChild(img)}else if(img&&img.parentNode)img.parentNode.removeChild(img) }
  /* 換了底色／背景圖後，卡片要「浮起來」：加影子、邊線、一點金屬光澤（Paul 11/23：不然卡片跟背景黏在一起）。
     只加在原本沒有漸層圖的卡片上，不改它原本的底色；關掉調色（白色、沒背景圖）就全部拿掉。 */
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]',ct=0;
@@ -388,7 +404,7 @@
    docsAll().forEach(function(d){try{var h=d.documentElement;
     if(d!==document){if(on&&!d.getElementById('vrt-pal-card')){var s2=d.createElement('style');s2.id='vrt-pal-card';s2.textContent=CARDCSS;(d.head||h).appendChild(s2)}
      h.classList.toggle('vp-on',on);h.classList.toggle('vp-inv',H.classList.contains('vp-inv'));h.classList.toggle('vp-acc',!!acc);if(acc)h.style.setProperty('--vp-acc',acc);else h.style.removeProperty('--vp-acc');
-     var dm=false;try{dm=isMenu(d.location.pathname)}catch(_){}h.classList.toggle('vp-ff',TCL.ff&&!dm);h.classList.toggle('vp-fwl',TCL.fwl&&!dm);h.classList.toggle('vp-fwd',TCL.fwd&&!dm);['vp-flatb','vp-flatc'].forEach(function(k){h.classList.toggle(k,H.classList.contains(k))});var ffv2=H.style.getPropertyValue('--vp-ff');if(ffv2)h.style.setProperty('--vp-ff',ffv2);else h.style.removeProperty('--vp-ff');
+     var dm=false;try{dm=isMenu(d.location.pathname)}catch(_){}h.classList.toggle('vp-ff',TCL.ff&&!dm);h.classList.toggle('vp-fz',TCL.fz!==100&&!dm);h.style.setProperty('--vp-fz',String((TCL.fz||100)/100));h.classList.toggle('vp-fwl',TCL.fwl&&!dm);h.classList.toggle('vp-fwd',TCL.fwd&&!dm);['vp-flatb','vp-flatc'].forEach(function(k){h.classList.toggle(k,H.classList.contains(k))});var ffv2=H.style.getPropertyValue('--vp-ff');if(ffv2)h.style.setProperty('--vp-ff',ffv2);else h.style.removeProperty('--vp-ff');
      if(!d.getElementById('vrt-pal-sty')){var s3=d.createElement('style');s3.id='vrt-pal-sty';s3.textContent=STYCSS;(d.head||h).appendChild(s3)}}
     var els=d.querySelectorAll(on?CSEL:'.vp-card'),n=0,w0=d.defaultView;
     for(var i=0;i<els.length&&n<600;i++){var e=els[i];if(!on){e.classList.remove('vp-card');e.__vpc=0;continue}if(e.classList.contains('vp-card')||e.__vpc)continue;n++;
@@ -413,6 +429,13 @@
  /* v2.14 字色：只換「原本是一般深灰／黑字」的字（亮色按鈕上的白字、紅綠狀態色都不動）；深底的頁面則換原本的淺灰白字 */
  function fontPass(d,on3){try{var w0=d.defaultView,fc=document.documentElement.style.getPropertyValue('--vp-fc');d.documentElement.style.setProperty('--vp-fc',fc);
    if(!on3){[].forEach.call(d.querySelectorAll('[data-vpf]'),function(e){var o=e.__vpf||['',''];if(o[0])e.style.setProperty('color',o[0],o[1]);else e.style.removeProperty('color');e.removeAttribute('data-vpf');e.__vpf2=0});return}
+   if(d.__vpFC!==fc){[].forEach.call(d.querySelectorAll('[data-vpf]'),function(e){var o=e.__vpf||['',''];if(o[0])e.style.setProperty('color',o[0],o[1]);else e.style.removeProperty('color');e.removeAttribute('data-vpf')});[].forEach.call(d.body.getElementsByTagName('*'),function(e){e.__vpf2=0});d.__vpFC=fc}
+   var want=hx2(fc.trim().charAt(0)==='#'?fc.trim():'#1f2937'),CAND=[want,[255,255,255],[17,24,39],[30,58,138],[76,29,149],[245,239,220],[15,76,117]];
+   function rl(c){var a=c.map(function(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]}
+   function cr(a,b){var x=rl(a),y=rl(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)}
+   function effBg(e){for(var x=e;x&&x.nodeType===1;x=x.parentElement){var m=(w0.getComputedStyle(x).backgroundColor.match(/[\d.]+/g)||[]).map(Number);if(m.length>=3&&(m.length<4||m[3]>0.5))return m.slice(0,3)}return [255,255,255]}
+   /* 字色跟底色太接近（對比不到 3 倍）就自動換成最看得清楚的那個 */
+   function best(e){var bg=effBg(e);if(cr(want,bg)>=3)return fc;var bc=want,bv=0;CAND.forEach(function(c){var v=cr(c,bg);if(v>bv){bv=v;bc=c}});return 'rgb('+bc.join(',')+')'}
    var nd=d===document?nativeDark():false,els=d.body.getElementsByTagName('*'),n=0;
    for(var i=0;i<els.length&&n<1500;i++){var e=els[i];if(e.__vpf2)continue;var tg=e.tagName;if(/^(SCRIPT|STYLE|SVG|svg|PATH|path|IMG|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OPTION)$/.test(tg))continue;
     var t=false;for(var c=e.firstChild;c;c=c.nextSibling)if(c.nodeType===3&&/\S/.test(c.nodeValue)){t=true;break}if(!t)continue;
@@ -420,14 +443,14 @@
     if(e.closest('#vpPanel,#vmPanel,#vmBox,#vmTip,nav,aside,.rail,.drawer,.sidebar'))continue;
     var m=(w0.getComputedStyle(e).color.match(/[\d.]+/g)||[]).map(Number);if(m.length<3)continue;var mx=Math.max(m[0],m[1],m[2]),mn=Math.min(m[0],m[1],m[2]),L=(0.2126*m[0]+0.7152*m[1]+0.0722*m[2])/255;
     if(mx-mn>42)continue;if(nd?L<0.55:L>0.55)continue;
-    e.__vpf=[e.style.getPropertyValue('color'),e.style.getPropertyPriority('color')];e.style.setProperty('color','var(--vp-fc)','important');e.setAttribute('data-vpf','')}}catch(_){}}
+    e.__vpf=[e.style.getPropertyValue('color'),e.style.getPropertyPriority('color')];e.style.setProperty('color',best(e),'important');e.setAttribute('data-vpf','')}}catch(_){}}
  setInterval(function(){if(!document.hidden&&document.documentElement.classList.contains('vp-on')){cards();if(st.wp)wpAll()}},2500);
  try{new MutationObserver(function(){if(document.documentElement.classList.contains('vp-on'))cards()}).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
  function draw(){ if(!panel||panel.hidden)return;
   var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+(w.pv===2?';background-size:cover;background-position:center bottom':w.pv?';background-size:auto 100%,100% 100%;background-position:30% 100%,0 0;background-color:#eef4fa':';background-size:'+w.s.join(',')):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
   if(WPONLY){panel.innerHTML='<b class="h">🧱 壁紙 Wallpaper（這個平台自己記住）</b>'+wpRow+rotHtml(false)+'<small>顏色請用這個平台原本的 🎨；這裡只管壁紙，每個平台各設各的。<br>Colours stay in this platform’s own 🎨; wallpaper is saved per platform.</small>';panel.innerHTML=tabBar()+(PTAB==='ty'?styHtml():panel.innerHTML);place2();return}
   panel.innerHTML='<b class="h">🎨 背景顏色 Background（這個平台自己記住 · saved per platform）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+(PROD?'<div class="swl">明暗 Light / Dark（生產平台原本的）</div><div class="mx" style="margin-top:0"><button data-a="th-light">☀️ 淡色 Light</button><button data-a="th-dark">🌙 深色 Dark</button>'+(document.getElementById('themeBtn')?'<button data-a="oldbg">原本的背景選單</button>':'')+'</div>':'<div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>')+
-   '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:'+mixHex(colOf(st.c)[2],colOf(st.c2)[2])+'"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
+   '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:linear-gradient(135deg,'+colOf(st.c)[2]+','+colOf(st.c2)[2]+')"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
    wpRow+
    '<div class="swl">🖼️ 我的照片 My photos（最多 10 張 · max 10）</div><div class="ph">'+IMGS.map(function(m){return '<span class="pt'+(st.img===m.id?' on':'')+'"><button data-im="'+m.id+'" style="background-image:url(&quot;'+m.d+'&quot;)" title="用這張 Use"></button><b data-imx="'+m.id+'" title="刪掉 Delete">✕</b></span>'}).join('')+(IMGS.length<10?'<button class="padd" data-a="pick" title="加照片 Add">＋</button>':'')+'</div>'+
    (BG?'<div class="im" style="border:0;padding-top:0;margin-top:6px"><button data-a="clear">不用照片 No photo</button><label>遮罩 Veil <input type="range" min="30" max="95" step="5" value="'+st.veil+'"><span>'+st.veil+'%</span></label></div>':'')+'<small>照片只存在這台裝置，不會上傳。遮罩越高，圖越淡、字越清楚。<br>Photos stay on this device. Higher veil = fainter image.</small>'+rotHtml(true);panel.innerHTML=tabBar()+(PTAB==='ty'?styHtml():panel.innerHTML);
@@ -441,6 +464,7 @@
   return '<div class="swl" style="margin-top:12px">🔤 字與樣式 Text &amp; style（這個平台自己記住）</div>'+
    '<div class="ty"><span style="width:100%;opacity:.7">字的顏色 Text colour</span>'+FCS.map(function(x){var bgc=x[0]==='bg'?(ACC[st.c]||'#1f2937'):x[2];return '<button class="fc'+(st.fc===x[0]?' on':'')+'" data-sy="fc" data-sv="'+x[0]+'" title="'+x[1]+'" style="'+(bgc?'background:'+bgc+';color:'+(x[0]==='w'?'#333':'#fff'):'background:#fff')+'">'+(x[0]===''?'原':x[0]==='bg'?'底':'')+'</button>'}).join('')+'</div>'+
    '<div class="ty"><span style="width:100%;opacity:.7">字的深淺 Weight</span>'+b('fw','l','淡 Light',st.fw)+b('fw','','標準 Normal',st.fw)+b('fw','d','深 Bold',st.fw)+'</div>'+
+   '<div class="ty"><span style="width:100%;opacity:.7">字的大小 Size</span>'+b('fz',90,'小 A-',st.fz)+b('fz',95,'稍小',st.fz)+b('fz',100,'標準 A',st.fz)+b('fz',105,'稍大',st.fz)+b('fz',110,'大 A+',st.fz)+'</div>'+
    '<div class="ty"><span style="width:100%;opacity:.7">字型 Font</span><select data-sy="ff">'+FFS.map(function(x){return '<option value="'+x[0]+'"'+(st.ff===x[0]?' selected':'')+' style="font-family:'+(x[2]||'inherit').replace(/"/g,"'")+'">'+x[1]+'</option>'}).join('')+'</select></div>'+
    '<div class="ty"><span style="width:100%;opacity:.7">按鈕 Buttons</span>'+b('b3',1,'立體 3D',st.b3)+b('b3',0,'平面 Flat',st.b3)+'<span style="width:100%;opacity:.7">卡片 Cards</span>'+b('c3',1,'立體 3D',st.c3)+b('c3',0,'平面 Flat',st.c3)+'</div>'+
    '<div class="ty"><label>☀️ 頁面亮度 Brightness <input type="range" data-sy="br" min="60" max="140" step="5" value="'+st.br+'"><span>'+st.br+'%</span></label>'+
@@ -474,7 +498,7 @@
    if(b.dataset.a==='oldbg'){panel.hidden=true;var tb=document.getElementById('themeBtn');if(tb)setTimeout(function(){tb.click()},0);return}
    if(b.dataset.w!=null){st.wp=b.dataset.w;save();apply();draw();return}
    if(b.dataset.pt){if(b.dataset.pt==='mu'){panel.hidden=true;var mm=document.getElementById('vmMore'),dt=document.getElementById('vmDot'),sw0=document.getElementById('vmSw');setTimeout(function(){if(mm&&mm.offsetWidth)mm.click();else if(dt&&dt.offsetWidth)dt.click();else if(sw0)sw0.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true}))},0);return}PTAB=b.dataset.pt;draw();panel.scrollTop=0;return}
-   if(b.dataset.sy){var sy=b.dataset.sy,sv=b.dataset.sv;if(sy==='reset'){st.fc='';st.fw='';st.ff='';st.b3=1;st.c3=1;st.br=100;st.co=85}else if(sy==='b3'||sy==='c3')st[sy]=+sv;else st[sy]=sv;save();apply();draw();return}
+   if(b.dataset.sy){var sy=b.dataset.sy,sv=b.dataset.sv;if(sy==='reset'){st.fc='';st.fw='';st.ff='';st.fz=100;st.b3=1;st.c3=1;st.br=100;st.co=85}else if(sy==='b3'||sy==='c3'||sy==='fz')st[sy]=+sv;else st[sy]=sv;save();apply();draw();return}
    if(b.dataset.im){imgUse(b.dataset.im);save();apply();draw();return}
    if(b.dataset.rci){st.rci=b.dataset.rci;save();rotTick(false);draw();return}if(b.dataset.rwi){st.rwi=b.dataset.rwi;save();rotTick(false);draw();return}
    if(b.dataset.a==='rc+'){var cv=st.c+(st.c2?'|'+st.c2:'');if(st.rc.indexOf(cv)<0)st.rc.push(cv);save();draw();return}
