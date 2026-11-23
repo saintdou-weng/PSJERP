@@ -11,11 +11,11 @@
   {k:'jazz',ic:'🎷',t:'輕爵士電台 Jazz radio',note:'Radio Swiss Jazz',urls:['https://stream.srg-ssr.ch/srgssr/rsj/mp3/128','https://stream.srg-ssr.ch/srgssr/rsj/aac/96']},
   {k:'pop',ic:'🎤',t:'抒情流行電台 Soft pop radio',note:'Radio Swiss Pop',urls:['https://stream.srg-ssr.ch/srgssr/rsp/mp3/128','https://stream.srg-ssr.ch/srgssr/rsp/aac/96']},
   {k:'hitz',ic:'🇲🇾',t:'馬來西亞 HITZ',note:'HITZ Malaysia',urls:['https://stream.rcs.revma.com/488kt4sbv4uvv','https://n10.rcs.revma.com/488kt4sbv4uvv']},
-  {k:'ufo',ic:'🇹🇼',t:'台灣 飛碟電台 UFO Radio',note:'飛碟聯播網',urls:['https://n10.rcs.revma.com/em90w4aeewzuv','https://stream.rcs.revma.com/em90w4aeewzuv']},
+  {k:'love',ic:'💗',t:'英文抒情歌電台 Love songs',note:'181.fm The Heart',urls:['https://listen.181fm.com/181-heart_128k.mp3','https://stream-uk1.radioparadise.com/mellow-128']},
   {k:'best',ic:'📻',t:'台灣 好事聯播網 Best Radio',note:'港都 983／好事 989',urls:['https://n10.rcs.revma.com/q2m07dc59duvv','https://stream.rcs.revma.com/q2m07dc59duvv','https://n01.rcs.revma.com/fkdywbc59duvv']},
   {k:'khmer',ic:'🇰🇭',t:'柬語電台 Khmer radio',note:'Sweet FM 88',urls:['https://n12.rcs.revma.com/whn9hqwstk3vv','https://stream.rcs.revma.com/whn9hqwstk3vv']}];
  var st={src:'rain',v:40};
- try{ var j=JSON.parse(localStorage.getItem('vrt_music')||'null'); if(!j){ var o=JSON.parse(localStorage.getItem('psj_music')||'null'); if(o)j={src:o.src,v:o.vol==='s'?20:o.vol==='l'?75:40} } if(j&&SRC.some(function(x){return x.k===j.src}))st.src=j.src; if(j&&j.v>=0&&j.v<=100)st.v=+j.v }catch(e){}
+ try{ var j=JSON.parse(localStorage.getItem('vrt_music')||'null'); if(!j){ var o=JSON.parse(localStorage.getItem('psj_music')||'null'); if(o)j={src:o.src,v:o.vol==='s'?20:o.vol==='l'?75:40} } if(j&&j.src==='ufo')j.src='love'; if(j&&SRC.some(function(x){return x.k===j.src}))st.src=j.src; if(j&&j.v>=0&&j.v<=100)st.v=+j.v }catch(e){}
  var save=function(){try{localStorage.setItem('vrt_music',JSON.stringify(st))}catch(e){}}, G=function(){return Math.pow(st.v/100,1.5)*0.85};
  var on=false,ctx=null,master=null,nodes=[],timer=0,radio=null,rTry=0,rWatch=0,waitGesture=false;
  function noiseBuf(kind){var n=ctx.sampleRate*4,b=ctx.createBuffer(1,n,ctx.sampleRate),d=b.getChannelData(0),last=0;for(var i=0;i<n;i++){var w=Math.random()*2-1;if(kind==='brown'){last=(last+0.02*w)/1.02;d[i]=last*3.5}else d[i]=w}return b}
@@ -422,10 +422,11 @@
   '.vc-dn:not(tr):not(.vc-bk):not(.vc3-p){filter:brightness(.92)!important;box-shadow:inset 0 2px 6px rgba(15,23,42,.28)!important}.vc-dn.vc-dt:not(tr):not(.vc-bk):not(.vc3){transform:translateY(1px)}'+
   'tr.vc-dn>td,tr.vc-dn>th{background-image:linear-gradient(rgba(79,70,229,.15),rgba(79,70,229,.15))!important}tr.vc-dn{box-shadow:inset 0 2px 5px rgba(15,23,42,.22)}'+
   /* v2.6 按鈕＝石磚（跟卡片的金屬不一樣）：四邊倒角（上／左亮、下／右暗）＋底下一道厚邊＋表面石頭的粗粒；按下去厚邊收掉、整塊陷下去 */
-  '.vc-bk{box-shadow:inset 0 1px 0 rgba(255,255,255,.62),inset 1px 0 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 2px 0 rgba(15,23,42,.34),0 4px 6px rgba(15,23,42,.20)!important;transition:transform .09s ease,box-shadow .09s ease,filter .09s ease;-webkit-tap-highlight-color:transparent}'+
+  '.vc-bk{box-shadow:inset 0 1px 0 rgba(255,255,255,.62),inset 1px 0 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 2px 0 rgba(15,23,42,.34),0 4px 6px rgba(15,23,42,.20)!important;transition:transform .09s ease,box-shadow .09s ease,filter .09s ease;-webkit-tap-highlight-color:transparent;font-weight:700!important}.vc-bk.vc-bk-k,.vc-bk.vc-bk-k *{color:#16263a!important}'+
   '.vc-bk.vc-bk-t{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,0) 45%,rgba(15,23,42,.10))!important;background-size:96px 96px,100% 100%!important}'+
   '.vc-bk.vc-bk-c{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.50),rgba(226,232,240,.34) 55%,rgba(148,163,184,.30))!important;background-size:96px 96px,100% 100%!important}'+
   '.vc-bk.vc-hov{filter:brightness(1.05) saturate(1.06)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 1px 0 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 3px 0 rgba(15,23,42,.34),0 6px 9px rgba(15,23,42,.24)!important}'+
+  '.vc-bk.vc-hov.vc-bk-t{background-image:linear-gradient(180deg,rgba(255,255,255,.26),rgba(129,140,248,.24))!important;background-size:100% 100%!important}'+
   '.vc-bk.vc-hov.vc-bk-c{background-image:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.26%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.32%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.62),rgba(199,210,254,.36) 55%,rgba(129,140,248,.26))!important}'+
   '.vc-bk.vc-dn,.vc-bk:active{filter:brightness(.93)!important;box-shadow:inset 0 2px 5px rgba(15,23,42,.38),inset 0 -1px 0 rgba(255,255,255,.35),0 0 0 rgba(15,23,42,0)!important}.vc-bk.vc-dn.vc-dt,.vc-bk.vc-dt:active{transform:translateY(2px)}'+
   'html.vp-inv .vc-bk{box-shadow:inset 0 1px 0 rgba(15,23,42,.45),inset 0 -2px 0 rgba(255,255,255,.55),0 0 0 1px rgba(15,23,42,.30)!important}html.vp-inv .vc-bk.vc-dn{box-shadow:inset 0 2px 5px rgba(255,255,255,.8)!important}'+
@@ -438,6 +439,7 @@
   /* 每頁最上面「回平台選單」那一條：原本黑底白字 → 跟底色同色系、細一點 */
   '#fx-homebar{background:var(--vc-hd,#e8ecf1)!important;box-shadow:0 1px 0 rgba(15,23,42,.14)!important}'+
   '#fx-home{background:var(--vc-hd,#e8ecf1)!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14));padding-top:5px!important;padding-bottom:5px!important;font-size:12px!important}'+
+  (/^\/vrt-prod\//i.test(location.pathname)?'.hdr{padding-top:3px!important;padding-bottom:3px!important;min-height:0!important;height:auto!important;row-gap:1px!important;column-gap:12px!important}.hdr .sub{display:none!important}.hdr .logo{font-size:13px!important;letter-spacing:1px!important}.hdr .hstat{display:flex!important;flex-direction:row-reverse;align-items:baseline;gap:4px;min-width:0!important;flex:none!important}.hdr .hsv{font-size:13px!important}.hdr .hbtn{padding:3px 9px!important}.hdr-r{width:auto!important;margin-left:auto!important}@media(min-width:900px){.hdr{padding-right:272px!important}}':'')+
   '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p.vc-hov,html .vc3.vc3-p.vc-dn,.vc-bk.vc-dn{transform:none}}'+
   '@media print{.vc3{box-shadow:none!important;background-image:none!important}}';
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.summary-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,.gip-kpi,.gcpt,.gcpt-kpi,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]';
@@ -492,6 +494,9 @@
     var c=rgb(cs.backgroundColor),img=cs.backgroundImage!=='none',clear=!img&&(!c||c[3]<0.15);
     if(clear&&(h<24||w<34))continue;   /* 沒底色的小字連結不變成磚 */
     o.classList.add('vc-bk');o.classList.remove('vc-opt','vc-opt-d');if(clear)o.classList.add('vc-bk-c');else if(!img)o.classList.add('vc-bk-t');
+    /* v2.7 字：淺底上的灰字看不清楚 → 加深（原本就有顏色的字，例如選到的藍／綠，不動） */
+    var tc=rgb(cs.color),bg=clear?pageBg():(c&&c[3]>=0.15?c:bgOf(o));
+    if(tc&&bg&&lum(bg)>0.6&&lum(tc)>0.22&&(Math.max(tc[0],tc[1],tc[2])-Math.min(tc[0],tc[1],tc[2]))<70)o.classList.add('vc-bk-k');
     if(cs.transform==='none'&&cs.position!=='fixed'&&cs.position!=='sticky')o.classList.add('vc-dt')}}catch(_){}}
  function tag(e,cs,w,hh){var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';
     var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
@@ -513,7 +518,7 @@
     if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
    generic();heads()}catch(_){}},180)}
  function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
-  cards();setInterval(function(){if(!document.hidden){H.__vcK='';cards()}},3000);
+  cards();chart3d();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d()}},3000);
   try{new MutationObserver(cards).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
   /* 手機：要有 touchstart 監聽，:active 才會出現；手指移開（開始捲動）就放開 */
   try{document.addEventListener('touchstart',function(){},{passive:true})}catch(_){}}
@@ -537,6 +542,21 @@
     if(e.pointerType==='touch'){setHov(t);setTimeout(function(){if(hovEl===t)setHov(null)},520)}},{passive:true});
   ['pointerup','pointercancel','dragend'].forEach(function(n){document.addEventListener(n,up,{passive:true})});
   document.addEventListener('scroll',function(){if(dnEl)up()},{passive:true,capture:true})}catch(_){}
+ /* v2.7 圖表（Chart.js）立體感：長條＝圓柱（左右暗、中間偏左一道亮）、圓環＝有厚度的環、折線＝底下一道影子。
+    只在圖表重畫時多畫一層漸層，不留任何東西在記憶體裡；超過 400 根的圖不畫。 */
+ function chart3d(){var C=W.Chart;if(!C||C.__vc3d||!C.register)return;C.__vc3d=1;
+  try{C.register({id:'vrt3d',
+   beforeDatasetDraw:function(ch,a){try{if(a.meta.type==='line'&&!a.meta.hidden){var x=ch.ctx;x.save();a.meta.__vs=1;x.shadowColor='rgba(15,23,42,.30)';x.shadowBlur=5;x.shadowOffsetY=3}}catch(_){}},
+   afterDatasetDraw:function(ch,a){try{var m=a.meta,x=ch.ctx,t=m.type,els=m.data||[];if(m.__vs){m.__vs=0;x.restore()}if(m.hidden||els.length>400)return;
+     if(t==='bar'){for(var i=0;i<els.length;i++){var p=els[i].getProps(['x','y','base','width','height','horizontal'],true);if(p.x==null||p.base==null)continue;var x0,y0,w,h,g;
+       if(p.horizontal){x0=Math.min(p.x,p.base);w=Math.abs(p.x-p.base);y0=p.y-p.height/2;h=p.height;g=x.createLinearGradient(0,y0,0,y0+h)}
+       else{x0=p.x-p.width/2;w=p.width;y0=Math.min(p.y,p.base);h=Math.abs(p.y-p.base);g=x.createLinearGradient(x0,0,x0+w,0)}
+       if(w<2||h<2)continue;g.addColorStop(0,'rgba(15,23,42,.24)');g.addColorStop(.26,'rgba(255,255,255,.38)');g.addColorStop(.5,'rgba(255,255,255,.04)');g.addColorStop(1,'rgba(15,23,42,.30)');
+       x.save();x.fillStyle=g;x.fillRect(x0,y0,w,h);x.restore()}}
+     else if(t==='doughnut'||t==='pie'||t==='polarArea'){for(var j=0;j<els.length;j++){var q=els[j].getProps(['x','y','startAngle','endAngle','innerRadius','outerRadius'],true);if(!(q.outerRadius>4)||q.endAngle-q.startAngle<0.005)continue;
+       var ir=Math.max(0,q.innerRadius||0),rg=x.createRadialGradient(q.x,q.y,ir,q.x,q.y,q.outerRadius);rg.addColorStop(0,'rgba(15,23,42,.22)');rg.addColorStop(.4,'rgba(255,255,255,.30)');rg.addColorStop(.62,'rgba(255,255,255,.03)');rg.addColorStop(1,'rgba(15,23,42,.28)');
+       x.save();x.beginPath();x.arc(q.x,q.y,q.outerRadius,q.startAngle,q.endAngle);if(ir>0)x.arc(q.x,q.y,ir,q.endAngle,q.startAngle,true);else x.lineTo(q.x,q.y);x.closePath();x.fillStyle=rg;x.fill();x.restore()}}}catch(_){}}});
+   var ins=C.instances||{};Object.keys(ins).forEach(function(k){try{ins[k].update('none')}catch(_){}})}catch(_){}}
  W.vrtCard3d={refresh:function(){H.__vcK='';cards()}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
