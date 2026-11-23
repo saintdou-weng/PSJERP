@@ -39,10 +39,11 @@
     if (/^QC/.test(G)) return 'qc';
     if (/^PACKING|FINISH|IRON|整燙|包裝/.test(G) || /iron|press|finish|packing/i.test(P)) return 'pack';
     if (/^CUTTING|MARKER/.test(G)) return 'cut';
-    if (/SERVICE ON LINE|SUPERVISOR SEWING|TRAINING LINE|SAMPLE LINE|MECHANIC|M&E|IE$|^PC$|PRODUCTION|WAREHOUSE/.test(G)) return 'sup';
+    /* 2026-11-23 Paul：生產支援只留跟車縫線直接有關的——巡線服務、車縫主管、機修；倉庫、PC、IE、訓練線、樣品線等不列 */
+    if (/SERVICE ON LINE|SUPERVISOR SEWING|^MECHANIC/.test(G)) return 'sup';
     return 'other';
   }
-  var CATS = { line: ['🧵', '這條線', 'This line'], qc: ['🔍', '品管 QC', 'QC'], pack: ['📦', '包裝／整燙', 'Packing / pressing'], cut: ['✂️', '裁剪', 'Cutting'], sup: ['🛠', '生產支援', 'Production support'] };
+  var CATS = { line: ['🧵', '這條線', 'This line'], qc: ['🔍', '品管 QC', 'QC'], pack: ['📦', '包裝／整燙', 'Packing / pressing'], cut: ['✂️', '裁剪', 'Cutting'], sup: ['🛠', '巡線・車縫主管・機修', 'Line service, supervisors, mechanics'] };
   function load() {
     if (EMP) return Promise.resolve(true);
     return get('db_v1').then(function (d) {
