@@ -1,4 +1,5 @@
-/* VRT 🎵 放鬆音樂開關 v2.5（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
+/* v2.12（2026-11-23）：加 4 張會動的風景壁紙、手機轉橫保持直立。
+   VRT 🎵 放鬆音樂開關 v2.5（2026-11-23）— 各平台共用一支（PSJERP repo 的 music.js）
    上方一顆小小的 ON/OFF 撥動開關（♪）：點一下開／關；旁邊 ▾ 選聲音、拉音量；滑鼠滾輪在開關上也能調音量。
    預設關。雨聲／海浪／輕鋼琴是瀏覽器即時產生（不下載、不連外）；公開電台要網路，連不上自動改雨聲。
    同一個瀏覽器分頁裡開著音樂換頁：新頁面會接著播（瀏覽器若擋自動播放，點一下畫面任何地方就接上）。
@@ -185,7 +186,7 @@
  /* 🧱 壁紙 v2（2026-11-23 Paul 看過第一版後）：花紋要小、有間隔、有立體感；金屬要有鐵片的光澤。
     每種花紋都是「亮邊＋暗邊」的浮雕畫法（左上受光），畫在頁面底色那一層；深色底用另一組濃淡。 */
  function svgU(w,h,body){return 'url("data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+body+'</svg>')+'")'}
- var WPS=[['','無 None'],['grid','格子 Grid'],['dots','圓點 Dots'],['stars','星星 Stars'],['diamond','菱形 Diamond'],['clover','四葉草 Clover'],['stone','石壁 Stone'],['brick','磚牆 Brick'],['metal','金屬 Metal']];
+ var WPS=[['','無 None'],['grid','格子 Grid'],['dots','圓點 Dots'],['stars','星星 Stars'],['diamond','菱形 Diamond'],['clover','四葉草 Clover'],['stone','石壁 Stone'],['brick','磚牆 Brick'],['metal','金屬 Metal'],['a_sun','☀️ 藍天白雲（會動）'],['a_river','🏞️ 小河平原（會動）'],['a_rain','🌧️ 雷雨（會動）'],['a_car','🚗 鄉間小車（會動）']];
  /* v2.9 風景壁紙（自己畫的向量圖，不是照片，不用下載）：貼在畫面最下面一條、左右連續，上面是很淡的天色；捲動時不跟著跑。 */
  var SCN={};
  function scene(k,dark){var key=k+(dark?1:0);if(SCN[key])return SCN[key];var sd=k.length*7919+17,b='',W0=1200,H0=420,x,i;
@@ -221,7 +222,79 @@
     b+='<rect x="'+(rx-2)+'" y="'+(ry-rh2*.4).toFixed(0)+'" width="5" height="'+(rh2*.4+8).toFixed(0)+'" fill="#6b4a32" fill-opacity=".8"/><circle cx="'+rx+'" cy="'+(ry-rh2*.6).toFixed(0)+'" r="'+(rh2*.32).toFixed(0)+'" fill="'+(R()<.5?'#4f9a58':'#77b96b')+'" fill-opacity=".85"/>'}
    sky='linear-gradient(180deg,rgba(186,220,240,0) 30%,rgba(186,220,240,.36) 72%,rgba(160,208,236,.44) 100%)'}
   return SCN[key]={i:[svgU(W0,H0,b),sky],s:['auto 44vh','100% 100%'],p:['center bottom','0 0'],r:['repeat-x','no-repeat'],a:['fixed','fixed'],pv:1}}
+ /* v2.12 會動的風景壁紙（2026-11-23 Paul）：藍天白雲／小河平原／雷雨／鄉間小車野餐。
+    整張 SVG 自己畫、用 SVG 內建動畫（SMIL），不下載、不跑程式；固定在畫面後面、半透明，不擋前面的卡片。
+    同一段動作一直重複，動得慢、量不多。手機直立時看中間那一塊，所以主角都放在畫面中間。 */
+ var ANI={};
+ function animScene(k,dark){var key=k+(dark?1:0);if(ANI[key])return ANI[key];
+  var W=1200,H=800,b='',d='',i,sd=k.length*7717+29;
+  function R(){sd=(sd*9301+49297)%233280;return sd/233280}
+  function f(n){return (+n).toFixed(1)}
+  function drift(inner,dur,beg,dx){return '<g>'+'<animateTransform attributeName="transform" type="translate" from="'+(-(dx||420))+' 0" to="'+(W+(dx||420))+' 0" dur="'+dur+'s" begin="-'+beg+'s" repeatCount="indefinite"/>'+inner+'</g>'}
+  function cloud(x,y,s,c,op){return '<g transform="translate('+f(x)+' '+f(y)+') scale('+s+')" fill="'+c+'" fill-opacity="'+op+'"><ellipse cx="0" cy="0" rx="70" ry="30"/><ellipse cx="-48" cy="10" rx="46" ry="24"/><ellipse cx="50" cy="8" rx="52" ry="26"/><ellipse cx="-8" cy="-22" rx="44" ry="30"/><ellipse cx="30" cy="-14" rx="36" ry="24"/></g>'}
+  function tree(x,y,s,c,sway){var g='<g transform="translate('+f(x)+' '+f(y)+') scale('+s+')"><g>'+(sway?'<animateTransform attributeName="transform" type="rotate" values="-2 0 0;2 0 0;-2 0 0" dur="'+(4+R()*3).toFixed(1)+'s" repeatCount="indefinite"/>':'')+
+    '<rect x="-3" y="-26" width="6" height="26" fill="#7a5a3c"/><circle cx="0" cy="-40" r="20" fill="'+c+'"/><circle cx="-11" cy="-30" r="13" fill="'+c+'"/><circle cx="11" cy="-31" r="14" fill="'+c+'"/><circle cx="-6" cy="-47" r="8" fill="#fff" fill-opacity=".18"/></g></g>';return g}
+  function house(x,y,s,wall,roof){return '<g transform="translate('+f(x)+' '+f(y)+') scale('+s+')"><rect x="-22" y="-26" width="44" height="26" fill="'+wall+'"/><path d="M-28 -26 L0 -48 L28 -26Z" fill="'+roof+'"/><rect x="-5" y="-14" width="10" height="14" fill="#7a5a3c"/><rect x="-17" y="-20" width="8" height="7" fill="#fdf3c4"/><rect x="9" y="-20" width="8" height="7" fill="#fdf3c4"/></g>'}
+  function sky(a,c){return '<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+a+'"/><stop offset="1" stop-color="'+c+'"/></linearGradient></defs><rect width="'+W+'" height="'+H+'" fill="url(#sk)"/>'}
+  function sun(x,y,r){var rays='';for(i=0;i<12;i++){var a=i*30;rays+='<rect x="-3" y="'+(-r-34)+'" width="6" height="20" rx="3" fill="#ffd25a" fill-opacity=".7" transform="rotate('+a+')"/>'}
+   return '<g transform="translate('+x+' '+y+')"><circle r="'+(r+44)+'" fill="#fff1b3" fill-opacity=".35"><animate attributeName="r" values="'+(r+36)+';'+(r+54)+';'+(r+36)+'" dur="7s" repeatCount="indefinite"/></circle><g><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="140s" repeatCount="indefinite"/>'+rays+'</g><circle r="'+r+'" fill="#ffcf4a"/><circle r="'+(r*.72)+'" fill="#ffe27a"/></g>'}
+  function bird(dur,beg,y,s){return '<g><animateTransform attributeName="transform" type="translate" values="-80 '+y+';'+(W+80)+' '+(y-40)+'" dur="'+dur+'s" begin="-'+beg+'s" repeatCount="indefinite"/><g transform="scale('+s+')"><path fill="none" stroke="#3b4a5a" stroke-width="2.4" stroke-linecap="round" d="M-10 0 Q-5 -7 0 0 Q5 -7 10 0"><animate attributeName="d" values="M-10 0 Q-5 -7 0 0 Q5 -7 10 0;M-10 2 Q-5 5 0 0 Q5 5 10 2;M-10 0 Q-5 -7 0 0 Q5 -7 10 0" dur=".9s" repeatCount="indefinite"/></path></g></g>'}
+
+  if(k==='a_sun'){b+=sky('#6fbfee','#dff2fb')+sun(760,150,54);
+   b+=drift(cloud(0,120,1.1,'#fff',.95),110,10)+drift(cloud(0,250,.8,'#fff',.9),80,50)+drift(cloud(0,330,1.3,'#fff',.85),140,95)+drift(cloud(0,470,.7,'#fff',.8),95,30)+drift(cloud(0,560,1,'#fff',.75),125,70);
+   b+='<path d="M0 760 Q300 700 600 740 T1200 730 V800 H0Z" fill="#bfe3c4" fill-opacity=".7"/>'}
+
+  else if(k==='a_river'){b+=sky('#bfe2f6','#eef6e6');
+   b+=drift(cloud(0,90,.8,'#fff',.9),120,20)+drift(cloud(0,170,.6,'#fff',.85),90,60);
+   b+='<path d="M0 300 Q200 286 400 296 T800 292 T1200 298 V800 H0Z" fill="#a9d690"/>';
+   for(i=0;i<6;i++)b+='<path d="M0 '+(330+i*80)+' Q600 '+(318+i*80)+' 1200 '+(332+i*80)+'" stroke="#c6e6a8" stroke-opacity=".6" stroke-width="'+(6+i*4)+'" fill="none"/>';
+   var L='',Rr='',C='';for(var y=296;y<=H;y+=10){var t=(y-296)/(H-296),cx=600+ (30+170*t)*Math.sin(t*Math.PI*2.6)*.9,w=5+150*t*t+30*t;L+=(y===296?'M':' L')+f(cx-w)+' '+y;Rr=' L'+f(cx+w)+' '+y+Rr;C+=(y===296?'M':' L')+f(cx)+' '+y}
+   b+='<path d="'+L+Rr+' Z" fill="#6ab3de"/><path d="'+L+'" fill="none" stroke="#e8f3d8" stroke-width="5"/>';
+   b+='<path d="'+C+'" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3" stroke-dasharray="14 46" stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="0" to="-60" dur="2.4s" repeatCount="indefinite"/></path>';
+   b+='<path d="'+C+'" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-dasharray="6 70" transform="translate(-18 0)"><animate attributeName="stroke-dashoffset" from="0" to="-76" dur="3.1s" repeatCount="indefinite"/></path>';
+   var hs=[[430,420,1,'#f4e3c3','#b5523b'],[790,390,.8,'#f6efe2','#5d6f86'],[300,560,1.4,'#efe0c8','#9a4a3a'],[880,610,1.6,'#f6efe2','#b5523b'],[520,340,.6,'#f4e3c3','#5d6f86'],[1050,470,1.1,'#efe0c8','#9a4a3a'],[150,450,1.1,'#f6efe2','#5d6f86']];
+   hs.forEach(function(h){b+=house(h[0],h[1],h[2],h[3],h[4])});
+   b+='<g><circle cx="438" cy="372" r="5" fill="#fff" fill-opacity=".7"><animate attributeName="cy" values="372;330" dur="5s" repeatCount="indefinite"/><animate attributeName="fill-opacity" values=".7;0" dur="5s" repeatCount="indefinite"/></circle></g>';
+   var ts=[[380,470,1],[700,420,.8],[820,520,1.3],[240,640,1.7],[980,700,1.9],[470,700,1.6],[640,350,.6],[1120,560,1.3],[90,560,1.3],[560,470,.9]];
+   ts.forEach(function(t){b+=tree(t[0],t[1],t[2],R()<.5?'#5aa55e':'#79bc66',true)})}
+
+  else if(k==='a_rain'){b+=sky('#535d6b','#8b95a0');
+   b+='<path d="M0 640 Q250 600 520 630 T1200 620 V800 H0Z" fill="#5e6e66"/><path d="M0 700 Q300 670 640 696 T1200 690 V800 H0Z" fill="#4c5c55"/>';
+   for(i=0;i<9;i++)b+=tree(80+i*135+R()*40,690+R()*40,1+R()*.5,'#3f5a49',false);
+   b+=house(560,700,1.6,'#9aa3a0','#4a4f57')+'<rect x="537" y="676" width="13" height="11" fill="#ffd977" fill-opacity=".85"/>';
+   b+=drift(cloud(0,90,2.2,'#39424d',.95),200,30,600)+drift(cloud(0,150,1.8,'#454e5a',.9),160,110,600)+drift(cloud(0,60,2.6,'#2f3741',.95),240,170,700)+drift(cloud(0,230,1.4,'#4b5561',.85),180,60,500);
+   d+='<pattern id="rp" width="48" height="64" patternUnits="userSpaceOnUse"><path d="M10 0 l-6 22 M34 18 l-6 22 M22 40 l-6 22" stroke="#dfe8f2" stroke-opacity=".75" stroke-width="2" stroke-linecap="round"/><animateTransform attributeName="patternTransform" type="translate" from="0 0" to="-12 64" dur=".55s" repeatCount="indefinite"/></pattern>';
+   b+='<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.06;.12;.68;.75;1" dur="46s" repeatCount="indefinite"/><rect width="'+W+'" height="'+H+'" fill="url(#rp)"/></g>';
+   b+='<rect width="'+W+'" height="'+H+'" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0;.5;0;.3;0;0" keyTimes="0;.55;.56;.575;.59;.61;1" dur="23s" repeatCount="indefinite"/></rect>';
+   b+='<path d="M660 170 L630 250 L655 250 L620 340 L690 230 L662 230 L690 170Z" fill="#fff6c8" opacity="0"><animate attributeName="opacity" values="0;0;1;0;.8;0;0" keyTimes="0;.55;.56;.575;.59;.61;1" dur="23s" repeatCount="indefinite"/></path>';
+   b+='<rect width="'+W+'" height="'+H+'" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0;.35;0;0" keyTimes="0;.3;.31;.33;1" dur="37s" repeatCount="indefinite"/></rect>'}
+
+  else if(k==='a_car'){b+=sky('#8fd0f3','#e9f7fd')+sun(820,130,40);
+   b+=drift(cloud(0,110,.8,'#fff',.9),130,40)+drift(cloud(0,210,.6,'#fff',.85),100,80);
+   b+=bird(26,4,250,1)+bird(26,5.2,270,.8)+bird(26,6,240,.7)+bird(34,20,180,.9);
+   b+='<rect x="0" y="560" width="'+W+'" height="240" fill="#79b86a"/><g transform="translate(0 -90)">';
+   b+='<path d="M0 520 Q180 380 380 470 T760 430 T1200 470 V800 H0Z" fill="#a8d394"/><path d="M0 590 Q260 510 520 570 T1000 545 T1200 560 V800 H0Z" fill="#84c174"/>';
+   for(i=0;i<11;i++)b+=tree(40+i*110+R()*50,560+R()*40,.9+R()*.6,R()<.5?'#4f9a58':'#6db362',true);
+   b+='<rect x="0" y="642" width="'+W+'" height="70" fill="#d9c39a"/><rect x="0" y="642" width="'+W+'" height="5" fill="#c4ab7f"/><rect x="0" y="707" width="'+W+'" height="5" fill="#c4ab7f"/><rect x="0" y="712" width="'+W+'" height="88" fill="#79b86a"/>';
+   for(i=0;i<14;i++)b+=tree(30+i*90+R()*40,790,.9+R()*.4,'#5aa55e',false);
+   /* 一家人＋野餐墊：車停下來的那段時間才出現 */
+   d+='<pattern id="ck" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#fff"/><rect width="8" height="8" fill="#e05a4f"/><rect x="8" y="8" width="8" height="8" fill="#e05a4f"/></pattern>';
+   function ppl(x,y,s,shirt){return '<g transform="translate('+x+' '+y+') scale('+s+')"><rect x="-7" y="-26" width="14" height="22" rx="6" fill="'+shirt+'"/><rect x="-6" y="-6" width="5" height="10" fill="#3d4a66"/><rect x="1" y="-6" width="5" height="10" fill="#3d4a66"/><circle cy="-34" r="8" fill="#f2c9a0"/><path d="M-8 -36 Q0 -46 8 -36" fill="#3b2a20"/></g>'}
+   var fam='<path d="M610 636 L740 636 L760 612 L630 612Z" fill="url(#ck)"/><rect x="668" y="606" width="22" height="14" rx="3" fill="#a8743f"/><path d="M670 606 Q679 594 688 606" fill="none" stroke="#7a5230" stroke-width="2"/>'+
+     ppl(625,636,1,'#4f86c6')+ppl(755,636,1,'#e08ab0')+'<g>'+'<animateTransform attributeName="transform" type="translate" values="0 0;0 -8;0 0" dur="1.1s" repeatCount="indefinite"/>'+ppl(700,640,.7,'#f2b84b')+'</g>'+ppl(650,640,.65,'#6cbf8a');
+   b+='<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.37;.41;.6;.64;1" dur="50s" repeatCount="indefinite"/>'+fam+'</g>';
+   /* 小車（圓頂、自己畫的，沒有任何廠牌）：開進來、停一下、再開走 */
+   var wheel=function(cx){return '<g transform="translate('+cx+' 690)"><circle r="15" fill="#2f3542"/><circle r="7" fill="#c9ced6"/><g><animateTransform attributeName="transform" type="rotate" values="0;2480;2480;5400" keyTimes="0;.35;.65;1" dur="50s" repeatCount="indefinite"/><rect x="-1.5" y="-13" width="3" height="26" fill="#c9ced6"/><rect x="-13" y="-1.5" width="26" height="3" fill="#c9ced6"/></g></g>'};
+   var car='<g><animateTransform attributeName="transform" type="translate" values="-220 0;0 0;0 0;900 0" keyTimes="0;.35;.65;1" dur="50s" repeatCount="indefinite"/>'+
+     '<g transform="translate(470 0)"><ellipse cx="60" cy="706" rx="62" ry="6" fill="#000" fill-opacity=".12"/>'+
+     '<path d="M4 690 Q2 662 26 656 Q40 618 76 618 Q104 620 116 656 Q126 662 124 690Z" fill="#ef7b5f"/>'+
+     '<path d="M40 656 Q48 628 74 628 Q96 630 104 656Z" fill="#cfe9f7"/><rect x="71" y="628" width="4" height="28" fill="#ef7b5f"/>'+
+     '<circle cx="118" cy="670" r="5" fill="#fff4b0"/><rect x="0" y="682" width="128" height="6" rx="3" fill="#c9ced6"/>'+wheel(32)+wheel(98)+'</g></g>';
+   b+=car+'</g>'}
+  var op=dark?.38:.55,svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMax slice"><defs>'+d+'</defs><g opacity="'+op+'">'+b+'</g></svg>';
+  return ANI[key]={i:['url("data:image/svg+xml,'+encodeURIComponent(svg)+'")'],s:['cover'],p:['center bottom'],r:['no-repeat'],a:['fixed'],pv:2}}
  function wpCss(k,dark){
+  if(/^a_/.test(k))return animScene(k,dark);
   if(k==='town'||k==='night'||k==='forest'||k==='river')return scene(k,dark);
   var dk=dark?1.9:1,hl=dark?.22:1;
   function D(a){return 'fill="#0f172a" fill-opacity="'+Math.min(.9,a*dk).toFixed(3)+'"'}
@@ -343,7 +416,7 @@
  setInterval(function(){if(!document.hidden&&document.documentElement.classList.contains('vp-on')){cards();if(st.wp)wpAll()}},2500);
  try{new MutationObserver(function(){if(document.documentElement.classList.contains('vp-on'))cards()}).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
  function draw(){ if(!panel||panel.hidden)return;
-  var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+(w.pv?';background-size:auto 100%,100% 100%;background-position:30% 100%,0 0;background-color:#eef4fa':';background-size:'+w.s.join(',')):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
+  var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+(w.pv===2?';background-size:cover;background-position:center bottom':w.pv?';background-size:auto 100%,100% 100%;background-position:30% 100%,0 0;background-color:#eef4fa':';background-size:'+w.s.join(',')):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
   if(WPONLY){panel.innerHTML='<b class="h">🧱 壁紙 Wallpaper（這個平台自己記住）</b>'+wpRow+'<small>顏色請用這個平台原本的 🎨；這裡只管壁紙，每個平台各設各的。<br>Colours stay in this platform’s own 🎨; wallpaper is saved per platform.</small>';place2();return}
   panel.innerHTML='<b class="h">🎨 背景顏色 Background（這個平台自己記住 · saved per platform）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+(PROD?'<div class="swl">明暗 Light / Dark（生產平台原本的）</div><div class="mx" style="margin-top:0"><button data-a="th-light">☀️ 淡色 Light</button><button data-a="th-dark">🌙 深色 Dark</button>'+(document.getElementById('themeBtn')?'<button data-a="oldbg">原本的背景選單</button>':'')+'</div>':'<div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>')+
    '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:'+mixHex(colOf(st.c)[2],colOf(st.c2)[2])+'"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
@@ -674,3 +747,35 @@
  setInterval(function(){if(!document.hidden){run();ink()}},3000);
  document.addEventListener('click',function(){setTimeout(ink,180)},true);
 }catch(e){}})();
+
+/* v2.12 手機轉橫也保持直立（2026-11-23 Paul）：手機往左或往右轉成橫的，頁面不跟著變成橫版，
+   一樣是直立的樣子（跟著手機轉回去）；轉的那一下，頁面會往那邊稍微歪一點，再慢慢擺正。
+   只在手機（觸控、小螢幕）的最外層頁面做；平板、電腦、內嵌的 iframe 都不動。 */
+(function(){try{
+ if(window.top!==window||window.__VRT_UPRIGHT)return;window.__VRT_UPRIGHT=1;
+ var mq=window.matchMedia&&matchMedia('(pointer:coarse)');if(!mq||!mq.matches)return;
+ if(Math.min(screen.width,screen.height)>=600)return;
+ var cur=0,st=null;
+ function ang(){var a=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(typeof window.orientation==='number'?window.orientation:0);a=((a%360)+360)%360;return a===90||a===270?a:0}
+ function css(){if(st)return;st=document.createElement('style');st.id='vrtUpright';st.textContent=
+  'html.vr-up,html.vr-up body{overflow:hidden!important;height:100%!important}'+
+  'html.vr-up body{position:fixed!important;top:0!important;left:0!important;margin:0!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;transform-origin:0 0!important}';
+  document.head.appendChild(st)}
+ function base(a){var w=document.documentElement.clientWidth,h=document.documentElement.clientHeight;
+  return a===90?'translateY('+h+'px) rotate(-90deg)':'translateX('+w+'px) rotate(90deg)'}
+ function size(){var b=document.body,w=document.documentElement.clientWidth,h=document.documentElement.clientHeight;b.style.setProperty('width',h+'px','important');b.style.setProperty('height',w+'px','important')}
+ function tilt(dir){var b=document.body;if(!b.animate)return;var t=b.style.transform||'';
+  /* 往手機轉的方向歪 7 度，再彈回來擺正 */
+  try{b.animate([{transform:t+' rotate('+(dir*7)+'deg)'},{transform:t+' rotate('+(-dir*2)+'deg)',offset:.6},{transform:t}],{duration:900,easing:'cubic-bezier(.2,.8,.3,1)'})}catch(_){}}
+ function set(){var a=ang(),b=document.body;if(!b)return;if(a===cur){if(a)size(),b.style.setProperty('transform',base(a),'important');return}
+  var dir=a===90||(a===0&&cur===270)?-1:1,prevTop=a?window.scrollY:(b.scrollTop||0);cur=a;
+  if(a){css();document.documentElement.classList.add('vr-up');size();b.style.setProperty('transform',base(a),'important');b.scrollTop=prevTop}
+  else{document.documentElement.classList.remove('vr-up');['width','height','transform'].forEach(function(p){b.style.removeProperty(p)});window.scrollTo(0,prevTop)}
+  tilt(dir)}
+ var tm;function later(){clearTimeout(tm);tm=setTimeout(set,120)}
+ if(screen.orientation&&screen.orientation.addEventListener)screen.orientation.addEventListener('change',later);
+ window.addEventListener('orientationchange',later);window.addEventListener('resize',later);
+ /* 能鎖就先鎖（只有加到主畫面／全螢幕時才有用，一般瀏覽器會拒絕，就用上面那招） */
+ try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('portrait').catch(function(){})}catch(_){}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',set);else set();
+}catch(_){}})();
