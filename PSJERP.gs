@@ -323,6 +323,7 @@ function sendTelegram_(chatId, text, keyboard) {
     parse_mode: 'HTML',
     disable_web_page_preview: true
   };
+  if (!keyboard) keyboard = erpButtons_();   /* 2026-11-23 Paul：摘要下方都要有回平台的按鈕 */
   if (keyboard) payload.reply_markup = JSON.stringify(keyboard);
   const res = UrlFetchApp.fetch('https://api.telegram.org/bot'+token_()+'/sendMessage', {
     method:'post', payload:payload, muteHttpExceptions:true
