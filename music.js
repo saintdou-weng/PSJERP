@@ -74,7 +74,7 @@
   var _vp=document.getElementById('vpBtn'),_mini=box.classList.contains('mini'),_pal=_vp&&!_vp.offsetWidth;panel.innerHTML=((_mini||_pal)?'<div class="hd">'+(_mini?'<button class="psw '+(on?'on':'')+'">♪ '+(on?'ON · 點一下關 Stop':'OFF · 點一下開 Play')+'</button>':'')+(_pal?'<button class="pal">'+(_vp&&_vp.textContent==='🧱'?'🧱 壁紙 Wallpaper':'🎨 背景 Background')+'</button>':'')+'</div>':'')+SRC.map(function(x){return '<button class="row '+(st.src===x.k?'on':'')+'" data-k="'+x.k+'"><span style="font-size:18px;width:24px;text-align:center">'+x.ic+'</span><span>'+x.t+(x.note?'<small>'+x.note+' · 需要網路 needs internet</small>':'')+'</span></button>'}).join('')+
    '<div class="vol">🔈<input type="range" min="0" max="100" step="5" value="'+st.v+'" aria-label="Volume"><span>'+st.v+'%</span></div><div class="q">'+[[20,'小 Low'],[40,'中 Mid'],[75,'大 High']].map(function(v){return '<button data-v="'+v[0]+'" class="'+(st.v===v[0]?'on':'')+'">'+v[1]+'</button>'}).join('')+'</div>'+
    '<div class="fxl">✨ 重點卡翻頁特效 Card effect</div><div class="fx">'+FXS.map(function(f){return '<button data-fx="'+f[0]+'" class="'+(fxGet()===f[0]?'on':'')+'">'+f[1]+'</button>'}).join('')+'</div>' }
- /* v2.8.0：嵌在分頁裡的頁面比外面那頁早載入時，會多出一顆音樂開關 → 發現外面那頁也有，就把自己這顆收掉 */
+ /* v2.9.0：嵌在分頁裡的頁面比外面那頁早載入時，會多出一顆音樂開關 → 發現外面那頁也有，就把自己這顆收掉 */
  try{if(window.top!==window){var dupN=0,dupT=setInterval(function(){var tp=false;try{tp=!!window.top.__VRT_MUSIC}catch(e){}
    if(tp){clearInterval(dupT);try{if(on)stop()}catch(e){}try{var b=document.getElementById('vmBox');if(b)b.style.display='none'}catch(e){}}else if(++dupN>15)clearInterval(dupT)},1000)}}catch(e){}
  function dock(){ if(!box)return; var ref=document.querySelector('.top #langSw'), narrow=innerWidth<=640;
@@ -185,8 +185,44 @@
  /* 🧱 壁紙 v2（2026-11-23 Paul 看過第一版後）：花紋要小、有間隔、有立體感；金屬要有鐵片的光澤。
     每種花紋都是「亮邊＋暗邊」的浮雕畫法（左上受光），畫在頁面底色那一層；深色底用另一組濃淡。 */
  function svgU(w,h,body){return 'url("data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+body+'</svg>')+'")'}
- var WPS=[['','無 None'],['grid','格子 Grid'],['dots','圓點 Dots'],['stars','星星 Stars'],['diamond','菱形 Diamond'],['clover','四葉草 Clover'],['stone','石壁 Stone'],['brick','磚牆 Brick'],['metal','金屬 Metal']];
+ var WPS=[['','無 None'],['grid','格子 Grid'],['dots','圓點 Dots'],['stars','星星 Stars'],['diamond','菱形 Diamond'],['clover','四葉草 Clover'],['stone','石壁 Stone'],['brick','磚牆 Brick'],['metal','金屬 Metal'],['town','歐洲小鎮 Town'],['night','都市夜景 City night'],['forest','夏日森林 Forest'],['river','河流 River']];
+ /* v2.9 風景壁紙（自己畫的向量圖，不是照片，不用下載）：貼在畫面最下面一條、左右連續，上面是很淡的天色；捲動時不跟著跑。 */
+ var SCN={};
+ function scene(k,dark){var key=k+(dark?1:0);if(SCN[key])return SCN[key];var sd=k.length*7919+17,b='',W0=1200,H0=420,x,i;
+  function R(){sd=(sd*9301+49297)%233280;return sd/233280}
+  function hill(y0,amp,per,ph,fill,op){var d='M0 '+H0,xx;for(xx=0;xx<=W0;xx+=20)d+=' L'+xx+' '+(y0-amp*Math.sin((xx/W0)*Math.PI*2*per+ph)-amp*.4*Math.sin((xx/W0)*Math.PI*2*per*3+ph*2)).toFixed(1);return '<path d="'+d+' L'+W0+' '+H0+' Z" fill="'+fill+'" fill-opacity="'+op+'"/>'}
+  var sky;
+  if(k==='town'){var cols=['#e9b384','#d98b6a','#f1d9a7','#b9c7a4','#a8c3d8','#e3a7a0','#cdb7dc','#f0c987'],roofs=['#9a4a3a','#7a4638','#8d5a4a','#5d6f86'];
+   b+=hill(300,26,2,.6,'#8fb08a',.35);
+   for(x=0;x<W0;){var w=58+Math.round(R()*52);if(W0-x-w<50)w=W0-x;var h=96+Math.round(R()*86),y=H0-h,c=cols[Math.floor(R()*cols.length)],rf=roofs[Math.floor(R()*roofs.length)],rh=26+Math.round(R()*30);
+    b+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+c+'" fill-opacity=".82"/><path d="M'+(x-3)+' '+y+' L'+(x+w/2)+' '+(y-rh)+' L'+(x+w+3)+' '+y+' Z" fill="'+rf+'" fill-opacity=".85"/>';
+    var cn=Math.max(2,Math.floor(w/26)),rn=Math.max(2,Math.floor(h/36));for(var a=0;a<cn;a++)for(var q=0;q<rn;q++)b+='<rect x="'+(x+9+a*((w-18)/cn)).toFixed(0)+'" y="'+(y+12+q*32)+'" width="10" height="15" rx="1" fill="'+(R()<.3?'#ffe9a8':'#fdfdfb')+'" fill-opacity=".8"/>';
+    if(R()<.16)b+='<rect x="'+(x+w/2-7)+'" y="'+(y-rh-70)+'" width="14" height="74" fill="#c9b79c" fill-opacity=".85"/><path d="M'+(x+w/2-11)+' '+(y-rh-70)+' L'+(x+w/2)+' '+(y-rh-112)+' L'+(x+w/2+11)+' '+(y-rh-70)+' Z" fill="#5d6f86" fill-opacity=".9"/>';
+    x+=w}
+   b+='<rect x="0" y="'+(H0-10)+'" width="'+W0+'" height="10" fill="#8a8f98" fill-opacity=".5"/>';sky='linear-gradient(180deg,rgba(186,214,238,0) 30%,rgba(186,214,238,.38) 70%,rgba(250,221,190,.42) 100%)'}
+  else if(k==='night'){b+='<circle cx="930" cy="70" r="26" fill="#fff7d6" fill-opacity=".9"/><circle cx="930" cy="70" r="44" fill="#fff7d6" fill-opacity=".14"/>';
+   for(i=0;i<46;i++)b+='<circle cx="'+Math.round(R()*W0)+'" cy="'+Math.round(R()*150)+'" r="'+(R()<.2?1.6:1)+'" fill="#fff" fill-opacity="'+(.4+R()*.5).toFixed(2)+'"/>';
+   for(var ly=0;ly<2;ly++)for(x=0;x<W0;){var w2=42+Math.round(R()*56);if(W0-x-w2<40)w2=W0-x;var h2=(ly?70:150)+Math.round(R()*(ly?150:170)),y2=H0-h2;
+    b+='<rect x="'+x+'" y="'+y2+'" width="'+w2+'" height="'+h2+'" fill="'+(ly?'#0b1630':'#1b2a52')+'" fill-opacity="'+(ly?.92:.7)+'"/>';
+    if(R()<.3)b+='<rect x="'+(x+w2/2-1)+'" y="'+(y2-22)+'" width="2" height="22" fill="#0b1630" fill-opacity=".9"/>';
+    for(var a2=x+6;a2<x+w2-8;a2+=11)for(var q2=y2+8;q2<H0-8;q2+=14)if(R()<(ly?.42:.3))b+='<rect x="'+a2+'" y="'+q2+'" width="5" height="7" fill="'+(R()<.8?'#ffd76a':'#9fd8ff')+'" fill-opacity="'+(.55+R()*.4).toFixed(2)+'"/>';
+    x+=w2}
+   sky='linear-gradient(180deg,rgba(30,41,90,'+(dark?.0:.10)+') 0%,rgba(30,41,90,'+(dark?.25:.34)+') 55%,rgba(88,60,130,'+(dark?.3:.40)+') 100%)'}
+  else if(k==='forest'){b+=hill(250,34,1,.4,'#9cc79a',.5)+hill(290,26,2,1.7,'#6fae78',.6);
+   for(i=0;i<34;i++){var tx=Math.round((i+R()*.7)*(W0/34)),th=70+Math.round(R()*90),ty=H0-18-Math.round(R()*26),tw=th*.42;
+    if(R()<.6)b+='<path d="M'+tx+' '+(ty-th)+' L'+(tx-tw/2)+' '+ty+' L'+(tx+tw/2)+' '+ty+' Z" fill="'+(R()<.5?'#2f7d4f':'#3f9360')+'" fill-opacity=".82"/><rect x="'+(tx-2)+'" y="'+ty+'" width="4" height="14" fill="#6b4a32" fill-opacity=".8"/>';
+    else b+='<rect x="'+(tx-3)+'" y="'+(ty-th*.45)+'" width="6" height="'+(th*.45+14).toFixed(0)+'" fill="#6b4a32" fill-opacity=".8"/><circle cx="'+tx+'" cy="'+(ty-th*.62).toFixed(0)+'" r="'+(th*.3).toFixed(0)+'" fill="'+(R()<.5?'#58a85f':'#7cc06d')+'" fill-opacity=".85"/>'}
+   b+=hill(404,7,4,.2,'#4f9a58',.9)+'<circle cx="170" cy="74" r="30" fill="#fff3b0" fill-opacity=".7"/>';sky='linear-gradient(180deg,rgba(190,228,236,0) 30%,rgba(190,228,236,.34) 72%,rgba(214,240,200,.42) 100%)'}
+  else{b+=hill(230,30,1,2.2,'#a9cfa6',.5)+hill(275,22,2,.5,'#7fb886',.6);
+   var d1='M0 '+H0,d2='';for(x=0;x<=W0;x+=20){var yy=330+18*Math.sin((x/W0)*Math.PI*4);d1+=' L'+x+' '+yy.toFixed(1)}
+   b+='<path d="'+d1+' L'+W0+' '+H0+' Z" fill="#5fa9d6" fill-opacity=".78"/>';
+   for(i=0;i<26;i++){var wx=Math.round(R()*W0),wy=350+Math.round(R()*56),wl=24+Math.round(R()*46);b+='<rect x="'+wx+'" y="'+wy+'" width="'+wl+'" height="2" rx="1" fill="#fff" fill-opacity="'+(.35+R()*.4).toFixed(2)+'"/>'}
+   for(i=0;i<16;i++){var rx=Math.round((i+R()*.6)*(W0/16)),ry=300+Math.round(18*Math.sin((rx/W0)*Math.PI*4))+4,rh2=44+Math.round(R()*50);
+    b+='<rect x="'+(rx-2)+'" y="'+(ry-rh2*.4).toFixed(0)+'" width="5" height="'+(rh2*.4+8).toFixed(0)+'" fill="#6b4a32" fill-opacity=".8"/><circle cx="'+rx+'" cy="'+(ry-rh2*.6).toFixed(0)+'" r="'+(rh2*.32).toFixed(0)+'" fill="'+(R()<.5?'#4f9a58':'#77b96b')+'" fill-opacity=".85"/>'}
+   sky='linear-gradient(180deg,rgba(186,220,240,0) 30%,rgba(186,220,240,.36) 72%,rgba(160,208,236,.44) 100%)'}
+  return SCN[key]={i:[svgU(W0,H0,b),sky],s:['auto 44vh','100% 100%'],p:['center bottom','0 0'],r:['repeat-x','no-repeat'],a:['fixed','fixed'],pv:1}}
  function wpCss(k,dark){
+  if(k==='town'||k==='night'||k==='forest'||k==='river')return scene(k,dark);
   var dk=dark?1.9:1,hl=dark?.22:1;
   function D(a){return 'fill="#0f172a" fill-opacity="'+Math.min(.9,a*dk).toFixed(3)+'"'}
   function L(a){return 'fill="#fff" fill-opacity="'+Math.min(.95,a*hl).toFixed(3)+'"'}
@@ -243,7 +279,7 @@
  var tint,img,btn,panel,wpEl;
  /* 壁紙畫在哪：body（它的底會鋪滿整頁）、html 自己有底色時也畫、以及「蓋滿整頁的外框」（有些平台用一個滿版的 div 當底）。
     卡片、表格、彈出視窗都不算外框，所以花紋只在最底層，卡片壓在上面。原本就有漸層／圖的底，花紋疊在它上面，不把它換掉。 */
- var WPROPS=['background-image','background-size','background-position','background-repeat'];
+ var WPROPS=['background-image','background-size','background-position','background-repeat','background-attachment'];
  function wpClear(e){try{var o=e.__vpInl||{};WPROPS.forEach(function(p){if(o[p]&&o[p][0])e.style.setProperty(p,o[p][0],o[p][1]);else e.style.removeProperty(p)});e.removeAttribute('data-vpwp');e.__vpInl=null}catch(_){}}
  function wpSet(e,k,w0){try{
    if(e.__vpInl){var o=e.__vpInl;WPROPS.forEach(function(p){if(o[p]&&o[p][0])e.style.setProperty(p,o[p][0],o[p][1]);else e.style.removeProperty(p)})}   /* 先還原，才讀得到它原本的底 */
@@ -256,6 +292,7 @@
    e.style.setProperty('background-size',c.s.join(',')+(has?','+cs.backgroundSize:''),'important');
    e.style.setProperty('background-position',c.p.join(',')+(has?','+cs.backgroundPosition:''),'important');
    e.style.setProperty('background-repeat',c.r.join(',')+(has?','+cs.backgroundRepeat:''),'important');
+   e.style.setProperty('background-attachment',(c.a||c.i.map(function(){return 'scroll'})).join(',')+(has?','+cs.backgroundAttachment:''),'important');
    e.setAttribute('data-vpwp',k)}catch(_){}}
  function wpCovers(d,w0){var out=[];try{if(!d.elementsFromPoint)return out;var vw=w0.innerWidth,vh=w0.innerHeight;
    [[.5,.5],[.5,.9],[.04,.55],[.96,.6],[.5,.22],[.25,.75]].forEach(function(pt){var stk=d.elementsFromPoint(vw*pt[0],vh*pt[1])||[];
@@ -306,7 +343,7 @@
  setInterval(function(){if(!document.hidden&&document.documentElement.classList.contains('vp-on')){cards();if(st.wp)wpAll()}},2500);
  try{new MutationObserver(function(){if(document.documentElement.classList.contains('vp-on'))cards()}).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
  function draw(){ if(!panel||panel.hidden)return;
-  var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+';background-size:'+w.s.join(','):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
+  var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+(w.pv?';background-size:auto 100%,100% 100%;background-position:30% 100%,0 0;background-color:#eef4fa':';background-size:'+w.s.join(',')):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
   if(WPONLY){panel.innerHTML='<b class="h">🧱 壁紙 Wallpaper（這個平台自己記住）</b>'+wpRow+'<small>顏色請用這個平台原本的 🎨；這裡只管壁紙，每個平台各設各的。<br>Colours stay in this platform’s own 🎨; wallpaper is saved per platform.</small>';place2();return}
   panel.innerHTML='<b class="h">🎨 背景顏色 Background（這個平台自己記住 · saved per platform）</b><div class="sw">'+COL.filter(function(x){return !x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>'+(PROD?'<div class="swl">明暗 Light / Dark（生產平台原本的）</div><div class="mx" style="margin-top:0"><button data-a="th-light">☀️ 淡色 Light</button><button data-a="th-dark">🌙 深色 Dark</button>'+(document.getElementById('themeBtn')?'<button data-a="oldbg">原本的背景選單</button>':'')+'</div>':'<div class="swl">深色 Dark</div><div class="sw">'+COL.filter(function(x){return x[4]}).map(function(x){return '<button data-c="'+x[0]+'" class="'+(st.c===x[0]?'on':'')+'"><i style="background:'+x[2]+'"></i>'+x[1]+'</button>'}).join('')+'</div>')+
    '<div class="mx"><button data-a="mix" class="'+(mixMode?'on':'')+'">🎨＋🎨 混色 Mix</button>'+(mixMode?'<span>再點一個顏色 pick a second colour</span>':'')+(st.c2&&colOf(st.c2)&&colOf(st.c)?'<span>'+colOf(st.c)[1].split(' ')[0]+'＋'+colOf(st.c2)[1].split(' ')[0]+' ＝ <i style="background:'+mixHex(colOf(st.c)[2],colOf(st.c2)[2])+'"></i></span><button data-a="unmix">取消混色 Unmix</button>':'')+'</div>'+
@@ -389,7 +426,7 @@
 (function(){
  if(window.__VRT_CARD3D)return; window.__VRT_CARD3D=1;
  var H=document.documentElement,W=window;
- function rgb(c){var m=String(c||'').match(/[\d.]+/g);if(!m||m.length<3)return null;return [+m[0],+m[1],+m[2],m.length>3?+m[3]:1]}
+ function rgb(c){c=String(c||'');if(!/^\s*rgb/i.test(c))return null;var m=c.match(/[\d.]+/g);if(!m||m.length<3)return null;return [+m[0],+m[1],+m[2],m.length>3?+m[3]:1]}
  function lum(a){return (0.2126*a[0]+0.7152*a[1]+0.0722*a[2])/255}
  function mix(a,b,t){return [0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)})}
  function bgOf(e){ /* 這個元素自己的底色（純色或漸層第一個顏色）；透明＝null */
@@ -425,8 +462,8 @@
   '.vc-dn:not(tr):not(.vc-bk):not(.vc3-p){filter:brightness(.92)!important;box-shadow:inset 0 2px 6px rgba(15,23,42,.28)!important}.vc-dn.vc-dt:not(tr):not(.vc-bk):not(.vc3){transform:translateY(1px)}'+
   'tr.vc-dn>td,tr.vc-dn>th{background-image:linear-gradient(rgba(79,70,229,.15),rgba(79,70,229,.15))!important}tr.vc-dn{box-shadow:inset 0 2px 5px rgba(15,23,42,.22)}'+
   /* v2.6 按鈕＝石磚（跟卡片的金屬不一樣）：四邊倒角（上／左亮、下／右暗）＋底下一道厚邊＋表面石頭的粗粒；按下去厚邊收掉、整塊陷下去 */
-  '.vc-bk{box-shadow:inset 0 1px 0 rgba(255,255,255,.62),inset 1px 0 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 2px 0 rgba(15,23,42,.34),0 4px 6px rgba(15,23,42,.20)!important;transition:transform .09s ease,box-shadow .09s ease,filter .09s ease;-webkit-tap-highlight-color:transparent;font-weight:700!important}.vc-bk.vc-bk-k,.vc-bk.vc-bk-k *{color:#16263a!important}'+
-  '.vc-bk.vc-bk-r{border-radius:11px 9px 12px 9px/10px 12px 9px 11px!important}'+
+  '.vc-bk{box-shadow:inset 0 1px 0 rgba(255,255,255,.62),inset 1px 0 0 rgba(255,255,255,.28),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 2px 0 rgba(15,23,42,.34),0 4px 6px rgba(15,23,42,.20)!important;transition:transform .09s ease,box-shadow .09s ease,filter .09s ease;-webkit-tap-highlight-color:transparent;font-weight:700!important}.vc-bk{text-shadow:0 2px 3px rgba(0,0,0,.45)}.vc-bk.vc-bk-k{text-shadow:0 1px 0 rgba(255,255,255,.9),0 3px 4px rgba(15,23,42,.34)}.vc-bk.vc-dn,.vc-bk:active{text-shadow:0 1px 1px rgba(15,23,42,.22)!important}.vc-bk.vc-bk-k:not(.on):not(.active):not(.sel):not(.selected):not(.is-active):not([aria-selected=true]):not([aria-pressed=true]),.vc-bk.vc-bk-k:not(.on):not(.active):not(.sel):not(.selected):not(.is-active):not([aria-selected=true]):not([aria-pressed=true]) *{color:#14233a!important}'+
+  '.vc-bk.vc-bk-r0{border-radius:5px 3px 6px 2px/3px 6px 2px 5px!important}.vc-bk.vc-bk-r1{border-radius:3px 7px 3px 5px/6px 3px 5px 2px!important}.vc-bk.vc-bk-r2{border-radius:7px 4px 2px 6px/4px 2px 6px 3px!important}.vc-bk.vc-bk-r3{border-radius:2px 5px 8px 3px/5px 3px 4px 8px!important}'+
   '.vc-bk.vc-bk-t{background-image:radial-gradient(130% 85% at 28% -10%,rgba(255,255,255,.62),rgba(255,255,255,.14) 42%,rgba(255,255,255,0) 62%),linear-gradient(158deg,rgba(255,255,255,0) 52%,rgba(255,255,255,.26) 70%,rgba(255,255,255,0) 86%),url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.20%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.22%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,0) 45%,rgba(15,23,42,.10))!important;background-size:100% 100%,100% 100%,96px 96px,100% 100%!important}'+
   '.vc-bk.vc-bk-c{background-image:radial-gradient(130% 85% at 28% -10%,rgba(255,255,255,.62),rgba(255,255,255,.14) 42%,rgba(255,255,255,0) 62%),linear-gradient(158deg,rgba(255,255,255,0) 52%,rgba(255,255,255,.26) 70%,rgba(255,255,255,0) 86%),url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2796%27 height=%2796%27%3E%3Cfilter id=%27n%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.55 .7%27 numOctaves=%273%27 seed=%277%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 .08 0 0 0 0 .1 0 0 0 0 .16 0 0 0 -1.5 .98%27/%3E%3C/filter%3E%3Cfilter id=%27m%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.5 .62%27 numOctaves=%273%27 seed=%2723%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.5 .95%27/%3E%3C/filter%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23n)%27 opacity=%27.20%27/%3E%3Crect width=%2796%27 height=%2796%27 filter=%27url(%23m)%27 opacity=%27.22%27/%3E%3C/svg%3E\"),linear-gradient(180deg,rgba(255,255,255,.50),rgba(226,232,240,.34) 55%,rgba(148,163,184,.30))!important;background-size:100% 100%,100% 100%,96px 96px,100% 100%!important}'+
   '.vc-bk.vc-hov{filter:brightness(1.05) saturate(1.06)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 1px 0 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(15,23,42,.20),inset -1px 0 0 rgba(15,23,42,.12),0 3px 0 rgba(15,23,42,.34),0 6px 9px rgba(15,23,42,.24)!important}'+
@@ -435,6 +472,7 @@
   '.vc-bk.vc-dn,.vc-bk:active{filter:brightness(.93)!important;box-shadow:inset 0 2px 5px rgba(15,23,42,.38),inset 0 -1px 0 rgba(255,255,255,.35),0 0 0 rgba(15,23,42,0)!important}.vc-bk.vc-dn.vc-dt,.vc-bk.vc-dt:active{transform:translateY(2px)}'+
   'html.vp-inv .vc-bk{box-shadow:inset 0 1px 0 rgba(15,23,42,.45),inset 0 -2px 0 rgba(255,255,255,.55),0 0 0 1px rgba(15,23,42,.30)!important}html.vp-inv .vc-bk.vc-dn{box-shadow:inset 0 2px 5px rgba(255,255,255,.8)!important}'+
   '@media print{.vc-bk{box-shadow:none!important}}'+
+  '.vc-k0{color:#1d2b3a!important}'+
   /* ② 卡片上方：不用黑色 */
   '.vc-hd{background:var(--vc-hd,#e8ecf1)!important;background-image:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0))!important;color:var(--vc-ink,#1d2b3a)!important;border-bottom:1px solid var(--vc-line,rgba(15,23,42,.14))!important;text-shadow:none!important}'+
   '.vc-hd .vc-ink{color:var(--vc-ink,#1d2b3a)!important;text-shadow:none!important}.vc-hd .vc-ink2{border-color:var(--vc-line,rgba(15,23,42,.2))!important}'+
@@ -446,6 +484,7 @@
   (/^\/vrt-prod\//i.test(location.pathname)?'.hdr{padding-top:3px!important;padding-bottom:3px!important;min-height:0!important;height:auto!important;row-gap:1px!important;column-gap:12px!important}.hdr .sub{display:none!important}.hdr .logo{font-size:13px!important;letter-spacing:1px!important}.hdr .hstat{display:flex!important;flex-direction:row-reverse;align-items:baseline;gap:4px;min-width:0!important;flex:none!important}.hdr .hsv{font-size:13px!important}.hdr .hbtn{padding:3px 9px!important}.hdr-r{width:auto!important;margin-left:auto!important}@media(min-width:900px){.hdr{padding-right:292px!important}}'+(W.top!==W?'#vrtLangSw{left:auto!important;right:8px!important;transform:none!important}':'')+'':'')+
   '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p.vc-hov,html .vc3.vc3-p.vc-dn,.vc-bk.vc-dn{transform:none}}'+
   '@media print{.vc3{box-shadow:none!important;background-image:none!important}}';
+ var SIDE=/^\/(psjerp|psjhr|psjgas)\//i.test(location.pathname)?',aside,#rail,.rail,.sidebar,#ga-sidebar,.mobile-nav,#drawer':'';
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.summary-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,.gip-kpi,.gcpt,.gcpt-kpi,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]';
  var HSEL='.ic-h,.pc-h,.mh,.dh,.modal-head,.modal-header,.m-head,.gc-modal-head,.cmp-dh,.gip-top,#kn-head,.pkn-head,.drawer-head,.dlg-head,.sheet-head,[class*="-head"],[class*="-hd"],[class*="-top"],[class$="-h"],header';
  var OSEL='.gip-ov,.cmp-mask,#kn-mask,.pkn-mask,.gcpt-ov,.modal,.modal-bg,.modal-overlay,.modal-mask,.ovl,.overlay,.mask,[role=dialog],dialog[open],.gc-common-modal,#drawer,.drawer,.sheet,[class*="modal"],[class*="-mask"],[class*="overlay"]';
@@ -479,39 +518,47 @@
     var cs=W.getComputedStyle(e);if(parseFloat(cs.borderTopLeftRadius)<6)continue;
     if(cs.position==='fixed'||cs.position==='sticky'||cs.display==='inline'||cs.display==='contents')continue;
     var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';if(!(c&&c[3]>=0.6)&&!(hasImg&&/gradient/.test(cs.backgroundImage)))continue;
-    if(e.hasAttribute('data-vpwp')||e.closest('#vmPanel,#vpPanel,#vmBox,#kn-foot,#kn-chips,td,th'))continue;
+    if(e.hasAttribute('data-vpwp')||e.closest('#vmPanel,#vpPanel,#vmBox,#kn-foot,#kn-chips,td,th'+SIDE))continue;
     e.__vc3=1;tag(e,cs,w,hh)}
    var os=document.querySelectorAll(OPSEL),m=0;
    for(var j=0;j<os.length&&m<500;j++){var o=os[j];if(o.__vco)continue;if(!o.offsetWidth)continue;o.__vco=1;m++;
-    if(o.closest('#vmPanel,#vpPanel,#vmBox'))continue;var s2=W.getComputedStyle(o);
+    if(o.closest('#vmPanel,#vpPanel,#vmBox'+SIDE))continue;var s2=W.getComputedStyle(o);
     var bw=parseFloat(s2.borderTopWidth)||0,bc=rgb(s2.borderTopColor);if(bw>0&&bc&&bc[3]>0.15&&s2.borderTopStyle!=='none')continue;   /* 本來就有框 */
     if(s2.boxShadow!=='none'||s2.outlineStyle!=='none'&&parseFloat(s2.outlineWidth)>0)continue;
     var tc=rgb(s2.color);o.classList.add(tc&&lum(tc)>0.72?'vc-opt-d':'vc-opt')}
    bricks()}catch(_){}}
  /* v2.6 哪些算按鈕：button／.btn 類／role=button／分頁。太小的（<24×22）、開關、列表裡整列的那種、已經是卡片的不算。 */
+ /* v2.9（Paul：點了會出卡片的才用有色字，沒得點的用黑字）：頁面載入 3.5 秒後看一次每張卡片——不能按的，裡面有顏色的大數字改成黑字（紅色警示不動）。 */
+ function inkCards(){try{if(!W.performance||performance.now()<3500)return;var cs0=document.querySelectorAll('.vc3'),n=0;
+   for(var i=0;i<cs0.length&&n<120;i++){var e=cs0[i];if(e.__vck)continue;e.__vck=1;n++;if(e.classList.contains('vc3-d'))continue;
+    var can=false;try{can=W.getComputedStyle(e).cursor==='pointer'||e.hasAttribute('onclick')||e.matches('a,button,[role=button],.kn-n[data-c]')||!!e.closest('a[href],button,[onclick],[role=button]')||(typeof W.acKnCardOf==='function'&&!!W.acKnCardOf(e))}catch(_){}
+    if(can)continue;var lf=e.querySelectorAll('*');
+    for(var k=0;k<lf.length&&k<60;k++){var x=lf[k];if(x.children.length||!/\d/.test(x.textContent||'')||x.closest('.vc-bk,a,button,[onclick]'))continue;var xs=W.getComputedStyle(x);if(parseFloat(xs.fontSize)<17)continue;
+     var c=rgb(xs.color);if(!c)continue;var sat=Math.max(c[0],c[1],c[2])-Math.min(c[0],c[1],c[2]);if(sat<70||(c[0]>170&&c[1]<110&&c[2]<110))continue;x.classList.add('vc-k0')}}}catch(_){}}
  var BSEL='button,input[type=button],input[type=submit],[role=button],[role=tab],a[class*="btn"],label[class*="btn"],label.cursor-pointer,.btn,.tab,.chip,.kn-chip';
  function bricks(){try{var bs=document.querySelectorAll(BSEL),m=0,vw=W.innerWidth;
    for(var j=0;j<bs.length&&m<600;j++){var o=bs[j];if(o.__vcb)continue;var w=o.offsetWidth,h=o.offsetHeight;if(!w)continue;o.__vcb=1;m++;
-    if(w<24||h<22||h>110||(w>vw*.9&&h>70))continue;
-    if(o.classList.contains('vc3')||o.matches('.kn-br,[role=switch],[data-nobrick],.kn-n')||o.closest('#vmBox,#vmPanel,#vpPanel,[data-nobrick],td,th,.leaflet-container'))continue;
+    if(w<24||h<22||h>220||(w>vw*.9&&h>70))continue;
+    if(o.classList.contains('vc3')||o.matches('.kn-br,[role=switch],[data-nobrick],.kn-n')||o.closest('#vmBox,#vmPanel,#vpPanel,[data-nobrick],td,th,.leaflet-container'+SIDE))continue;
     var cs=W.getComputedStyle(o);if(cs.display==='inline'||cs.display==='contents')continue;
     var c=rgb(cs.backgroundColor),img=cs.backgroundImage!=='none',clear=!img&&(!c||c[3]<0.15);
-    if(clear&&(h<24||w<34))continue;   /* 沒底色的小字連結不變成磚 */
-    o.classList.add('vc-bk');if(parseFloat(cs.borderTopLeftRadius)<9&&h>=24)o.classList.add('vc-bk-r');o.classList.remove('vc-opt','vc-opt-d');if(clear)o.classList.add('vc-bk-c');else if(!img)o.classList.add('vc-bk-t');
+    if(clear&&(h<24||w<34))continue;
+    if(h>64){if(!clear&&!o.__vc3&&!o.closest('.vc3')){o.__vc3=1;tag(o,cs,w,h)}continue}   /* 大顆的（數字磚）＝卡片：金屬，不要石頭粗粒 */   /* 沒底色的小字連結不變成磚 */
+    o.classList.add('vc-bk');if(parseFloat(cs.borderTopLeftRadius)<9&&h>=24)o.classList.add('vc-bk-r'+(j%4));o.classList.remove('vc-opt','vc-opt-d');if(clear)o.classList.add('vc-bk-c');else if(!img)o.classList.add('vc-bk-t');
     /* v2.7 字：淺底上的灰字看不清楚 → 加深（原本就有顏色的字，例如選到的藍／綠，不動） */
     var tc=rgb(cs.color),bg=clear?pageBg():(c&&c[3]>=0.15?c:bgOf(o));
-    if(tc&&bg&&lum(bg)>0.6&&lum(tc)>0.22&&(Math.max(tc[0],tc[1],tc[2])-Math.min(tc[0],tc[1],tc[2]))<70)o.classList.add('vc-bk-k');
+    if(bg&&lum(bg)>0.6)o.classList.add('vc-bk-k');
     if(cs.transform==='none'&&cs.position!=='fixed'&&cs.position!=='sticky')o.classList.add('vc-dt')}}catch(_){}}
  function tag(e,cs,w,hh){var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';
     var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
     e.classList.add('vc3');if(!hasImg)e.classList.add('vc3-g');if(dk)e.classList.add('vc3-d');
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
     if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
- function cards(){if(ct)return;ct=setTimeout(function(){ct=0;try{vars();
+ function cards(){if(ct)return;ct=setTimeout(function(){ct=0;try{vars();inkCards();
    var els=document.querySelectorAll(CSEL),n=0;
    for(var i=0;i<els.length&&n<500;i++){var e=els[i];if(e.__vc3)continue;
     var w=e.offsetWidth,hh=e.offsetHeight;if(!w&&!hh)continue;   /* 還沒顯示的下次再看 */
-    e.__vc3=1;n++;if(w<70||hh<36)continue;if(e.closest('#vmPanel,#vpPanel,#vmBox,#kn-foot,#kn-chips'))continue;if(e.hasAttribute('data-vpwp'))continue;
+    e.__vc3=1;n++;if(w<70||hh<36)continue;if(e.closest('#vmPanel,#vpPanel,#vmBox,#kn-foot,#kn-chips'+SIDE))continue;if(e.hasAttribute('data-vpwp'))continue;
     var cs=W.getComputedStyle(e);if(cs.position==='fixed'||cs.display==='inline'||cs.display==='contents')continue;
     var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';if(!hasImg&&(!c||c[3]<0.4))continue;
     var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
@@ -520,7 +567,7 @@
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
     /* 小張、裡面沒有輸入框／表格／影片的，才加按壓動作 */
     if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
-   generic();heads()}catch(_){}},180)}
+   generic();heads()}catch(_){}},70)}
  function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
   cards();chart3d();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d()}},3000);
   try{new MutationObserver(cards).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
@@ -528,7 +575,7 @@
   try{document.addEventListener('touchstart',function(){},{passive:true})}catch(_){}}
  /* v2.5 滑鼠經過／按下的浮凸感（事件掛在整頁，一次只標一個元素；不動各頁自己的樣式表） */
  var HSEL2='button,a[href],[onclick],[role=button],[role=tab],summary,select,label[for],.kn-br,.kn-n[data-c],.gcpt-kpi,.cmp-rec .cmp-pslot,.quickcard',hovEl=null,dnEl=null,dnT=0;
- function clk(t){try{if(!t||!t.closest||t.closest('#vmBox,#vmPanel,#vpPanel,[data-nohover]'))return null;
+ function clk(t){try{if(!t||!t.closest||t.closest('#vmBox,#vmPanel,#vpPanel,[data-nohover]'+SIDE))return null;
    var e=t.closest(HSEL2),tr=t.closest('tr');
    if(e&&e.tagName!=='TR'&&e!==document.body){if(e.disabled||e.getAttribute('aria-disabled')==='true')return null;}
    else{e=null;if(tr&&tr.parentElement&&tr.parentElement.tagName==='TBODY'&&tr.cells.length>=2){var pc=false;try{pc=W.getComputedStyle(tr).cursor==='pointer'}catch(_){}if(pc||tr.hasAttribute('onclick')||/\b(kn-able|pkn-row|r)\b/.test(tr.className))e=tr}
