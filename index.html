@@ -6382,9 +6382,13 @@ init();
  const findOrd=(style,price)=>{ const I=ordIx(), k=KN(style); if(!k)return null; let l=I.st.get(k), how='same';
   if(!l){ const p=I.keys.find(x=>x.length>=4&&k.startsWith(x)); if(p){l=I.st.get(p);how='prefix'} }
   if(!l){ const p=I.keys.find(x=>k.length>=4&&x.startsWith(k)); if(p){l=I.st.get(p);how='longer'} }
-  if(!l||!l.length)return null; let o=l[0];
-  if(price>0){ let best=null,d=1e9; l.slice(0,30).forEach(x=>{const dd=Math.abs(x.price-price)/price; if(dd<d){d=dd;best=x}}); if(best&&d<0.35)o=best }
-  return {o,how,n:l.length} };
+  if(!l||!l.length)return null;
+  /* 樣品單（-SAM）和三年前的舊單只在沒有別的單時才用 */
+  const cut=String(TODAY.getFullYear()-3); const good=l.filter(x=>!/SAM/i.test(String(x.my_no||'')+String(x.od_no||''))&&String(x.order_date||'')>=cut); if(good.length)l=good;
+  let o=l[0], d=price>0?Math.abs(o.price-price)/price:0;
+  if(price>0){ l.slice(0,40).forEach(x=>{const dd=Math.abs(x.price-price)/price; if(dd<d){d=dd;o=x}}) }
+  if(how!=='same'&&price>0&&d>0.35)return null;   /* 近似款但單價差太多：當作找不到，不硬比 */
+  return {o,how,n:l.length,unit:how==='same'&&price>0&&d>0.6} };
  const CC=new Map(); const costOf=o=>{ const k=o.id||(o.od_no+'|'+o.my_no+'|'+o.price); if(!CC.has(k)){ let c=null; try{c=costOrder(o,'latest')}catch(e){c=null} CC.set(k,c) } return CC.get(k) };
  window.dmSet=(k,v)=>{ St('dmargin')[k]=v; rerender() };
  RENDER.dmargin=function(){
@@ -6394,10 +6398,10 @@ init();
   const all=refs('margin'); if(!all.length)return pageHead('dmargin')+empty();
   const custs=[...new Set(all.map(r=>r.cust))];
   const rows=all.map(r=>{ const m=findOrd(r.style,r.price); let x={r,m,po:null,dp:null,sm:null,dm:null,flag:'nomatch'};
-   if(m){ x.po=m.o.price; x.dp=(r.price-m.o.price)/m.o.price*100; const c=costOf(m.o); if(c&&c.total!=null&&r.price>0){ x.sm=(r.price-c.total)/r.price*100; x.cost=c.total; if(r.margin!=null)x.dm=x.sm-r.margin }
-    x.flag=Math.abs(x.dp)>3?'price':(x.dm!=null&&x.dm<-5)?'low':(x.dm!=null&&x.dm>5)?'high':'ok' }
+   if(m){ x.po=m.o.price; x.dp=(r.price-m.o.price)/m.o.price*100; const c=m.unit?null:costOf(m.o); if(c&&c.total!=null&&r.price>0){ x.sm=(r.price-c.total)/r.price*100; x.cost=c.total; if(r.margin!=null)x.dm=x.sm-r.margin }
+    x.flag=m.unit?'unit':Math.abs(x.dp)>3?'price':(x.dm!=null&&x.dm<-5)?'low':(x.dm!=null&&x.dm>5)?'high':'ok' }
    return x });
-  const FL={ok:['相符','Matches','good'],price:['售價和 PO 不同','Price ≠ PO','warn'],low:['系統算的利潤較低','System margin lower','crit'],high:['系統算的利潤較高','System margin higher','info'],nomatch:['ERP 找不到此款','Not in ERP','neu']};
+  const FL={ok:['相符','Matches','good'],price:['售價和 PO 不同','Price ≠ PO','warn'],low:['系統算的利潤較低','System margin lower','crit'],high:['系統算的利潤較高','System margin higher','info'],unit:['單位可能不同（打／件／組）','Unit differs?','neu'],nomatch:['ERP 找不到此款','Not in ERP','neu']};
   let V=rows.filter(x=>(!st.cust||x.r.cust===st.cust)&&(st.f==='all'||x.flag===st.f)&&(!st.q||KN(x.r.style+x.r.desc).includes(KN(st.q))));
   V.sort((a,b)=>(Math.abs(b.dm||0)+Math.abs(b.dp||0))-(Math.abs(a.dm||0)+Math.abs(a.dp||0)));
   const base=rows.filter(x=>!st.cust||x.r.cust===st.cust); const cnt=k=>base.filter(x=>x.flag===k).length;
@@ -6407,7 +6411,7 @@ init();
   h+=`<p class="note info small">📨 ${L('資料來源：Dillard Cheek 的 Margin 報表 ','Source: Dillard Cheek margin reports ')}${[...new Set(all.map(r=>r.src_date))].sort().map(d=>`<b>${esc(d)}</b>（${esc([...new Set(all.filter(r=>r.src_date===d).map(r=>r.cust))].join('、'))}）`).join('；')}。${L('報表只有售價和 Margin，沒有成本明細；「系統 Margin」＝用 ERP 的 BOM×料價＋SMV×工資／製費率（同款式損益）算出來的估計。','Reports have price and margin only; system margin = ERP BOM × price + SMV × rates (same as Style P&L).')}</p>`;
   h+=`<div class="kpis">${kpi(L('報表列數','Rows'),fmt(base.length),'',esc(st.cust||L('全部客戶','All customers')))}${kpi(L('Dillard 平均 Margin','Dillard avg margin'),pc(avg(base,x=>x.r.margin)))}${kpi(L('系統估算平均 Margin','System avg margin'),pc(avg(base,x=>x.sm)),'',L('有對到 ERP 的列','matched rows'))}${kpi(L('對到 ERP 訂單','Matched to ERP'),fmt(base.length-cnt('nomatch')),'',pc(base.length?(base.length-cnt('nomatch'))/base.length*100:null))}${kpi(L('售價和 PO 不同','Price ≠ PO'),fmt(cnt('price')),'','>3%',cnt('price')?'warn':'')}${kpi(L('系統利潤低 5 點以上','Margin 5pt lower'),fmt(cnt('low')),'','',cnt('low')?'crit':'')}</div>`;
   h+=`<div class="toolbar"><div class="seg">${['',...custs].map(c=>`<button class="${st.cust===c?'on':''}" onclick="dmSet('cust','${esc(c)}')">${esc(c||L('全部','All'))}</button>`).join('')}</div>
-   <div class="seg">${['all','price','low','high','ok','nomatch'].map(k=>`<button class="${st.f===k?'on':''}" onclick="dmSet('f','${k}')">${k==='all'?L('全部','All'):esc(L(FL[k][0],FL[k][1]))}</button>`).join('')}</div>
+   <div class="seg">${['all','price','low','high','ok','unit','nomatch'].map(k=>`<button class="${st.f===k?'on':''}" onclick="dmSet('f','${k}')">${k==='all'?L('全部','All'):esc(L(FL[k][0],FL[k][1]))}</button>`).join('')}</div>
    <input class="inp" style="max-width:200px" placeholder="${L('找款號','Search style')}" value="${esc(st.q)}" onchange="dmSet('q',this.value)"></div>`;
   /* Paul 的核對報告（每個客戶的結論） */
   const notes=refs('mnote').filter(n=>!st.cust||String(n.cust).includes(st.cust));
