@@ -6491,8 +6491,8 @@ init();
  RENDER.guides=function(){
   const st=St('guides'); st.c=st.c||''; const G=refs('guide').sort((a,b)=>String(b.src_date).localeCompare(String(a.src_date))); let h=pageHead('guides'); if(!G.length)return h+empty();
   const cats=[...new Set(G.map(r=>r.category))];
-  h+=`<div class="toolbar"><div class="seg">${['',...cats].map(c=>`<button class="${st.c===c?'on':''}" onclick="S('guides').c='${esc(c)}';rerender()">${esc(c||L('全部','All'))}</button>`).join('')}</div></div>`;
-  G.filter(r=>!st.c||r.category===st.c).forEach(r=>{ h+=`<div class="panel" style="margin-bottom:12px"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><h2 style="flex:1;min-width:220px">📘 ${esc(r.title)}</h2><span class="st info">${esc(r.category)}</span><button class="btn sm" onclick="refCopy('${r.id}')">📋 ${L('複製重點（貼週報）','Copy key points')}</button></div>${src(r)}${pts(r.points)}${full(r)}${noteBox(r,L('後續修訂、實際執行情況…','Revisions, how it went…'))}</div>` });
+  h+=`<div class="toolbar"><div class="seg">${['',...cats,...(refs('report').length?['📊 分析報告']:[])].map(c=>`<button class="${st.c===c?'on':''}" onclick="S('guides').c='${esc(c)}';rerender()">${esc(c||L('全部','All'))}</button>`).join('')}</div></div>`;
+  G.filter(r=>!st.c||r.category===st.c).filter(()=>st.c!=='📊 分析報告').forEach(r=>{ h+=`<div class="panel" style="margin-bottom:12px"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><h2 style="flex:1;min-width:220px">📘 ${esc(r.title)}</h2><span class="st info">${esc(r.category)}</span><button class="btn sm" onclick="refCopy('${r.id}')">📋 ${L('複製重點（貼週報）','Copy key points')}</button></div>${src(r)}${pts(r.points)}${full(r)}${noteBox(r,L('後續修訂、實際執行情況…','Revisions, how it went…'))}</div>` });
   return h };
 
  /* ══════════ 5. 📋 年底盤點計畫（布倉／輔料倉） ══════════ */
@@ -6533,6 +6533,27 @@ init();
     <p class="small muted">${L('只列差異最大的 80 個；全部在工作簿「05_系統vsERP」。「ERP 現在」＝目前 ERP 布料快照同料號、同色號的結存合計。','Top 80 gaps; full list in workbook sheet 05.')}</p></details>` } }
   return h };
 
+ /* ══════════ 6. 📎 相關報告（v1.6.1 2026-11-24）：每份報告依性質掛在相關的頁面上方，守則頁也列全部 ══════════
+    Paul 11/24：看的人要立刻懂、會操作，而且不要誤解真實成本或目的 → 每份都標「這份是什麼／不是什麼」。 */
+ const TYC={'會計實際數':'good','計畫對實際':'info','口徑說明':'neu','排單分析':'info','報價試算':'warn','情境試算':'warn'};
+ const tyCls=t=>{for(const k in TYC)if(String(t||'').includes(k))return TYC[k];return 'neu'};
+ const relOf=k=>[...refs('report'),...refs('guide')].filter(r=>String(r.pages||'').split(',').map(x=>x.trim()).includes(k)).sort((a,b)=>String(b.src_date).localeCompare(String(a.src_date)));
+ const relItem=r=>`<details style="border-top:1px solid var(--line-2);padding:6px 0"><summary style="cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="st ${tyCls(r.rtype||r.category)}">${esc(r.rtype||r.category||'')}</span><b style="font-size:13px">${esc(r.title)}</b><span class="small muted">${esc(r.src_from||'')} · ${esc(r.src_date||'')}</span></summary>
+   ${r.isnot?`<p class="note warn small" style="margin:6px 0">⚠️ ${esc(r.isnot)}</p>`:''}${pts(r.points)}${r.attach?`<p class="small muted" style="margin:6px 0 0">📎 ${L('原信附件：','Attachment: ')}${esc(r.attach)}</p>`:''}${full(r)}</details>`;
+ window.refRelBox=function(k){ const R=relOf(k); if(!R.length)return ''; return `<div class="panel" style="margin:0 0 14px;padding:10px 14px"><div style="display:flex;gap:8px;align-items:center"><b>📎 ${L('相關報告','Related reports')}（${R.length}）</b><span class="small muted">${L('Paul 寫的分析與說明；點開看重點。黃色＝試算／假設，不是實際帳。','Paul’s analyses; yellow = estimate, not actual books.')}</span><a class="small" style="margin-left:auto" href="#guides">${L('全部 →','All →')}</a></div>${R.map(relItem).join('')}</div>` };
+ const injectRel=(k,h)=>{ h=String(h); const box=refRelBox(k); if(!box)return h; const i=h.indexOf('<div class="acts">'); if(i>=0){ const j=h.indexOf('</div></div>',i); if(j>=0)return h.slice(0,j+12)+box+h.slice(j+12) } return box+h };
+ const REL_PAGES=['p-ie','styles','factory-cost','costing','stylepl','dmargin','forecast','production','p-prodplan','p-sewing','labor','ordercenter'];
+ REL_PAGES.forEach(k=>{ const o=RENDER[k]; if(typeof o!=='function'||o.__rel)return; const w=function(){ return injectRel(k,o.apply(this,arguments)) }; w.__rel=1; RENDER[k]=w });
+ /* 守則頁：連報告一起列 */
+ T.guides=['生產作業守則與報告','Production guidelines & reports','គោលការណ៍ និងរបាយការណ៍'];
+ T.sub_guides=['Paul 寫的加班、停工、SOP、成本、報價試算、SMV、排單報告。每份標明是「實際帳」還是「試算／假設」，週報月報引用時不會弄錯；同一份也會出現在相關頁面上方。','Paul’s guidelines and analysis reports, each labelled actual vs estimate.'];
+ const _rg=RENDER.guides; RENDER.guides=function(){ const st=St('guides'); const R=refs('report'); if(!R.length)return _rg.apply(this,arguments);
+  let h=String(_rg.apply(this,arguments)); if(st.c&&st.c!=='📊 分析報告')return h;
+  const sec=`<div class="sec-h">📊 ${L('分析報告（成本、報價、SMV、排單）','Analysis reports')} · ${R.length}</div>`+R.sort((a,b)=>String(b.src_date).localeCompare(String(a.src_date))).map(r=>`<div class="panel" style="margin-bottom:12px"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><h2 style="flex:1;min-width:220px">📊 ${esc(r.title)}</h2><span class="st ${tyCls(r.rtype)}">${esc(r.rtype||'')}</span><button class="btn sm" onclick="refCopy('${r.id}')">📋 ${L('複製重點（貼週報）','Copy key points')}</button></div>${src(r)}${r.isnot?`<p class="note warn small" style="margin:8px 0 0">⚠️ ${esc(r.isnot)}</p>`:''}${pts(r.points)}<p class="small muted" style="margin:6px 0 0">${L('也出現在：','Also shown on: ')}${String(r.pages||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<a href="#${esc(x)}">${esc(t(x))}</a>`).join('、')}</p>${r.attach?`<p class="small muted" style="margin:4px 0 0">📎 ${esc(r.attach)}</p>`:''}${full(r)}${noteBox(r,L('後續修訂、核對結果…','Follow-up…'))}</div>`).join('');
+  const i=h.indexOf('<div class="toolbar">'); const j=i>=0?h.indexOf('</div></div>',i)+12:-1;
+  if(st.c==='📊 分析報告'){ return j>0?h.slice(0,j)+sec:h+sec }
+  return h+sec };
+ const _rc2=window.refCopy; window.refCopy=function(id){ return _rc2(id) };
  try{ renderNav() }catch(e){}
 })();
 </script>
