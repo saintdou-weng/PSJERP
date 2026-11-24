@@ -6346,12 +6346,12 @@ init();
  const _por=pageOfRep; pageOfRep=function(r){return r==='refdoc'?'dmargin':_por(r)};
  const L=(zh,en)=>tt(zh,en);
  const KN=s=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'');
- const refs=k=>live(DB.refdocs||[]).filter(r=>r.kind===k);
+ const refs=k=>{ if(!Array.isArray(DB.refdocs))DB.refdocs=[]; return live(DB.refdocs).filter(r=>r.kind===k) };
  const pc=v=>v==null||isNaN(v)?'—':fmt(v,1)+'%';
  const src=r=>`<span class="small muted">${esc(r.src_from||'')}${r.src_date?' · '+esc(r.src_date):''}</span>`;
 
  /* ── 匯入（Claude 從信件整理好的資料，由這支寫進來、上雲端） ── */
- window.refImport=function(group,recs,info){ info=info||{}; const key='ref|'+group; const at=nowStamp();
+ window.refImport=function(group,recs,info){ info=info||{}; const key='ref|'+group; const at=nowStamp(); if(!Array.isArray(DB.refdocs))DB.refdocs=[];
   const old=new Map(live(DB.refdocs||[]).filter(r=>r.import_key===key).map(r=>[r.id,r]));
   const R=recs.map((r,i)=>{ const id='rf_'+group+'_'+(r.rid||i); const o=old.get(id);
    return Object.assign({id,import_key:key,source_system:'VRT_REF',source_record_id:key+'#'+(i+1),source_file:info.file||group,import_batch_id:key,synced_at:at},r,o&&o.notes?{notes:o.notes,tags:o.tags}:{}) });
