@@ -6331,6 +6331,203 @@ init();
 })();
 
 </script>
+<script>
+/* ---------- v1.6.0 (2026-11-24)：參考資料（Dillard Margin、客戶預估、機台租借、生產作業守則、年底盤點計畫） ----------
+   Paul 11/24：把 Dillard 傳來的各客戶 Margin 表、WPL 2027 預估、機台租借通知、Paul 寫的加班／停工／SOP／成本報告、布倉年底抽盤計畫放進 ERP，
+   跟系統資料（ERP 訂單單價、款式成本、應付、布料庫存）比對，有差異就看得到，並註明是誰、何時發的。
+   ・資料存在 DB.refdocs（rep＝refdoc，跟其他匯入一樣上雲端；雲端是 Paul 自己的 Google 試算表，不放在公開網頁裡）。
+   ・每一列都可以寫「備註」（雲端備註，跟訂單備註同一套），例如：PO 已到、金額已對、某天已盤。
+   五個頁面：💼 客戶報價 Margin（成本）、🔮 客戶預估（接單）、🛠 機台租借（生產，在機修零件旁）、📘 生產作業守則（中樞，週報月報引用）、📋 年底盤點計畫（備料，布倉／輔料倉）。 */
+(function(){
+ if(typeof REP_DS==='undefined')return;
+ REP_DS.refdoc='refdocs'; REP_SHEET.refdoc='ORDERS';
+ const _ld=loadDB; loadDB=async function(){ await _ld.apply(this,arguments); if(!Array.isArray(DB.refdocs))DB.refdocs=[] };
+ if(DB&&!Array.isArray(DB.refdocs))DB.refdocs=[];
+ const _por=pageOfRep; pageOfRep=function(r){return r==='refdoc'?'dmargin':_por(r)};
+ const L=(zh,en)=>tt(zh,en);
+ const KN=s=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'');
+ const refs=k=>live(DB.refdocs||[]).filter(r=>r.kind===k);
+ const pc=v=>v==null||isNaN(v)?'—':fmt(v,1)+'%';
+ const src=r=>`<span class="small muted">${esc(r.src_from||'')}${r.src_date?' · '+esc(r.src_date):''}</span>`;
+
+ /* ── 匯入（Claude 從信件整理好的資料，由這支寫進來、上雲端） ── */
+ window.refImport=function(group,recs,info){ info=info||{}; const key='ref|'+group; const at=nowStamp();
+  const old=new Map(live(DB.refdocs||[]).filter(r=>r.import_key===key).map(r=>[r.id,r]));
+  const R=recs.map((r,i)=>{ const id='rf_'+group+'_'+(r.rid||i); const o=old.get(id);
+   return Object.assign({id,import_key:key,source_system:'VRT_REF',source_record_id:key+'#'+(i+1),source_file:info.file||group,import_batch_id:key,synced_at:at},r,o&&o.notes?{notes:o.notes,tags:o.tags}:{}) });
+  const ds=R.map(r=>r.src_date).filter(Boolean).sort();
+  const meta={key,rep:'refdoc',fn:'REF',file:info.file||group,label:info.label||group,rows:R.length,at,dirty:true,version:null,cloud:false,range:[ds[0]||today(),ds[ds.length-1]||today()]};
+  storeBatch('refdoc',key,meta,R);
+  try{(DB.importlog=DB.importlog||[]).unshift({at,rep:'refdoc',file:meta.file,key,added:R.length,user:'paul.weng'})}catch(e){}
+  GC.clear(); persist(); try{renderNav()}catch(e){} if(typeof cloudReady==='function'&&cloudReady())setTimeout(()=>cloudSync(false),400); return R.length };
+
+ /* ── 備註（雲端備註） ── */
+ window.refNoteSave=function(id){ const r=(DB.refdocs||[]).find(x=>x.id===id); const el=document.getElementById('rn_'+id); if(!r||!el)return; const v=el.value.trim(); if(v===(r.notes||''))return;
+  const before={notes:r.notes||''}; r.notes=v; try{audit('refdocs',r.id,'EDIT',before,{notes:v})}catch(e){} try{cloudNote('refdocs',r)}catch(e){} persist(); toast(L('備註已存','Note saved')) };
+ const noteBox=(r,ph)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-top:6px"><textarea class="inp" id="rn_${r.id}" rows="1" style="min-height:34px;font-size:12.5px" placeholder="${esc(ph||L('備註（例如：已核對、PO 已到、已完成＋證據）','Note'))}">${esc(r.notes||'')}</textarea><button class="btn sm" onclick="refNoteSave('${r.id}')">${L('存','Save')}</button></div>`;
+ const pts=s=>`<ul style="margin:6px 0 0 18px;padding:0">${String(s||'').split('\n').filter(Boolean).map(x=>`<li style="margin:2px 0">${esc(x)}</li>`).join('')}</ul>`;
+ const full=r=>r.text?`<details style="margin-top:8px"><summary class="small" style="cursor:pointer;color:var(--accent)">${L('看原文全文','Full text')}</summary><div class="small" style="white-space:pre-wrap;max-height:420px;overflow:auto;background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px;padding:8px;margin-top:6px">${esc(r.text)}</div></details>`:'';
+ const empty=k=>`<div class="panel empty"><h2>${L('還沒有資料','No data yet')}</h2><p class="hint">${L('資料由 Claude 從信件整理後寫進來，並上雲端；其他電腦按 ☁️ 同步就會有。','Loaded by Claude from emails and synced to the cloud.')}</p></div>`;
+ const St=k=>S(k);
+
+ /* ══════════ 1. 💼 客戶報價 Margin（Dillard） ══════════ */
+ T.dmargin=['客戶報價 Margin（Dillard）','Customer quote margin (Dillard)','ប្រាក់ចំណេញតាមតម្លៃ'];
+ T.sub_dmargin=['Dillard 傳來的各客戶售價與 Margin，逐款對 ERP 最新 PO 單價和系統估算成本：售價對不對、利潤成不成立。每列註明 Dillard 哪天發的。','Dillard’s customer prices and margins vs ERP PO prices and system cost.'];
+ { const i=MODS.findIndex(m=>m[0]==='stylepl'); MODS.splice(i>=0?i+1:MODS.length,0,['dmargin','💼','g_cost','fin']) }
+ let OIX=null;
+ const ordIx=()=>{ if(OIX&&OIX.n===(DB.orders||[]).length)return OIX; const st=new Map(); let keys=[];
+  ordersView().forEach(o=>{ if(!(o.price>0))return; const k=KN(o.style); if(!k)return; let l=st.get(k); if(!l){st.set(k,l=[]);keys.push(k)} l.push(o) });
+  st.forEach(l=>l.sort((a,b)=>String(b.order_date||'').localeCompare(String(a.order_date||''))));
+  keys.sort((a,b)=>b.length-a.length); OIX={st,keys,n:(DB.orders||[]).length}; return OIX };
+ const findOrd=(style,price)=>{ const I=ordIx(), k=KN(style); if(!k)return null; let l=I.st.get(k), how='same';
+  if(!l){ const p=I.keys.find(x=>x.length>=4&&k.startsWith(x)); if(p){l=I.st.get(p);how='prefix'} }
+  if(!l){ const p=I.keys.find(x=>k.length>=4&&x.startsWith(k)); if(p){l=I.st.get(p);how='longer'} }
+  if(!l||!l.length)return null; let o=l[0];
+  if(price>0){ let best=null,d=1e9; l.slice(0,30).forEach(x=>{const dd=Math.abs(x.price-price)/price; if(dd<d){d=dd;best=x}}); if(best&&d<0.35)o=best }
+  return {o,how,n:l.length} };
+ const CC=new Map(); const costOf=o=>{ const k=o.id||(o.od_no+'|'+o.my_no+'|'+o.price); if(!CC.has(k)){ let c=null; try{c=costOrder(o,'latest')}catch(e){c=null} CC.set(k,c) } return CC.get(k) };
+ window.dmSet=(k,v)=>{ St('dmargin')[k]=v; rerender() };
+ RENDER.dmargin=function(){
+  const st=St('dmargin'); st.cust=st.cust||''; st.f=st.f||'all'; st.q=st.q||''; st.all=st.all||0;
+  const L0=(window.DS_LAZY||{}).LOADED; const need=['bom','price','purchase'].filter(k=>L0&&!L0.has(k));
+  if(need.length){ ensureDS(need).then(()=>{CC.clear();GC.clear();if(CUR==='dmargin')rerender()}); return pageHead('dmargin')+`<div class="note">⏳ ${L('載入 BOM／料價…','Loading BOM / prices…')}</div>` }
+  const all=refs('margin'); if(!all.length)return pageHead('dmargin')+empty();
+  const custs=[...new Set(all.map(r=>r.cust))];
+  const rows=all.map(r=>{ const m=findOrd(r.style,r.price); let x={r,m,po:null,dp:null,sm:null,dm:null,flag:'nomatch'};
+   if(m){ x.po=m.o.price; x.dp=(r.price-m.o.price)/m.o.price*100; const c=costOf(m.o); if(c&&c.total!=null&&r.price>0){ x.sm=(r.price-c.total)/r.price*100; x.cost=c.total; if(r.margin!=null)x.dm=x.sm-r.margin }
+    x.flag=Math.abs(x.dp)>3?'price':(x.dm!=null&&x.dm<-5)?'low':(x.dm!=null&&x.dm>5)?'high':'ok' }
+   return x });
+  const FL={ok:['相符','Matches','good'],price:['售價和 PO 不同','Price ≠ PO','warn'],low:['系統算的利潤較低','System margin lower','crit'],high:['系統算的利潤較高','System margin higher','info'],nomatch:['ERP 找不到此款','Not in ERP','neu']};
+  let V=rows.filter(x=>(!st.cust||x.r.cust===st.cust)&&(st.f==='all'||x.flag===st.f)&&(!st.q||KN(x.r.style+x.r.desc).includes(KN(st.q))));
+  V.sort((a,b)=>(Math.abs(b.dm||0)+Math.abs(b.dp||0))-(Math.abs(a.dm||0)+Math.abs(a.dp||0)));
+  const base=rows.filter(x=>!st.cust||x.r.cust===st.cust); const cnt=k=>base.filter(x=>x.flag===k).length;
+  const avg=(arr,f)=>{const a=arr.map(f).filter(v=>v!=null&&!isNaN(v));return a.length?a.reduce((s,v)=>s+v,0)/a.length:null};
+  const dates=[...new Set(all.map(r=>r.cust+' '+r.src_date))];
+  let h=pageHead('dmargin');
+  h+=`<p class="note info small">📨 ${L('資料來源：Dillard Cheek 的 Margin 報表 ','Source: Dillard Cheek margin reports ')}${[...new Set(all.map(r=>r.src_date))].sort().map(d=>`<b>${esc(d)}</b>（${esc([...new Set(all.filter(r=>r.src_date===d).map(r=>r.cust))].join('、'))}）`).join('；')}。${L('報表只有售價和 Margin，沒有成本明細；「系統 Margin」＝用 ERP 的 BOM×料價＋SMV×工資／製費率（同款式損益）算出來的估計。','Reports have price and margin only; system margin = ERP BOM × price + SMV × rates (same as Style P&L).')}</p>`;
+  h+=`<div class="kpis">${kpi(L('報表列數','Rows'),fmt(base.length),'',esc(st.cust||L('全部客戶','All customers')))}${kpi(L('Dillard 平均 Margin','Dillard avg margin'),pc(avg(base,x=>x.r.margin)))}${kpi(L('系統估算平均 Margin','System avg margin'),pc(avg(base,x=>x.sm)),'',L('有對到 ERP 的列','matched rows'))}${kpi(L('對到 ERP 訂單','Matched to ERP'),fmt(base.length-cnt('nomatch')),'',pc(base.length?(base.length-cnt('nomatch'))/base.length*100:null))}${kpi(L('售價和 PO 不同','Price ≠ PO'),fmt(cnt('price')),'','>3%',cnt('price')?'warn':'')}${kpi(L('系統利潤低 5 點以上','Margin 5pt lower'),fmt(cnt('low')),'','',cnt('low')?'crit':'')}</div>`;
+  h+=`<div class="toolbar"><div class="seg">${['',...custs].map(c=>`<button class="${st.cust===c?'on':''}" onclick="dmSet('cust','${esc(c)}')">${esc(c||L('全部','All'))}</button>`).join('')}</div>
+   <div class="seg">${['all','price','low','high','ok','nomatch'].map(k=>`<button class="${st.f===k?'on':''}" onclick="dmSet('f','${k}')">${k==='all'?L('全部','All'):esc(L(FL[k][0],FL[k][1]))}</button>`).join('')}</div>
+   <input class="inp" style="max-width:200px" placeholder="${L('找款號','Search style')}" value="${esc(st.q)}" onchange="dmSet('q',this.value)"></div>`;
+  /* Paul 的核對報告（每個客戶的結論） */
+  const notes=refs('mnote').filter(n=>!st.cust||String(n.cust).includes(st.cust));
+  if(notes.length)h+=`<div class="grid2" style="margin-bottom:14px">${notes.map(n=>`<div class="panel"><h2>📝 ${esc(n.title)}</h2>${src(n)}<span class="small muted"> · Dillard ${esc(n.dillard_date||'')} ${L('發','sent')}</span>${pts(n.points)}${full(n)}${noteBox(n)}</div>`).join('')}</div>`;
+  const show=st.all?V:V.slice(0,200);
+  h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('客戶','Cust')}</th><th>${L('款號','Style')}</th><th>${L('品名／尺寸／顏色','Desc')}</th><th class="r">Dillard ${L('售價','price')}</th><th class="r">Dillard Margin</th><th class="r">ERP ${L('最新 PO 單價','PO price')}</th><th class="r">${L('售價差','Δ price')}</th><th class="r">${L('系統單件成本','Sys cost')}</th><th class="r">${L('系統 Margin','Sys margin')}</th><th class="r">${L('差（點）','Δ pt')}</th><th>${L('判斷','Check')}</th><th>${L('來源','Source')}</th></tr></thead><tbody>
+   ${show.map(x=>{const r=x.r,o=x.m&&x.m.o,f=FL[x.flag];return `<tr><td data-l="${L('客戶','Cust')}">${esc(r.cust)}</td><td class="lead mono">${esc(r.style)}</td><td class="wrap small" data-l="${L('品名','Desc')}">${esc([r.desc,r.size,r.color].filter(Boolean).join(' · '))}${r.extra?`<div class="muted">${esc(r.extra)}</div>`:''}</td>
+    <td class="r" data-l="Dillard">${money(r.price,3)}<div class="small muted">${esc(r.term||'')}</div></td><td class="r" data-l="Margin">${pc(r.margin)}</td>
+    <td class="r" data-l="PO">${o?money(o.price,3)+`<div class="small muted">${esc(String(o.order_date||'').slice(0,10))} · ${esc(o.my_no||o.od_no||'')}${x.m.how!=='same'?' · '+L('近似款','similar'):''}</div>`:'—'}</td>
+    <td class="r ${x.dp>3?'diff-neg':''}" data-l="${L('售價差','Δ')}">${x.dp==null?'—':(x.dp>0?'+':'')+fmt(x.dp,1)+'%'}</td><td class="r" data-l="${L('成本','Cost')}">${x.cost!=null?money(x.cost,3):'—'}</td>
+    <td class="r ${x.sm!=null&&x.sm<0?'diff-neg':''}" data-l="${L('系統','Sys')}">${pc(x.sm)}</td><td class="r ${x.dm!=null&&x.dm<-5?'diff-neg':x.dm>5?'diff-pos':''}" data-l="Δ">${x.dm==null?'—':(x.dm>0?'+':'')+fmt(x.dm,1)}</td>
+    <td data-l="${L('判斷','Check')}"><span class="st ${f[2]}">${esc(L(f[0],f[1]))}</span></td><td class="small muted" data-l="${L('來源','Src')}">Dillard ${esc(r.src_date)}<br>${esc(r.file)}</td></tr>`}).join('')}</tbody></table></div>`;
+  if(V.length>200&&!st.all)h+=`<p class="small"><button class="btn sm" onclick="dmSet('all',1)">${L('顯示全部 ','Show all ')}${fmt(V.length)}</button></p>`;
+  h+=`<p class="small muted">${L('對法：款號去掉空白符號後完全相同＝同款；Dillard 的料號比 ERP 款號長（例如 ADI 料號含顏色尺寸）時，取最長的 ERP 款號開頭相同的那一款；同款有多張 PO 時取單價最接近的一張。售價差超過 3% 或系統 Margin 低 5 點以上才標示。系統成本用的是 ERP 的 BOM 和料價，不是 Dillard 的 costing sheet，只能當參考。','Matching: same style key, or longest ERP style that the item code starts with; closest-price PO. Flags: price differs >3% or system margin 5 pt lower.')}</p>`;
+  return h };
+
+ /* ══════════ 2. 🔮 客戶預估 Forecast ══════════ */
+ T.forecast=['客戶預估 Forecast','Customer forecast','ការព្យាករណ៍អតិថិជន'];
+ T.sub_forecast=['客戶提供的採購預估（還不是訂單），之後 PO 進來時對照：有沒有下、下了多少、差多少。','Customer purchase projections vs the POs that later arrive.'];
+ { const i=MODS.findIndex(m=>m[0]==='ordercenter'); const j=i>=0?i+1:MODS.findIndex(m=>m[0]==='orders')+1; MODS.splice(j>0?j:MODS.length,0,['forecast','🔮','g_order','prod']) }
+ const CAT=[['桌布、桌旗',/TABLE|CLOTH|TPS|ROUND|RUNNER|桌/],['餐巾',/NAP|餐巾|SERV/],['圍裙',/APRON|BIB|圍裙|\bAP\d/],['襯衫、褲子、廚師服',/.*/]];
+ const catOf=o=>{ const s=String([o.style,o.name,o.desc,o.item,o.style_name].filter(Boolean).join(' ')).toUpperCase(); return (CAT.find(c=>c[1].test(s))||CAT[3])[0] };
+ RENDER.forecast=function(){
+  const F=refs('forecast'); let h=pageHead('forecast'); if(!F.length)return h+empty();
+  const custs=[...new Set(F.map(r=>r.cust))];
+  custs.forEach(cu=>{ const fs=F.filter(r=>r.cust===cu), since=fs.map(r=>r.src_date).sort()[0]||'';
+   const re=cu==='WPL'?/WPL|WHITE\s*PLAINS/i:new RegExp(cu,'i');
+   const os=ordersView().filter(o=>re.test(String(o.cust||''))&&String(o.order_date||'')>=since);
+   const by={}; os.forEach(o=>{const c=catOf(o);(by[c]=by[c]||{q:0,n:new Set()}).q+=(+o.qty||0);by[c].n.add(o.od_no||o.my_no)});
+   const tot=fs.reduce((s,r)=>s+(+r.qty||0),0), got=os.reduce((s,o)=>s+(+o.qty||0),0);
+   const fn=refs('fnote').filter(n=>n.cust===cu);
+   h+=`<div class="panel" style="margin-bottom:14px"><h2>🔮 ${esc(cu)} · ${esc(fs[0].period||'')} ${L('採購預估','projection')}</h2>${src(fs[0])}
+    <div class="kpis" style="margin-top:10px">${kpi(L('預估總量','Forecast qty'),fmt(tot),L('件','pcs'),esc(fs[0].expect||''))}${kpi(L(since+' 後 ERP 已下單','ERP orders since '+since),fmt(got),L('件','pcs'),fmt(new Set(os.map(o=>o.od_no||o.my_no)).size)+L(' 張單',' orders'),got?'good':'warn')}${kpi(L('已下單／預估','Ordered / forecast'),pc(tot?got/tot*100:null))}</div>
+    <p class="note ${os.length?'info':'warn'} small" style="margin-top:10px">${os.length?L('ERP 已看到 '+since+' 之後的 '+cu+' 訂單，下面逐類對照。','ERP shows '+cu+' orders after '+since+'.'):L('ERP 還沒看到 '+since+' 之後的 '+cu+' 訂單（'+(fs[0].expect||'')+'）。PO 進 ERP 後這裡會自動對上。','No '+cu+' orders in ERP since '+since+' yet.')}</p>
+    <div class="tbl-wrap" style="margin-top:10px"><table class="t cards"><thead><tr><th>${L('類別','Category')}</th><th class="r">${L('預估件數','Forecast')}</th><th>${L('主要品項','Items')}</th><th class="r">${L('ERP 已下單','Ordered')}</th><th class="r">${L('差','Gap')}</th><th>${L('備註','Note')}</th></tr></thead><tbody>
+    ${fs.map(r=>{const g=by[r.category]||{q:0,n:new Set()};const d=g.q-(+r.qty||0);return `<tr><td class="lead">${esc(r.category)}</td><td class="r" data-l="${L('預估','Fc')}">${fmt(r.qty)}</td><td class="wrap small" data-l="${L('品項','Items')}">${esc(r.items||'')}</td><td class="r" data-l="${L('已下單','Ord')}">${fmt(g.q)}<div class="small muted">${g.n.size?fmt(g.n.size)+L(' 張',' POs'):''}</div></td><td class="r ${d<0?'diff-neg':'diff-pos'}" data-l="${L('差','Gap')}">${(d>0?'+':'')+fmt(d)}</td><td class="wrap" data-l="${L('備註','Note')}">${noteBox(r,L('例如：PO 已到、改量、延後','e.g. PO received'))}</td></tr>`}).join('')}</tbody></table></div>
+    <p class="small muted">${esc(fs[0].note||'')}</p>
+    ${fn.map(n=>`<div style="margin-top:10px"><h3>📝 ${esc(n.title)}</h3>${src(n)}${pts(n.points)}${full(n)}${noteBox(n)}</div>`).join('')}</div>` });
+  h+=`<p class="small muted">${L('對法：預估日期之後、客戶名稱相符的 ERP 訂單；類別用款號／品名的字判斷（TABLE、NAP、APRON…），其餘歸成衣，只當參考。','Orders after the forecast date for the same customer; category by style/name keywords.')}</p>`;
+  return h };
+
+ /* ══════════ 3. 🛠 機台租借（在機修零件旁） ══════════ */
+ T.rental=['機台租借','Machine rental','ជួលម៉ាស៊ីន'];
+ T.sub_rental=['向外租機台的通知（何時、租什麼、多少錢、為哪些單），對照應付／採購有沒有這筆、金額對不對。','Machine rental notices vs payables / purchase records.'];
+ { const i=MODS.findIndex(m=>m[0]==='p-spare'); MODS.splice(i>=0?i+1:MODS.length,0,['rental','🛠️','g_make','prod']) }
+ const RX=/熱轉印|熱轉|HEAT\s*TRANS|HEAT\s*PRESS|FUSING|燙襯|雙針|DOUBLE\s*NEEDLE|租|RENT/i;
+ const amtOf=r=>{for(const k of ['amount','amt','total','pay_amt','inv_amt','ap_amt','money','sum']){const v=+r[k];if(v)return v}return null};
+ const dOf=r=>String(r.pay_date||r.recv_date||r.inv_date||r.date||r.po_date||r.purchase_date||r.voucher_date||'').slice(0,10);
+ RENDER.rental=function(){
+  const L0=(window.DS_LAZY||{}).LOADED; const need=['payables','purchase'].filter(k=>L0&&!L0.has(k));
+  if(need.length){ ensureDS(need).then(()=>{GC.clear();if(CUR==='rental')rerender()}); return pageHead('rental')+`<div class="note">⏳ ${L('載入應付／採購…','Loading payables / purchase…')}</div>` }
+  const R=refs('rental').sort((a,b)=>String(a.src_date).localeCompare(String(b.src_date))); let h=pageHead('rental'); if(!R.length)return h+empty();
+  const pool=[...live(DB.payables||[]).map(r=>['AP',r]),...live(DB.purchase||[]).map(r=>[L('採購','PO'),r])].filter(([,r])=>RX.test(Object.values(r).filter(v=>typeof v==='string').join(' ')));
+  const tot=R.reduce((s,r)=>s+(+r.amount||0),0);
+  h+=`<div class="kpis">${kpi(L('租借通知','Notices'),fmt(R.length))}${kpi(L('通知金額合計','Notified total'),money(tot,0),'',L('每月租金合計（照通知）','monthly rents as notified'))}${kpi(L('應付／採購裡找到的租借相關列','Matching AP / PO lines'),fmt(pool.length),'',pool.length?L('依關鍵字：租、熱轉印、燙襯、雙針…','by keyword'):L('目前 ERP 應付、採購都找不到','none found in AP / PO'),pool.length?'':'warn')}</div>`;
+  h+=`<div class="tbl-wrap mt"><table class="t cards"><thead><tr><th>${L('通知日期','Notice')}</th><th>${L('機台','Machine')}</th><th>${L('台數','Units')}</th><th class="r">${L('金額','Amount')}</th><th>${L('期間','Period')}</th><th class="r">${L('件數','Qty')}</th><th>${L('訂單','Orders')}</th><th>${L('ERP 對照','ERP check')}</th><th>${L('備註','Note')}</th></tr></thead><tbody>
+   ${R.map(r=>{ const d0=r.src_date, d1=new Date(new Date(d0).getTime()+75*864e5).toISOString().slice(0,10), d00=new Date(new Date(d0).getTime()-15*864e5).toISOString().slice(0,10);
+    const hit=pool.filter(([,x])=>{const d=dOf(x);return d&&d>=d00&&d<=d1}); const same=hit.filter(([,x])=>{const a=amtOf(x);return a!=null&&Math.abs(a-(+r.amount||0))<=1});
+    const chk=same.length?`<span class="st good">${L('找到同金額','Same amount found')}</span>`:hit.length?`<span class="st warn">${L('有相關列，金額不同','Related lines, amount differs')}</span>`:`<span class="st neu">${L('ERP 還找不到','Not found in ERP yet')}</span>`;
+    return `<tr><td class="lead">${esc(r.src_date)}</td><td data-l="${L('機台','M/C')}">${esc(r.machine)}</td><td data-l="${L('台數','Units')}">${esc(r.units||'')}</td><td class="r" data-l="${L('金額','Amt')}">${money(+r.amount||0,0)}</td><td class="wrap small" data-l="${L('期間','Period')}">${esc(r.period||'')}</td><td class="r" data-l="${L('件數','Qty')}">${fmt(+r.qty||0)}</td><td class="wrap small" data-l="${L('訂單','Orders')}">${esc(r.orders||'')}<div class="muted">${esc(r.note||'')}</div></td>
+     <td class="wrap small" data-l="ERP">${chk}${hit.slice(0,4).map(([k,x])=>`<div class="muted">${esc(k)} ${esc(dOf(x))} ${esc(x.supplier||x.supplier_id||'')} ${amtOf(x)!=null?money(amtOf(x),2):''}</div>`).join('')}</td><td class="wrap" data-l="${L('備註','Note')}">${noteBox(r,L('例如：發票已到、金額已核','e.g. invoice checked'))}</td></tr>` }).join('')}</tbody></table></div>`;
+  refs('rnote').forEach(n=>{h+=`<div class="panel mt"><h2>📝 ${esc(n.title)}</h2>${src(n)}${pts(n.points)}${full(n)}</div>`});
+  h+=`<p class="small muted">${L('對法：通知日前 15 天到後 75 天內，應付（W_AR700）與採購裡有「租、熱轉印、燙襯、雙針、RENT、HEAT TRANSFER、FUSING」字樣的列；金額相差 $1 以內算相同。','AP / PO lines with rental keywords within −15 / +75 days; same amount within $1.')}</p>`;
+  return h };
+
+ /* ══════════ 4. 📘 生產作業守則／原則 ══════════ */
+ T.guides=['生產作業守則','Production guidelines','គោលការណ៍ផលិតកម្ម'];
+ T.sub_guides=['Paul 寫的加班、停工、作業程序（SOP）、成本與人力報告：重點、門檻數字、原文。週報、月報寫到相關事情時從這裡引用。','Paul’s overtime, shutdown, SOP, cost and workforce reports — key points and thresholds for weekly / monthly reports.'];
+ { const i=MODS.findIndex(m=>m[0]==='p-weekly'); MODS.splice(i>=0?i:MODS.length,0,['guides','📘','g_hub','prod']) }
+ window.refCopy=function(id){ const r=(DB.refdocs||[]).find(x=>x.id===id); if(!r)return; const s='【'+r.title+'】（'+r.src_date+'）\n'+String(r.points||'').split('\n').map(x=>'• '+x).join('\n');
+  (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast(L('重點已複製，可貼到週報','Copied'))).catch(()=>prompt(L('複製這段','Copy'),s)) };
+ window.REF_GUIDES=()=>refs('guide');
+ RENDER.guides=function(){
+  const st=St('guides'); st.c=st.c||''; const G=refs('guide').sort((a,b)=>String(b.src_date).localeCompare(String(a.src_date))); let h=pageHead('guides'); if(!G.length)return h+empty();
+  const cats=[...new Set(G.map(r=>r.category))];
+  h+=`<div class="toolbar"><div class="seg">${['',...cats].map(c=>`<button class="${st.c===c?'on':''}" onclick="S('guides').c='${esc(c)}';rerender()">${esc(c||L('全部','All'))}</button>`).join('')}</div></div>`;
+  G.filter(r=>!st.c||r.category===st.c).forEach(r=>{ h+=`<div class="panel" style="margin-bottom:12px"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap"><h2 style="flex:1;min-width:220px">📘 ${esc(r.title)}</h2><span class="st info">${esc(r.category)}</span><button class="btn sm" onclick="refCopy('${r.id}')">📋 ${L('複製重點（貼週報）','Copy key points')}</button></div>${src(r)}${pts(r.points)}${full(r)}${noteBox(r,L('後續修訂、實際執行情況…','Revisions, how it went…'))}</div>` });
+  return h };
+
+ /* ══════════ 5. 📋 年底盤點計畫（布倉／輔料倉） ══════════ */
+ T.stocktake=['年底盤點計畫','Year-end stock count','ផែនការរាប់ស្តុក'];
+ T.sub_stocktake=['布倉、輔料倉的盤點計畫、時程和負責人；每一步寫下有沒有做、證據在哪；跟計畫當時的庫存（倉庫系統 vs ERP）和現在的 ERP 庫存比較。','Stock-count plans, schedule and evidence; baseline vs current ERP stock.'];
+ { const i=MODS.findIndex(m=>m[0]==='p-fabstock'); MODS.splice(i>=0?i+1:MODS.length,0,['stocktake','📋','g_matl','prod']) }
+ RENDER.stocktake=function(){
+  const st=St('stocktake'); st.wh=st.wh||'fabric'; let h=pageHead('stocktake');
+  if(!refs('stplan').length)return h+empty();
+  h+=`<div class="toolbar"><div class="seg"><button class="${st.wh==='fabric'?'on':''}" onclick="S('stocktake').wh='fabric';rerender()">🧶 ${L('布倉','Fabric warehouse')}</button><button class="${st.wh==='acc'?'on':''}" onclick="S('stocktake').wh='acc';rerender()">🧷 ${L('輔料倉','Trims warehouse')}</button></div></div>`;
+  const P=refs('stplan').find(r=>r.wh===st.wh);
+  const ttl=a=>a.reduce((s,r)=>s+(+r.balance||+r.qty||0),0);
+  if(st.wh==='fabric'){
+   const B=refs('stbase').filter(r=>r.wh==='fabric'), sys=B.find(r=>/倉庫系統/.test(r.src)), erp=B.find(r=>/ERP/.test(r.src));
+   const nowE=ttl(live(DB.fabric||[])), asof=(DB.asof||{}).fabric||'';
+   h+=`<div class="kpis">${sys?kpi(L('倉庫系統 ','Warehouse system ')+sys.asof,fmt(sys.yards),L('碼','yd'),fmt(sys.rolls)+L(' 卷 · ',' rolls · ')+fmt(sys.items)+L(' 個布號',' items')):''}${erp?kpi(L('ERP 主料 ','ERP fabric ')+erp.asof,fmt(erp.yards),L('碼','yd'),fmt(erp.items)+L(' 個布號／色',' lines')):''}${sys&&erp?kpi(L('計畫當時相差','Gap at plan'),fmt(sys.yards-erp.yards),L('碼','yd'),pc((sys.yards-erp.yards)/erp.yards*100),'warn'):''}${kpi(L('ERP 布料庫存（現在）','ERP fabric now'),nowE?fmt(nowE):'—',L('碼','yd'),asof?L('截至 ','as of ')+esc(asof):L('布料頁還沒載入快照','load fabric stock'))}</div>`;
+   if(erp&&erp.note)h+=`<p class="note warn small mt">${esc(erp.note)}</p>`;
+  } else {
+   const nowA=live(DB.accessories||[]); h+=`<div class="kpis">${kpi(L('ERP 輔料庫存列數（現在）','ERP trims lines now'),fmt(nowA.length),'',(DB.asof||{}).accessories?L('截至 ','as of ')+esc(DB.asof.accessories):'')}</div>`;
+  }
+  if(P)h+=`<div class="panel mt"><h2>📋 ${esc(P.title)}</h2>${src(P)}${pts(P.points)}${P.docs?`<p class="small" style="margin:8px 0 0"><b>${L('附件文件：','Documents: ')}</b>${esc(P.docs)}</p>`:''}${full(P)}${noteBox(P,L('計畫修訂、主管核可…','Revisions, approvals…'))}</div>`;
+  const SC=refs('stsched').filter(r=>r.wh===st.wh).sort((a,b)=>(+a.seq||0)-(+b.seq||0));
+  if(SC.length){ const td=today();
+   const stat=r=>{ const n=String(r.notes||''); if(/完成|已做|done|✅/i.test(n))return ['good',L('已完成（有記錄）','Done (recorded)')]; if(/沒做|未做|取消|延/i.test(n))return ['crit',L('沒做／延後','Not done / delayed')]; if(String(r.due)<td)return ['warn',L('時間已過，還沒記錄','Past due, no record')]; return ['neu',L('還沒到','Not yet due')] };
+   const done=SC.filter(r=>stat(r)[0]==='good').length, late=SC.filter(r=>stat(r)[0]==='warn').length;
+   h+=`<div class="sec-h">${L('時程與執行狀況','Schedule & status')} · ${L('完成 ','done ')}${done}/${SC.length}${late?` · <span class="diff-neg">${L('過期未記錄 ','overdue ')}${late}</span>`:''}</div>
+   <div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('時間','When')}</th><th>${L('工作','Task')}</th><th>${L('負責','Owner')}</th><th>${L('狀態','Status')}</th><th>${L('實際執行記錄／證據','What was done / evidence')}</th></tr></thead><tbody>
+   ${SC.map(r=>{const s=stat(r);return `<tr><td class="lead">${esc(r.when)}</td><td class="wrap" data-l="${L('工作','Task')}">${esc(r.task)}</td><td data-l="${L('負責','Owner')}">${esc(r.owner)}</td><td data-l="${L('狀態','Status')}"><span class="st ${s[0]}">${esc(s[1])}</span></td><td class="wrap" data-l="${L('記錄','Record')}">${noteBox(r,L('寫「已完成」＋日期、人、證據（照片、表單、檔名）','Write “done” + date, who, evidence'))}</td></tr>`}).join('')}</tbody></table></div>`;
+  } else if(st.wh==='acc') h+=`<p class="note warn mt">${L('輔料倉目前沒有盤點計畫，也沒有時程。要做時比照布倉建立，這裡就會出現時程與執行狀況。','No trims-warehouse plan or schedule yet.')}</p>`;
+  if(st.wh==='fabric'){ const C=refs('stcode'); if(C.length){
+   const F=live(DB.fabric||[]); const byM=new Map(); F.forEach(f=>{const k=KN(f.material_no);if(!k)return;let l=byM.get(k);if(!l)byM.set(k,l=[]);l.push(f)});
+   const nowOf=c=>{ const l=byM.get(KN(c.material)); if(!l)return null; const cc=KN(String(c.color||'').split('-')[0]); const m=cc?l.filter(f=>KN(f.color).startsWith(cc)||KN(f.color).includes(cc)):l; return (m.length?m:[]).reduce((s,f)=>s+(+f.balance||0),0) };
+   const cnt={}; C.forEach(c=>{cnt[c.result]=(cnt[c.result]||0)+1});
+   const show=C.filter(c=>Math.abs((+c.sys||0)-(+c.erp||0))>0).sort((a,b)=>Math.abs((+b.sys||0)-(+b.erp||0))-Math.abs((+a.sys||0)-(+a.erp||0))).slice(0,80);
+   h+=`<details class="mt"><summary class="sec-h" style="cursor:pointer">${L('計畫當時（10/31）倉庫系統 vs ERP 逐布號比對 · ','10/31 warehouse system vs ERP by code · ')}${fmt(C.length)} ${L('個布號','codes')} · ${Object.entries(cnt).map(([k,v])=>esc(k)+' '+v).join(' · ')}</summary>
+    <div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('對照碼','Code')}</th><th>${L('品名／顏色','Name')}</th><th class="r">ERP 10/31</th><th class="r">${L('系統 10/31','SYS 10/31')}</th><th class="r">${L('差','Δ')}</th><th>${L('判定','Result')}</th><th class="r">${L('ERP 現在','ERP now')}</th></tr></thead><tbody>
+    ${show.map(c=>{const n=nowOf(c);return `<tr><td class="lead mono">${esc(c.code)}</td><td class="wrap small" data-l="${L('品名','Name')}">${esc(c.name)} · ${esc(c.color)}</td><td class="r" data-l="ERP">${fmt(+c.erp||0)}</td><td class="r" data-l="SYS">${fmt(+c.sys||0)}</td><td class="r ${(+c.sys||0)<(+c.erp||0)?'diff-neg':''}" data-l="Δ">${fmt((+c.sys||0)-(+c.erp||0))}</td><td class="small" data-l="${L('判定','Result')}">${esc(c.result)}</td><td class="r" data-l="${L('現在','Now')}">${n==null?'—':fmt(n)}</td></tr>`}).join('')}</tbody></table></div>
+    <p class="small muted">${L('只列差異最大的 80 個；全部在工作簿「05_系統vsERP」。「ERP 現在」＝目前 ERP 布料快照同料號、同色號的結存合計。','Top 80 gaps; full list in workbook sheet 05.')}</p></details>` } }
+  return h };
+
+ try{ renderNav() }catch(e){}
+})();
+</script>
 <script src="music.js?v=2.16.0" defer></script>
 <script src="psj-links.js?v=3" defer></script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
