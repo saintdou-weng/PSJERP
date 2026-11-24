@@ -6557,6 +6557,144 @@ init();
  try{ renderNav() }catch(e){}
 })();
 </script>
+<script>
+/* ---------- v1.7.0 (2026-11-24)：🚨 生產異常報告（自動追蹤 ERP）＋ 📐 SMV 制度對照 ----------
+   Paul 11/24：Malen 不敢寫（怕得罪 Dillard），異常報告由 Paul 在 PSJERP 繼續；照 email 寫清楚，並隨時追 ERP／email 進度
+   （例：Vestis 取消單的布到底用了多少、還剩多少要自動更新）。看到 Paul 丟的品質異常也放進來跟進。有進度就每月發一次。
+   SMV：每款要寫新 SMV 何時生效、有沒有扣 5/10/15% → 一個「最真」（核准）、一個「暫扣」（算效率用）；
+   生效前的 SMV（7 月前車縫日報）與舊 -35% 放旁邊當參考；有差異原因就寫在該款。IE 週報以後一直會來 → 自動接 PROD 的 IE 週報。 */
+(function(){
+ if(typeof REP_DS==='undefined')return;
+ const L=(zh,en)=>tt(zh,en);
+ const tday=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+ const KN=s=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'');
+ const refs=k=>{ if(!Array.isArray(DB.refdocs))DB.refdocs=[]; return live(DB.refdocs).filter(r=>r.kind===k) };
+ const J=s=>{try{return JSON.parse(s||'[]')}catch(e){return []}};
+ const n0=v=>{const x=parseFloat(v);return isNaN(x)?0:x};
+ const noteBox=(r,ph)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-top:6px"><textarea class="inp" id="rn_${r.id}" rows="2" style="min-height:40px;font-size:12.5px" placeholder="${esc(ph||'')}">${esc(r.notes||'')}</textarea><button class="btn sm" onclick="refNoteSave('${r.id}')">${L('存','Save')}</button></div>`;
+ const multi=s=>esc(String(s||'')).replace(/\n/g,'<br>');
+ const zhOf=s=>{s=String(s||'');const i=s.indexOf('中：');return i>=0?s.slice(i+2).trim():s.trim()};
+
+ /* ══════════ A. 🚨 生產異常報告 ══════════ */
+ T.abnormal=['生產異常報告','Production abnormal report','របាយការណ៍មិនប្រក្រតី'];
+ T.sub_abnormal=['每件異常的原因、處理、最新進度；能從 ERP 自動追的（例 Vestis 取消單的布料／成品消化）會自己更新。有進度每月發一次月報。','Abnormal cases with progress; ERP-tracked items update automatically. Monthly report when there is progress.'];
+ { const i=MODS.findIndex(m=>m[0]==='guides'); const j=i>=0?i:MODS.findIndex(m=>m[0]==='prodreports'); MODS.splice(j>=0?j+1:MODS.length,0,['abnormal','🚨',j>=0?MODS[j][2]:'g_hub','prod']) }
+ const isClosed=r=>/closed|已結案/i.test(r.status);
+ const stCls=s=>/closed/i.test(s)?'good':/open/i.test(s)?'crit':/correct/i.test(s)?'warn':'info';
+ const stZh=s=>/closed/i.test(s)?L('已結案','Closed'):/open/i.test(s)?L('待處理','Open'):/correct/i.test(s)?L('改善中','Correcting'):/invest/i.test(s)?L('調查中','Investigating'):esc(s);
+ const svCls=s=>/crit/i.test(s)?'crit':/high/i.test(s)?'warn':'info';
+ const svZh=s=>/crit/i.test(s)?L('極嚴重','Critical'):/high/i.test(s)?L('高','High'):/med/i.test(s)?L('中','Medium'):L('低','Low');
+ /* Vestis：基準（Malen 7/6 庫存報告）vs ERP 現在 */
+ window.abnVestis=function(){ const B=refs('abnbase').find(r=>r.case==='VRT-AR-0003'); if(!B)return null;
+  const fab=J(B.fab), fg=J(B.fg);
+  const F=live(DB.fabric||[]).filter(r=>KN(r.material_no)==='CSTT3567'); const byC={}; F.forEach(r=>{const c=KN(r.color);byC[c]=(byC[c]||0)+n0(r.balance)});
+  const G=live(DB.fgstock||[]).filter(r=>/ARAMARK|VESTIS|RENO/i.test(r.cust)&&+r.order_year>=2025); const byS={}; G.forEach(r=>{byS[KN(r.style)]=(byS[KN(r.style)]||0)+n0(r.qty)});
+  const asofF=F.reduce((m,r)=>String(r.synced_at||'')>m?String(r.synced_at):m,''), asofG=G.reduce((m,r)=>String(r.synced_at||'')>m?String(r.synced_at):m,'');
+  const frows=fab.map(f=>{const now=byC[KN(f.clr)]; return Object.assign({},f,{now:now==null?null:now})});
+  const grows=fg.map(g=>{const now=byS[KN(g.style)]; return Object.assign({},g,{now:now==null?0:now})});
+  const tot=(a,k)=>a.reduce((s,r)=>s+n0(r[k]),0);
+  return {B,frows,grows,fStock:tot(frows,'stock'),fNow:tot(frows,'now'),gStock:tot(grows,'stock'),gNow:tot(grows,'now'),asofF:asofF.slice(0,10),asofG:asofG.slice(0,10),
+   main:frows.filter(r=>r.type==='MAIN'),bias:frows.filter(r=>r.type==='BIAS')} };
+ const bar=(p,cls)=>`<div style="height:8px;background:var(--line-2);border-radius:6px;overflow:hidden;min-width:80px"><div style="width:${Math.max(0,Math.min(100,p))}%;height:100%;background:var(--${cls||'accent'})"></div></div>`;
+ function vestisBox(){ const V=abnVestis(); if(!V)return '';
+  const pct=(a,b)=>a>0?Math.max(0,(a-b)/a*100):0, fp=pct(V.fStock,V.fNow), gp=pct(V.gStock,V.gNow);
+  const mS=V.main.reduce((s,r)=>s+n0(r.stock),0), mN=V.main.reduce((s,r)=>s+n0(r.now),0), bS=V.bias.reduce((s,r)=>s+n0(r.stock),0), bN=V.bias.reduce((s,r)=>s+n0(r.now),0);
+  return `<div class="panel" style="margin-top:10px;padding:10px 14px;border-left:4px solid var(--accent)"><b>📡 ${L('ERP 自動追蹤：Vestis 取消單物料消化','Auto-tracked from ERP: Vestis cancelled-order stock')}</b>
+   <p class="small muted" style="margin:4px 0 8px">${L('基準＝Malen 7/6 庫存報告的原庫存；「ERP 現在」＝ERP 布料庫存（料號 CSTT3567 各色）與成品庫存（ARAMARK 2025 訂單）。ERP 每次匯入就自動更新。','Baseline = Malen 7/6 stock report; “ERP now” = ERP fabric (CSTT3567) and FG (ARAMARK 2025 orders).')}</p>
+   <div class="kpis">${kpi(L('布料 已消化','Fabric used'),fmt(fp,1)+'%','',fmt(V.fStock)+L(' → 剩 ',' → left ')+fmt(Math.round(V.fNow))+L(' 碼（ERP ',' yd (ERP ')+esc(V.asofF)+'）',fp>=99?'good':'')}${kpi(L('　主布','　Main fabric'),fmt(pct(mS,mN),1)+'%','',fmt(mS)+' → '+fmt(Math.round(mN))+L(' 碼',' yd'))}${kpi(L('　滾條布','　Bias fabric'),fmt(pct(bS,bN),1)+'%','',fmt(bS)+' → '+fmt(Math.round(bN))+L(' 碼',' yd'),pct(bS,bN)<20?'warn':'')}${kpi(L('成品 已消化','FG used'),fmt(gp,1)+'%','',fmt(V.gStock)+L(' → 剩 ',' → left ')+fmt(V.gNow)+L(' 件（ERP ',' pcs (ERP ')+esc(V.asofG)+'）',gp>=99?'good':'')}</div>
+   <details class="mt"><summary class="small" style="cursor:pointer;color:var(--accent)">${L('逐布號／逐款明細','By code / style')}</summary>
+   <div class="tbl-wrap"><table class="t"><thead><tr><th>${L('布號','Code')}</th><th>${L('類','Type')}</th><th class="r">${L('原庫存','Base')}</th><th class="r">${L('7/6 已用','Used 7/6')}</th><th class="r">${L('ERP 現在','ERP now')}</th><th>${L('已消化','Used')}</th></tr></thead><tbody>
+   ${V.frows.map(r=>{const p=pct(r.stock,r.now==null?r.stock:r.now);return `<tr><td class="mono">${esc(r.code)}</td><td>${r.type==='MAIN'?L('主布','Main'):L('滾條','Bias')}</td><td class="r">${fmt(r.stock)}</td><td class="r">${fmt(r.used)}</td><td class="r">${r.now==null?'—':fmt(Math.round(r.now))}</td><td>${bar(p,p<10?'warn':'good')}<span class="small">${fmt(p,1)}%</span></td></tr>`}).join('')}
+   ${V.grows.map(r=>{const p=pct(r.stock,r.now);return `<tr><td class="mono">${esc(r.style)}</td><td>${L('成品','FG')}</td><td class="r">${fmt(r.stock)}</td><td class="r">${fmt(r.used)}</td><td class="r">${fmt(r.now)}</td><td>${bar(p,p<10?'warn':'good')}<span class="small">${fmt(p,1)}%</span></td></tr>`}).join('')}
+   </tbody></table></div><p class="small muted">${L('ERP 的成品庫存可能含同款其他舊單以外的餘數；以 Malen 每月的 Vestis 庫存報告為最終核對。結案條件：ERP 帳上相關數量／金額清零、剩餘材料全部消化／轉用／清理。','Final check = Malen’s monthly Vestis stock report.')}</p></details></div>` }
+ /* 同款 ERP 訂單 */
+ function erpOf(style){ const k=KN(style); if(!k||k.length<4||/MIXED|N\/?A/i.test(style))return ''; let n=0,q=0,last=''; try{ ordersView().forEach(o=>{ if(KN(o.style).startsWith(k)){ n++; q+=+o.qty||0; if(String(o.order_date)>last)last=String(o.order_date) } }) }catch(e){}
+  return n?`<span class="small">🧾 ERP ${L('同款訂單 ','orders ')}${n}${L(' 張 · ',' · ')}${fmt(q)} ${L('件','pcs')}${last?L(' · 最近 ',' · latest ')+esc(last):''} · <a href="#styles" onclick="setTimeout(()=>window.openStyle&&openStyle('${esc(style)}'),300)">${L('款式卡 →','Style card →')}</a></span>`:'' }
+ function caseCard(r){ const H=J(r.hist);
+  return `<div class="panel" style="margin-bottom:12px;border-left:4px solid var(--${isClosed(r)?'good':svCls(r.sev)==='crit'?'crit':'warn'})">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b class="mono">${esc(r.case)}</b><span class="st ${stCls(r.status)}">${stZh(r.status)}</span><span class="st ${svCls(r.sev)}">${svZh(r.sev)}</span><b>${esc(r.cust)}</b><span class="mono small">${esc(r.style)}${r.po&&r.po!=='N/A'?' · PO '+esc(r.po):''}</span>${n0(r.cost)?`<span class="st crit">US$ ${fmt(n0(r.cost),2)}</span>`:''}<span class="small muted" style="margin-left:auto">${esc(r.date)}${r.target?L(' · 目標 ',' · target ')+esc(r.target):''}${!isClosed(r)&&r.target&&r.target<tday()?` <span class="diff-neg">${L('已逾期','overdue')}</span>`:''}</span></div>
+  <h2 style="margin:6px 0 2px;font-size:15px">${esc(zhOf(r.issue).split('\n')[0])}</h2>
+  <p class="small" style="margin:2px 0 6px">${multi(zhOf(r.latest)||zhOf(r.remarks))}</p>
+  ${r.track==='vestis'?vestisBox():''}
+  ${erpOf(r.style)}
+  ${H.length?`<div class="sec-h" style="margin-top:8px">${L('進度時間軸','Timeline')}</div><div style="border-left:2px solid var(--line);margin-left:6px;padding-left:12px">${H.map(h=>`<div style="margin:4px 0"><span class="mono small">${esc(h.d)}</span> <span class="small muted">${esc(h.src)}</span><div class="small">${esc(h.t)}</div></div>`).join('')}</div>`:''}
+  <details style="margin-top:6px"><summary class="small" style="cursor:pointer;color:var(--accent)">${L('原因／立即措施／矯正措施（中英原文）','Root cause / actions')}</summary><div class="small" style="display:grid;gap:6px;margin-top:6px">
+   <div><b>${L('異常描述','Issue')}</b><br>${multi(r.issue)}</div><div><b>${L('根本原因','Root cause')}</b><br>${multi(r.root)}</div><div><b>${L('立即措施','Immediate action')}</b><br>${multi(r.imm)}</div><div><b>${L('矯正措施','Corrective action')}</b><br>${multi(r.ca)}</div><div><b>${L('備註','Remarks')}</b><br>${multi(r.remarks)}</div></div></details>
+  ${noteBox(r,L('新進度：寫日期＋內容（例 11/30 ALSCO 回覆新樣 OK）；寫「結案」＋證據會在月報標出','New progress: date + what happened'))}</div>` }
+ function abnStats(){ const C=refs('abn'), ym=tday().slice(0,7); const open=C.filter(r=>!isClosed(r));
+  return {C,open,crit:open.filter(r=>/crit/i.test(r.sev)),cost:open.reduce((s,r)=>s+n0(r.cost),0),reps:refs('abnrep').sort((a,b)=>String(b.src_date).localeCompare(String(a.src_date))),ym} }
+ /* 月報文字（Telegram 與 Email 共用；有進度才發） */
+ window.abnMonthText=function(mode){ const S=abnStats(), V=abnVestis(), last=S.reps[0]; const since=last?last.src_date:'';
+  const prog=S.C.filter(r=>String(r.notes||'').trim()&&(!r.notes_at||r.notes_at>since));
+  const head=mode==='tg'?`🚨 <b>VRT ${L('生產異常報告 · 月更新','Production abnormal report · monthly')}</b> ${S.ym}\n━━━━━━━━━━━━\n`:`VRT ${L('生產異常報告 · 月更新','Production Abnormal Report – Monthly Update')} ${S.ym}\n\n`;
+  const b=x=>mode==='tg'?'<b>'+esc(x)+'</b>':x;
+  let t=head+`📋 ${L('共','Total')} ${S.C.length}${L(' 件・未結 ',' · open ')}${S.open.length}${S.crit.length?L('（極嚴重 ',' (critical ')+S.crit.length+'）':''}${S.cost?L('・金額風險 US$',' · cost exposure US$')+fmt(S.cost,0):''}\n${since?L('上次月報 ','Last report ')+since+'\n':''}\n`;
+  t+=b(L('未結案件','Open cases'))+'\n'+S.open.map(r=>`• ${r.case} ${r.cust} ${r.style} — ${stZh(r.status).replace(/<[^>]+>/g,'')}${r.target&&r.target<tday()?L('（目標 ','(target ')+r.target+L(' 已逾期）',' overdue)'):''}\n   ${zhOf(r.issue).split('\n')[0].slice(0,60)}${r.notes?'\n   📝 '+String(r.notes).split('\n')[0].slice(0,120):''}`).join('\n')+'\n';
+  if(V){ const fp=V.fStock?(V.fStock-V.fNow)/V.fStock*100:0, gp=V.gStock?(V.gStock-V.gNow)/V.gStock*100:0;
+   t+=`\n${b(L('Vestis 取消單（ERP 自動追蹤）','Vestis cancelled order (ERP)'))}\n🧶 ${L('布料','Fabric')} ${fmt(V.fStock)} → ${fmt(Math.round(V.fNow))} ${L('碼','yd')}（${L('已消化 ','used ')}${fmt(fp,1)}%，ERP ${V.asofF}）\n👕 ${L('成品','FG')} ${fmt(V.gStock)} → ${fmt(V.gNow)} ${L('件','pcs')}（${L('已消化 ','used ')}${fmt(gp,1)}%，ERP ${V.asofG}）\n${L('結案條件：ERP 帳清零、剩料全部消化／轉用／清理。','Close only when ERP balance is zero and all material is used/cleared.')}\n` }
+  t+=`\n${prog.length?L('本月有進度：','Progress this month: ')+prog.map(r=>r.case).join('、'):L('本月沒有新的進度記錄。','No new progress recorded this month.')}`;
+  return t };
+ { const _st=window.summaryText; if(typeof _st==='function')window.summaryText=function(k,id){ if(k==='abnormal'&&!id)return abnMonthText('tg'); return _st.apply(this,arguments) } }
+ window.abnCopy=function(){ const t=abnMonthText('mail'); try{navigator.clipboard.writeText(t);toast(L('月報已複製（可貼 Email）','Copied'))}catch(e){prompt('Copy',t)} };
+ RENDER.abnormal=function(){ const st=S('abnormal'); st.v=st.v||'open';
+  let h=pageHead('abnormal',`<button class="btn sm" onclick="sendSummary('abnormal')">📤 ${L('發月報到 Telegram','Send monthly to Telegram')}</button><button class="btn sm" onclick="abnCopy()">📋 ${L('複製月報（Email 用）','Copy monthly (email)')}</button>`);
+  const X=abnStats(); if(!X.C.length)return h+`<div class="panel empty"><h2>${L('還沒有資料','No data yet')}</h2></div>`;
+  const last=X.reps[0], next=last?(()=>{const d=new Date(last.src_date+'T00:00:00');d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)})():'';
+  h+=`<div class="kpis">${kpi(L('案件總數','Total cases'),fmt(X.C.length))}${kpi(L('未結案','Open'),fmt(X.open.length),'',X.open.map(r=>r.case.replace('VRT-AR-','#')).join(' '),X.open.length?'warn':'good')}${kpi(L('極嚴重（未結）','Critical open'),fmt(X.crit.length),'','',X.crit.length?'crit':'good')}${kpi(L('未結金額風險','Open cost exposure'),'US$ '+fmt(X.cost,0))}${kpi(L('上次月報','Last report'),last?esc(last.src_date):'—','',next?L('下次約 ','next ≈ ')+next:'')}</div>`;
+  h+=`<div class="toolbar"><div class="seg">${[['open',L('未結案','Open')],['closed',L('已結案','Closed')],['all',L('全部','All')],['rep',L('月報記錄','Monthly reports')]].map(([v,l])=>`<button class="${st.v===v?'on':''}" onclick="S('abnormal').v='${v}';rerender()">${l}</button>`).join('')}</div></div>`;
+  if(st.v==='rep'){ h+=X.reps.map(r=>`<div class="panel" style="margin-bottom:10px"><b>📨 ${esc(r.title)}</b> <span class="small muted">${esc(r.src_date)} · ${esc(r.src_from||'')}</span><p class="small" style="margin:6px 0 0">${esc(r.points)}</p></div>`).join('')+`<div class="panel"><b>📝 ${L('本月月報預覽（有進度才發）','This month preview')}</b><pre class="small" style="white-space:pre-wrap;margin:8px 0 0">${esc(abnMonthText('mail'))}</pre></div>`; return h }
+  const list=X.C.filter(r=>st.v==='all'||(st.v==='open'?!isClosed(r):isClosed(r))).sort((a,b)=>(isClosed(a)-isClosed(b))||String(b.date).localeCompare(String(a.date)));
+  h+=list.map(caseCard).join('')||`<p class="note">${L('沒有','None')}</p>`;
+  h+=`<p class="small muted">${L('資料來源：Malen 填的 VRT Abnormal Report（VRT-QC-001）＋ Paul 每月更新信。新的品質異常信／檔案丟給 Claude，會加進來並跟進；進度寫在每件下面的備註（雲端）。','Source: VRT Abnormal Report + Paul’s monthly emails.')}</p>`;
+  return h };
+
+ /* ══════════ B. 📐 SMV 制度對照 ══════════ */
+ T.smvlog=['SMV 制度對照（新 SMV／暫扣／舊值）','SMV rule view (approved / applied / previous)','SMV'];
+ T.sub_smvlog=['每款：核准 SMV（最真）、計算效率用 SMV（暫扣 0/10/15%）、生效日；旁邊放生效前的 SMV（7 月前車縫日報）與舊 -35% 當參考。IE 週報進 PROD 後自動出現在這裡。','Per style: approved SMV, applied SMV, effective date, previous and old -35% for reference.'];
+ { const i=MODS.findIndex(m=>m[0]==='styles'); MODS.splice(i>=0?i+1:MODS.length,0,['smvlog','📐',i>=0?MODS[i][2]:'g_order','prod']) }
+ const EFF0='2026-09-14';
+ const dedOf=(prev,appr)=>{ if(!(prev>0))return 0; const c=(appr-prev)/prev; return c< -0.20?15:c<= -0.10?10:0 };
+ window.smvRows=function(){ if(GC.has('smvrows'))return GC.get('smvrows');
+  const M=new Map(); refs('smv').forEach(r=>M.set(KN(r.style),Object.assign({src_kind:'ref'},r)));
+  /* 自動：PROD IE 週報（已簽核）→ 沒在清單裡的款自動補上 */
+  try{ const I=window.styleIdx?styleIdx():null; if(I)I.list.forEach(s=>{ (s.ie||[]).filter(v=>v.kind==='upd'&&/已簽核|approv/i.test(String(v.appr||''))&&+v.v>0).forEach(v=>{ const k=KN(s.style); const o=M.get(k); if(o&&o.src_kind==='ref'){ if(!o.ieAuto)o.ieAuto=v; return }
+     const prev=+v.prev>0?+v.prev:null, appr=+v.v, d=dedOf(prev,appr), ad=String(v.d||'').slice(0,10);
+     const ex=M.get(k); if(ex&&String(ex.adate)>=ad)return;
+     M.set(k,{src_kind:'ie',style:s.style,cust:v.cust||'',cat:v.cat||'',prev:prev||'',prev65:prev?+(prev*0.65).toFixed(3):'',appr,chg:prev?+((appr-prev)/prev*100).toFixed(1):'',ded:d,applied:+(appr*(1-d/100)).toFixed(3),adate:ad,eff:ad>EFF0?ad:EFF0,src:L('PROD IE 週報（自動）','PROD IE weekly (auto)'),note:v.notes||''}) }) }) }catch(e){}
+  const R=[...M.values()]; R.forEach(r=>{ const e=live(DB.smv||[]).find(x=>KN(x.style)===KN(r.style)); r.erp=e?+(e.smv_prod||e.smv||0):null });
+  GC.set('smvrows',R); return R };
+ RENDER.smvlog=function(){ const st=S('smvlog'); st.q=st.q||''; st.f=st.f||'';
+  let h=pageHead('smvlog');
+  h+=`<div class="panel" style="padding:10px 14px"><b>${L('怎麼看','How to read')}</b><div class="small" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:6px">
+   <div><span class="st good">${L('核准 SMV（最真）','Approved (true)')}</span><br>${L('IE 重測、OBD 簽核的完整分鐘數。成本、報價用這個。','IE re-tested & signed. Use for costing.')}</div>
+   <div><span class="st warn">${L('計算效率用（暫扣）','Applied (provisional)')}</span><br>${L('核准 SMV 依 9/12 通知暫扣：比舊值低 >20% 扣 15%、低 10–20% 扣 10%，其他 0%。連續 5 天效率 50%→-10%、60%→-15%（最高 15%）。','Rule per 9/12 notice.')}</div>
+   <div><span class="st neu">${L('生效前 SMV（參考）','Previous (ref.)')}</span><br>${L('7 月前車縫日報用的完整舊值。','Full old SMV in sewing reports before July.')}</div>
+   <div><span class="st neu">${L('舊 -35%（參考）','Old -35% (ref.)')}</span><br>${L('舊制度：舊值 × 65%。還沒核准新 SMV 的款仍用這個。','Old rule; still used for styles without approved SMV.')}</div></div>
+   <p class="small muted" style="margin:6px 0 0">${L('生效日＝9/14（正式導入日）或核准日，取較晚的。核准以前的歷史效率不回改。','Effective = later of 9/14 and approval date. History is not rewritten.')}</p></div>`;
+  const R=smvRows(); const c10=R.filter(r=>+r.ded===10).length, c15=R.filter(r=>+r.ded===15).length, ok=R.filter(r=>+r.appr>0);
+  h+=`<div class="kpis">${kpi(L('已核准新 SMV','Approved'),fmt(ok.length),L('款','styles'))}${kpi(L('暫扣 10%','−10%'),fmt(c10))}${kpi(L('暫扣 15%','−15%'),fmt(c15))}${kpi(L('只有參考（待重測）','Reference only'),fmt(R.length-ok.length),'','','warn')}${kpi(L('ERP 主檔跟生效前不同','ERP ≠ previous'),fmt(ok.filter(r=>r.erp&&r.prev&&Math.abs(r.erp-r.prev)>0.05).length),'',L('ERP 還是舊值或別的值','ERP not updated'))}</div>`;
+  h+=`<div class="toolbar"><input class="inp" style="max-width:260px" placeholder="🔍 ${L('款號／客戶','Style / customer')}" value="${esc(st.q)}" onchange="S('smvlog').q=this.value;GC.delete&&GC.delete('smvrows');rerender()"><div class="seg">${[['',L('全部','All')],['ded',L('有暫扣','Deducted')],['ref',L('待重測','Pending')]].map(([v,l])=>`<button class="${st.f===v?'on':''}" onclick="S('smvlog').f='${v}';rerender()">${l}</button>`).join('')}</div></div>`;
+  const q=KN(st.q); const list=R.filter(r=>(!q||KN(r.style+' '+r.cust).includes(q))&&(!st.f||(st.f==='ded'?+r.ded>0:!(+r.appr>0)))).sort((a,b)=>String(b.eff||'').localeCompare(String(a.eff||''))||String(a.style).localeCompare(String(b.style)));
+  h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('款號','Style')}</th><th>${L('客戶／類別','Cust / cat')}</th><th>${L('生效日','Effective')}</th><th class="r">${L('核准（最真）','Approved')}</th><th>${L('暫扣','Ded.')}</th><th class="r">${L('算效率用','Applied')}</th><th class="r">${L('生效前','Previous')}</th><th class="r">${L('舊 -35%','Old -35%')}</th><th class="r">${L('差異','Δ')}</th><th class="r">ERP</th><th>${L('來源／原因','Source / reason')}</th></tr></thead><tbody>
+   ${list.map(r=>`<tr class="rowlink" onclick="location.hash='#styles';setTimeout(()=>window.openStyle&&openStyle('${esc(r.style)}'),300)"><td class="lead mono"><b>${esc(r.style)}</b></td><td class="small" data-l="${L('客戶','Cust')}">${esc(r.cust)}${r.cat?' · '+esc(r.cat):''}</td><td class="mono small" data-l="${L('生效','Eff')}">${esc(r.eff||'—')}</td>
+    <td class="r" data-l="${L('核准','Appr')}">${+r.appr>0?`<b>${fmt(+r.appr,3)}</b>`:'<span class="st warn">'+L('待重測','pending')+'</span>'}</td><td data-l="${L('暫扣','Ded')}">${+r.appr>0?`<span class="st ${+r.ded?'warn':'good'}">${+r.ded?'-'+r.ded+'%':'0%'}</span>`:''}</td><td class="r" data-l="${L('算效率','Applied')}">${+r.applied>0?fmt(+r.applied,3):''}</td>
+    <td class="r muted" data-l="${L('生效前','Prev')}">${+r.prev>0?fmt(+r.prev,3):'—'}</td><td class="r muted" data-l="-35%">${+r.prev65>0?fmt(+r.prev65,3):'—'}</td><td class="r ${+r.chg<0?'diff-neg':''}" data-l="Δ">${r.chg!==''&&r.chg!=null?(+r.chg>0?'+':'')+fmt(+r.chg,1)+'%':''}</td><td class="r small ${r.erp&&r.prev&&Math.abs(r.erp-r.prev)>0.05?'diff-neg':''}" data-l="ERP">${r.erp?fmt(r.erp,3):'—'}</td>
+    <td class="wrap small" data-l="${L('來源','Src')}">${esc(r.src||'')}${r.note?`<div class="muted" style="white-space:pre-wrap">${esc(r.note)}</div>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+  h+=`<p class="small muted">${L('還沒核准新 SMV 的款不在這張表：它們仍用舊值 × 65%（看款式卡的 SMV 歷程）。點一列打開款式卡。','Styles not listed still use old × 65%.')}</p>`;
+  return h };
+ /* 款式卡多一個分頁：📐 SMV 制度 */
+ if(window.STY_TABS&&window.STAB_EXT&&!STY_TABS.some(x=>x[0]==='smvrule')){ const i=STY_TABS.findIndex(x=>x[0]==='smv'); STY_TABS.splice(i>=0?i:1,0,['smvrule','📐',['SMV 制度','SMV rule']]);
+  STAB_EXT.smvrule=function(s){ const r=smvRows().find(x=>KN(x.style)===KN(s.style))||smvRows().find(x=>KN(s.style).startsWith(KN(x.style))&&KN(x.style).length>=4);
+   if(!r)return `<p class="note">${L('這款還沒有核准的新 SMV → 仍用舊制度：舊值 × 65%。','No approved new SMV → old rule (× 65%).')}</p>${s.cur?`<p>${L('現行 SMV ','Current ')}<b>${fmt(s.cur.v,3)}</b> × 65% = <b>${fmt(s.cur.v*0.65,3)}</b></p>`:''}`;
+   const kv2=(l,v,c)=>`<div class="kpi ${c||''}"><div class="l">${l}</div><div class="v num">${v}</div></div>`;
+   return `<div class="kpis">${kv2(L('核准 SMV（最真）','Approved'),+r.appr>0?fmt(+r.appr,3):L('待重測','pending'),'good')}${kv2(L('算效率用（暫扣 ','Applied (−')+(r.ded||0)+'%）',+r.applied>0?fmt(+r.applied,3):'—','warn')}${kv2(L('生效前（參考）','Previous'),+r.prev>0?fmt(+r.prev,3):'—')}${kv2(L('舊 -35%（參考）','Old -35%'),+r.prev65>0?fmt(+r.prev65,3):'—')}</div>
+    <p class="small">${L('生效日 ','Effective ')}<b>${esc(r.eff||'—')}</b>${r.adate?L(' · 核准 ',' · approved ')+esc(r.adate):''}${r.chg!==''?L(' · 比生效前 ',' · vs previous ')+(+r.chg>0?'+':'')+fmt(+r.chg,1)+'%':''} · ${esc(r.src||'')}</p>${r.note?`<p class="small" style="white-space:pre-wrap">${esc(r.note)}</p>`:''}<p><a href="#smvlog">${L('全部款式 →','All styles →')}</a></p>` } }
+ /* 相關報告框也掛到 SMV 制度頁 */
+ ['smvlog'].forEach(k=>{ const o=RENDER[k]; if(typeof o!=='function'||o.__rel||!window.refRelBox)return; const w=function(){ const h=String(o.apply(this,arguments)); const box=refRelBox(k); if(!box)return h; const i=h.indexOf('<div class="panel"'); return i>=0?h.slice(0,i)+box+h.slice(i):box+h }; w.__rel=1; RENDER[k]=w });
+ try{ renderNav() }catch(e){}
+})();
+</script>
+
 <script src="music.js?v=2.16.0" defer></script>
 <script src="psj-links.js?v=3" defer></script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
