@@ -6398,7 +6398,10 @@ init();
   const all=refs('margin'); if(!all.length)return pageHead('dmargin')+empty();
   const custs=[...new Set(all.map(r=>r.cust))];
   const rows=all.map(r=>{ const m=findOrd(r.style,r.price); let x={r,m,po:null,dp:null,sm:null,dm:null,flag:'nomatch'};
-   if(m){ x.po=m.o.price; x.dp=(r.price-m.o.price)/m.o.price*100; const c=m.unit?null:costOf(m.o); if(c&&c.total!=null&&r.price>0){ x.sm=(r.price-c.total)/r.price*100; x.cost=c.total; if(r.margin!=null)x.dm=x.sm-r.margin }
+   if(m){ x.po=m.o.price; x.dp=(r.price-m.o.price)/m.o.price*100; const c=m.unit?null:costOf(m.o); if(c&&c.total!=null&&r.price>0){ const sm=(r.price-c.total)/r.price*100;
+     /* 料錢是 0 或算出來利潤超過 45%：多半是這張單的 BOM／料價不完整，不拿來比 */
+     if(c.mat>0&&sm<=45){ x.sm=sm; x.cost=c.total; if(r.margin!=null)x.dm=x.sm-r.margin } else x.inc=1 }
+    x.old=String(m.o.order_date||'')<String(TODAY.getFullYear()-3);
     x.flag=m.unit?'unit':Math.abs(x.dp)>3?'price':(x.dm!=null&&x.dm<-5)?'low':(x.dm!=null&&x.dm>5)?'high':'ok' }
    return x });
   const FL={ok:['相符','Matches','good'],price:['售價和 PO 不同','Price ≠ PO','warn'],low:['系統算的利潤較低','System margin lower','crit'],high:['系統算的利潤較高','System margin higher','info'],unit:['單位可能不同（打／件／組）','Unit differs?','neu'],nomatch:['ERP 找不到此款','Not in ERP','neu']};
@@ -6420,8 +6423,8 @@ init();
   h+=`<div class="tbl-wrap"><table class="t cards"><thead><tr><th>${L('客戶','Cust')}</th><th>${L('款號','Style')}</th><th>${L('品名／尺寸／顏色','Desc')}</th><th class="r">Dillard ${L('售價','price')}</th><th class="r">Dillard Margin</th><th class="r">ERP ${L('最新 PO 單價','PO price')}</th><th class="r">${L('售價差','Δ price')}</th><th class="r">${L('系統單件成本','Sys cost')}</th><th class="r">${L('系統 Margin','Sys margin')}</th><th class="r">${L('差（點）','Δ pt')}</th><th>${L('判斷','Check')}</th><th>${L('來源','Source')}</th></tr></thead><tbody>
    ${show.map(x=>{const r=x.r,o=x.m&&x.m.o,f=FL[x.flag];return `<tr><td data-l="${L('客戶','Cust')}">${esc(r.cust)}</td><td class="lead mono">${esc(r.style)}</td><td class="wrap small" data-l="${L('品名','Desc')}">${esc([r.desc,r.size,r.color].filter(Boolean).join(' · '))}${r.extra?`<div class="muted">${esc(r.extra)}</div>`:''}</td>
     <td class="r" data-l="Dillard">${money(r.price,3)}<div class="small muted">${esc(r.term||'')}</div></td><td class="r" data-l="Margin">${pc(r.margin)}</td>
-    <td class="r" data-l="PO">${o?money(o.price,3)+`<div class="small muted">${esc(String(o.order_date||'').slice(0,10))} · ${esc(o.my_no||o.od_no||'')}${x.m.how!=='same'?' · '+L('近似款','similar'):''}</div>`:'—'}</td>
-    <td class="r ${x.dp>3?'diff-neg':''}" data-l="${L('售價差','Δ')}">${x.dp==null?'—':(x.dp>0?'+':'')+fmt(x.dp,1)+'%'}</td><td class="r" data-l="${L('成本','Cost')}">${x.cost!=null?money(x.cost,3):'—'}</td>
+    <td class="r" data-l="PO">${o?money(o.price,3)+`<div class="small muted">${esc(String(o.order_date||'').slice(0,10))} · ${esc(o.my_no||o.od_no||'')}${x.m.how!=='same'?' · '+L('近似款','similar'):''}${x.old?' · '+L('三年前舊單','old order'):''}</div>`:'—'}</td>
+    <td class="r ${x.dp>3?'diff-neg':''}" data-l="${L('售價差','Δ')}">${x.dp==null?'—':(x.dp>0?'+':'')+fmt(x.dp,1)+'%'}</td><td class="r" data-l="${L('成本','Cost')}">${x.cost!=null?money(x.cost,3):x.inc?`<span class="small muted">${L('BOM／料價不完整','BOM incomplete')}</span>`:'—'}</td>
     <td class="r ${x.sm!=null&&x.sm<0?'diff-neg':''}" data-l="${L('系統','Sys')}">${pc(x.sm)}</td><td class="r ${x.dm!=null&&x.dm<-5?'diff-neg':x.dm>5?'diff-pos':''}" data-l="Δ">${x.dm==null?'—':(x.dm>0?'+':'')+fmt(x.dm,1)}</td>
     <td data-l="${L('判斷','Check')}"><span class="st ${f[2]}">${esc(L(f[0],f[1]))}</span></td><td class="small muted" data-l="${L('來源','Src')}">Dillard ${esc(r.src_date)}<br>${esc(r.file)}</td></tr>`}).join('')}</tbody></table></div>`;
   if(V.length>200&&!st.all)h+=`<p class="small"><button class="btn sm" onclick="dmSet('all',1)">${L('顯示全部 ','Show all ')}${fmt(V.length)}</button></p>`;
