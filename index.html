@@ -6345,6 +6345,7 @@ init();
  if(DB&&!Array.isArray(DB.refdocs))DB.refdocs=[];
  const _por=pageOfRep; pageOfRep=function(r){return r==='refdoc'?'dmargin':_por(r)};
  const L=(zh,en)=>tt(zh,en);
+ const tday=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
  const KN=s=>String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'');
  const refs=k=>{ if(!Array.isArray(DB.refdocs))DB.refdocs=[]; return live(DB.refdocs).filter(r=>r.kind===k) };
  const pc=v=>v==null||isNaN(v)?'—':fmt(v,1)+'%';
@@ -6356,7 +6357,7 @@ init();
   const R=recs.map((r,i)=>{ const id='rf_'+group+'_'+(r.rid||i); const o=old.get(id);
    return Object.assign({id,import_key:key,source_system:'VRT_REF',source_record_id:key+'#'+(i+1),source_file:info.file||group,import_batch_id:key,synced_at:at},r,o&&o.notes?{notes:o.notes,tags:o.tags}:{}) });
   const ds=R.map(r=>r.src_date).filter(Boolean).sort();
-  const meta={key,rep:'refdoc',fn:'REF',file:info.file||group,label:info.label||group,rows:R.length,at,dirty:true,version:null,cloud:false,range:[ds[0]||today(),ds[ds.length-1]||today()]};
+  const meta={key,rep:'refdoc',fn:'REF',file:info.file||group,label:info.label||group,rows:R.length,at,dirty:true,version:null,cloud:false,range:[ds[0]||tday(),ds[ds.length-1]||tday()]};
   storeBatch('refdoc',key,meta,R);
   try{(DB.importlog=DB.importlog||[]).unshift({at,rep:'refdoc',file:meta.file,key,added:R.length,user:'paul.weng'})}catch(e){}
   GC.clear(); persist(); try{renderNav()}catch(e){} if(typeof cloudReady==='function'&&cloudReady())setTimeout(()=>cloudSync(false),400); return R.length };
@@ -6514,7 +6515,7 @@ init();
   }
   if(P)h+=`<div class="panel mt"><h2>📋 ${esc(P.title)}</h2>${src(P)}${pts(P.points)}${P.docs?`<p class="small" style="margin:8px 0 0"><b>${L('附件文件：','Documents: ')}</b>${esc(P.docs)}</p>`:''}${full(P)}${noteBox(P,L('計畫修訂、主管核可…','Revisions, approvals…'))}</div>`;
   const SC=refs('stsched').filter(r=>r.wh===st.wh).sort((a,b)=>(+a.seq||0)-(+b.seq||0));
-  if(SC.length){ const td=today();
+  if(SC.length){ const td=tday();
    const stat=r=>{ const n=String(r.notes||''); if(/完成|已做|done|✅/i.test(n))return ['good',L('已完成（有記錄）','Done (recorded)')]; if(/沒做|未做|取消|延/i.test(n))return ['crit',L('沒做／延後','Not done / delayed')]; if(String(r.due)<td)return ['warn',L('時間已過，還沒記錄','Past due, no record')]; return ['neu',L('還沒到','Not yet due')] };
    const done=SC.filter(r=>stat(r)[0]==='good').length, late=SC.filter(r=>stat(r)[0]==='warn').length;
    h+=`<div class="sec-h">${L('時程與執行狀況','Schedule & status')} · ${L('完成 ','done ')}${done}/${SC.length}${late?` · <span class="diff-neg">${L('過期未記錄 ','overdue ')}${late}</span>`:''}</div>
