@@ -623,6 +623,7 @@ table.t.list tr.sel td{background:#FFF7ED}
 })(window);
 /* DEL-GUARD END */
 </script>
+<script src="assets/mm-vault.js"></script><script src="assets/minutes.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 
@@ -651,7 +652,7 @@ const T={
  fabric:['布料','Fabric','ក្រណាត់'], accessories:['輔料','Accessories','គ្រឿងបន្សំ'], production:['生產','Production','ផលិតកម្ម'],
  wip:['在製 WIP','WIP','ការងារកំពុងផលិត WIP'], 'finished-goods':['成品入庫','Finished Goods','ទំនិញសម្រេច'], shipping:['出貨','Shipping','ការដឹកជញ្ជូន'],
  'factory-cost':['製造費用','Factory Cost','ចំណាយរោងចក្រ'], costing:['成本分析','Costing','ការគណនាថ្លៃដើម'], sync:['同步中心','Sync Center','មជ្ឈមណ្ឌលសមកាលកម្ម'],
- compare:['比對中心','Compare Center','មជ្ឈមណ្ឌលប្រៀបធៀប'], exceptions:['異常中心','Exceptions','ករណីមិនប្រក្រតី'], reports:['報告','Reports','របាយការណ៍'],
+ compare:['比對中心','Compare Center','មជ្ឈមណ្ឌលប្រៀបធៀប'], exceptions:['異常中心','Exceptions','ករណីមិនប្រក្រតី'], reports:['報告','Reports','របាយការណ៍'], minutes:['會議追蹤','Meeting follow-up','តាមដានការប្រជុំ'], sub_minutes:['台北／VRT 會議紀錄逐項追蹤：待追、進行中、已完成。','Track every meeting action item.','តាមដានការប្រជុំ'],
  telegram:['Telegram','Telegram','Telegram'], audit:['稽核 / 回收','Audit & Trash','សវនកម្ម / ធុងសំរាម'], settings:['設定','Settings','ការកំណត់'],
  legacy_ro:['Legacy ERP 唯讀','Legacy ERP read-only','Legacy ERP អានតែប៉ុណ្ណោះ'],
  proto_note:['v0.7.1 · 真實資料來自 ERP 匯出檔，不連線 clothes.exe','v0.7.1 · real data from ERP export files; no link to clothes.exe','v0.5 · ទិន្នន័យពិតពីឯកសារ ERP'],
@@ -1311,7 +1312,7 @@ const MODS=[
  ['orders','🧾','g_mat'],['bom','🧵','g_mat'],['purchase','🛒','g_mat'],['pprice','🏷️','g_mat'],['receiving','📥','g_mat'],['fabric','🧶','g_mat'],['accessories','🧷','g_mat'],['stockmove','🔁','g_mat'],
  ['production','🏭','g_prod'],['wip','⏳','g_prod'],['finished-goods','📦','g_prod'],['fgstock','🗃️','g_prod'],['shipping','🚢','g_prod'],
  ['factory-cost','💰','g_cost'],['labor','👷','g_cost'],['costing','🧮','g_cost'],
- ['sync','🔄','g_hub'],['compare','🔍','g_hub'],['exceptions','⚠️','g_hub'],['reports','📑','g_hub'],
+ ['sync','🔄','g_hub'],['compare','🔍','g_hub'],['exceptions','⚠️','g_hub'],['reports','📑','g_hub'],['minutes','📝','g_hub'],
  ['telegram','✈️','g_sys'],['audit','🗂️','g_sys'],['settings','⚙️','g_sys'],
 ];
 const modIcon=k=>(MODS.find(m=>m[0]===k)||[])[1]||'';
@@ -1682,7 +1683,7 @@ function pageHead(k,acts=''){
  <div class="url-chip" title="${esc(t('direct_url'))}">${esc(PAGE_BASE)}#${k}</div></div>
  <div class="acts">${acts}${k!=='dashboard'?`<a class="btn sm" href="#solo-${k}">${esc(t('open_solo'))} ↗</a>`:''}</div></div>`;
 }
-const subKey=k=>({dashboard:'sub_dashboard',orders:'sub_orders',bom:'sub_bom',purchase:'sub_purchase',receiving:'sub_receiving',fabric:'sub_fabric',accessories:'sub_accessories',
+const subKey=k=>({minutes:'sub_minutes',dashboard:'sub_dashboard',orders:'sub_orders',bom:'sub_bom',purchase:'sub_purchase',receiving:'sub_receiving',fabric:'sub_fabric',accessories:'sub_accessories',
  production:'sub_production',shipping:'sub_shipping',wip:'sub_wip','finished-goods':'sub_fg','factory-cost':'sub_fc',costing:'sub_costing',sync:'sub_sync',compare:'sub_compare',
  exceptions:'sub_exc',prodorders:'sub_prodorders',issues:'sub_issues',materials:'sub_materials',invoices:'sub_invoices',payables:'sub_payables',apsum:'sub_apsum',pprice:'sub_pprice',stockmove:'sub_stockmove',fgstock:'sub_fgstock',labor:'sub_labor','smart-import':'sub_import',reports:'sub_reports',telegram:'sub_tg',audit:'sub_audit',settings:'sub_settings'}[k]);
 let toastT; function toast(m){const el=$('#toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
@@ -2563,7 +2564,7 @@ function gsearch(q){
 }
 
 /* ================= router / init ================= */
-const RENDER={production:renderProduction,dashboard:renderDashboard,'smart-import':renderImport,wip:renderWIP,'finished-goods':renderFG,'factory-cost':renderFC,costing:renderCosting,sync:renderSync,compare:renderCompare,exceptions:renderExceptions,reports:renderReports,telegram:renderTelegram,audit:renderAudit,settings:renderSettings};
+const RENDER={minutes:()=>window.renderMinutes?window.renderMinutes():'',production:renderProduction,dashboard:renderDashboard,'smart-import':renderImport,wip:renderWIP,'finished-goods':renderFG,'factory-cost':renderFC,costing:renderCosting,sync:renderSync,compare:renderCompare,exceptions:renderExceptions,reports:renderReports,telegram:renderTelegram,audit:renderAudit,settings:renderSettings};
 function rerender(){
  COSTC.clear(); HOL=null;
  const st=S(CUR); if(st.pt==='ALL'&&st.view!=='detail')st.view='detail';
