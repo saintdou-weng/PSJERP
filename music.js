@@ -1,4 +1,5 @@
-/* v2.16（2026-11-23 夜）：照片改成鋪在最後面當背景（跟壁紙一樣，不蓋住選單、卡片、字）；混色改成斜向漸層，兩個顏色都看得到；字可以調大小（90–110%）；
+/* v2.17（2026-11-24）：Paul：傾斜太敏感，手機一動就開始斜跟閃 → 拿掉「歪一下再擺正」的效果（含重力感應觸發和轉向時的那一下），轉手機時只維持直立。
+   v2.16（2026-11-23 夜）：照片改成鋪在最後面當背景（跟壁紙一樣，不蓋住選單、卡片、字）；混色改成斜向漸層，兩個顏色都看得到；字可以調大小（90–110%）；
    字色跟底色太接近時自動換成看得清楚的顏色；音樂：手機休眠或離開畫面超過 30 分鐘自動停，回來再接著播（到設定的關閉時間或離開為止）。
    v2.15（2026-11-23 晚）：調色盤分頁（背景／字與樣式／音樂）；加字型 Times New Roman、新細明體、Comic Sans、Calibri；字的設定不套在各平台的選單頁和 PSJ 左邊選單；手機轉向改用重力感應（<45° 微歪、>45° 多歪、90° 歪更多再擺正，永遠直立）。
    v2.14（2026-11-23 晚）：每個平台各自可以設 字的顏色（同底色系＋10 色）、字的深淺、字型（10 種常見字型）、按鈕／卡片要不要立體、頁面亮度、卡片透明度。
@@ -845,7 +846,7 @@
   document.head.appendChild(st)}
  function base(a){var z=dims();return a===90?'translateY('+z.S+'px) rotate(-90deg)':'translateX('+z.L+'px) rotate(90deg)'}
  function fit(a){var b=document.body,z=dims();b.style.setProperty('width',z.S+'px','important');b.style.setProperty('height',z.L+'px','important');b.style.setProperty('transform',base(a),'important')}
- function tilt(deg){var b=document.body;if(!b||!b.animate)return;var now=Date.now();if(now-lastAnim<700)return;lastAnim=now;var t=b.style.transform||'';
+ function tilt(deg){return;/* v2.17 Paul：太敏感、一動就斜跟閃 → 不再歪一下，只保持直立 */var b=document.body;if(!b||!b.animate)return;var now=Date.now();if(now-lastAnim<700)return;lastAnim=now;var t=b.style.transform||'';
   try{b.animate([{transform:t+' rotate(0deg)'},{transform:t+' rotate('+deg+'deg)',offset:.35},{transform:t+' rotate('+(-deg*.25).toFixed(2)+'deg)',offset:.75},{transform:t+' rotate(0deg)'}],{duration:Math.abs(deg)>8?1000:800,easing:'cubic-bezier(.3,.7,.3,1)'})}catch(_){}}
  function set(){var a=ang(),b=document.body;if(!b)return;
   if(a===cur){if(a)fit(a);return}
@@ -858,7 +859,7 @@
  /* 重力感應：算手機往左／右歪了幾度，跨過 45 度那一下讓頁面歪一下再擺正 */
  function onMotion(e){var g=e.accelerationIncludingGravity;if(!g||g.x==null||g.y==null)return;var x=g.x,y=g.y;if(Math.abs(x)+Math.abs(y)<4)return;   /* 平放在桌上：不算 */
   var r=Math.atan2(x,y)*180/Math.PI;roll=r;var ar=Math.abs(r),nb=ar<20?0:ar<45?1:ar<80?2:3;
-  if(nb!==band){var up=nb>band;band=nb;if(up&&nb<3&&!cur){tilt((r>0?-1:1)*(nb===1?3:6))}}}
+  band=nb;/* v2.17：只記方向（判斷轉橫時往哪邊），不再讓頁面歪 */}
  window.addEventListener('devicemotion',onMotion,{passive:true});
  var tm;function later(){clearTimeout(tm);tm=setTimeout(set,100)}
  if(screen.orientation&&screen.orientation.addEventListener)screen.orientation.addEventListener('change',later);
