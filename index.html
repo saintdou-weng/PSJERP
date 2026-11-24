@@ -6484,7 +6484,7 @@ init();
  /* ══════════ 4. 📘 生產作業守則／原則 ══════════ */
  T.guides=['生產作業守則','Production guidelines','គោលការណ៍ផលិតកម្ម'];
  T.sub_guides=['Paul 寫的加班、停工、作業程序（SOP）、成本與人力報告：重點、門檻數字、原文。週報、月報寫到相關事情時從這裡引用。','Paul’s overtime, shutdown, SOP, cost and workforce reports — key points and thresholds for weekly / monthly reports.'];
- { const i=MODS.findIndex(m=>m[0]==='p-weekly'); MODS.splice(i>=0?i:MODS.length,0,['guides','📘','g_hub','prod']) }
+ { const i=MODS.findIndex(m=>m[0]==='prodreports'); MODS.splice(i>=0?i+1:MODS.length,0,['guides','📘',i>=0?MODS[i][2]:'g_hub','prod']) }   /* 放在「生產報告」下面：寫週報月報時就在旁邊 */
  window.refCopy=function(id){ const r=(DB.refdocs||[]).find(x=>x.id===id); if(!r)return; const s='【'+r.title+'】（'+r.src_date+'）\n'+String(r.points||'').split('\n').map(x=>'• '+x).join('\n');
   (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast(L('重點已複製，可貼到週報','Copied'))).catch(()=>prompt(L('複製這段','Copy'),s)) };
  window.REF_GUIDES=()=>refs('guide');
@@ -6498,7 +6498,7 @@ init();
  /* ══════════ 5. 📋 年底盤點計畫（布倉／輔料倉） ══════════ */
  T.stocktake=['年底盤點計畫','Year-end stock count','ផែនការរាប់ស្តុក'];
  T.sub_stocktake=['布倉、輔料倉的盤點計畫、時程和負責人；每一步寫下有沒有做、證據在哪；跟計畫當時的庫存（倉庫系統 vs ERP）和現在的 ERP 庫存比較。','Stock-count plans, schedule and evidence; baseline vs current ERP stock.'];
- { const i=MODS.findIndex(m=>m[0]==='p-fabstock'); MODS.splice(i>=0?i+1:MODS.length,0,['stocktake','📋','g_matl','prod']) }
+ { let i=MODS.findIndex(m=>m[0]==='p-fabstock'); if(i<0)i=MODS.findIndex(m=>m[0]==='fabric'); MODS.splice(i>=0?i+1:MODS.length,0,['stocktake','📋','g_matl','prod']) }
  RENDER.stocktake=function(){
   const st=St('stocktake'); st.wh=st.wh||'fabric'; let h=pageHead('stocktake');
   if(!refs('stplan').length)return h+empty();
