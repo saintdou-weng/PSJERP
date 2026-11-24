@@ -1,4 +1,4 @@
-/* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變。
+/* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變；③ 卡片底色改成比後面的底色稍深一點（約 4.5%），立體卡片左上的白色反光調淡，卡片不再比背景亮。
 /* v2.17（2026-11-24）：Paul：傾斜太敏感，手機一動就開始斜跟閃 → 拿掉「歪一下再擺正」的效果（含重力感應觸發和轉向時的那一下），轉手機時只維持直立。
    v2.16（2026-11-23 夜）：照片改成鋪在最後面當背景（跟壁紙一樣，不蓋住選單、卡片、字）；混色改成斜向漸層，兩個顏色都看得到；字可以調大小（90–110%）；
    字色跟底色太接近時自動換成看得清楚的顏色；音樂：手機休眠或離開畫面超過 30 分鐘自動停，回來再接著播（到設定的關閉時間或離開為止）。
@@ -588,7 +588,7 @@
  function pageBg(){var c=document.body&&bgOf(document.body);if(!c)c=bgOf(H);return c||[255,255,255,1]}
  var CSS=
   '.vc3{box-shadow:0 12px 26px rgba(15,23,42,.20),0 3px 7px rgba(15,23,42,.14),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 0 rgba(15,23,42,.10)!important}.vc3:not(.vc3-a){border-color:rgba(15,23,42,.24)!important}'+
-  '.vc3.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.80) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.30) 74%,rgba(15,23,42,.11) 100%)!important}'+
+  '.vc3.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 30%,rgba(15,23,42,.06) 58%,rgba(255,255,255,.18) 74%,rgba(15,23,42,.12) 100%)!important}'+
   '.vc3.vc3-d{box-shadow:0 12px 26px rgba(0,0,0,.46),0 3px 7px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 0 rgba(0,0,0,.36)!important}.vc3.vc3-d:not(.vc3-a){border-color:rgba(255,255,255,.18)!important}'+
   '.vc3.vc3-d.vc3-g{background-image:linear-gradient(150deg,rgba(255,255,255,.11) 0%,rgba(255,255,255,0) 30%,rgba(0,0,0,.10) 58%,rgba(255,255,255,.06) 74%,rgba(0,0,0,.18) 100%)!important}'+
   /* 按壓：平常微微浮起 → 按下去往下沉、影子收掉、裡面出現一圈壓痕，放開彈回來 */
@@ -705,11 +705,28 @@
     var tc=rgb(cs.color),bg=clear?pageBg():(c&&c[3]>=0.15?(c[3]<0.95?mix(pageBg(),c,c[3]):c):bgOf(o));   /* 半透明的底：跟頁面底色混過以後才算深淺 */
     if(bg&&lum(bg)>0.6)o.classList.add('vc-bk-k');
     if(cs.transform==='none'&&cs.position!=='fixed'&&cs.position!=='sticky')o.classList.add('vc-dt')}}catch(_){}}
+ /* v2.18（2026-11-25 Paul：卡片底色要比背景稍深一點）：
+    卡片跟它後面的底色差不多、或比底色還亮（例如白卡片放在淺灰／淺綠的頁面上）→ 卡片底色改成「後面底色再深 4.5%」，透明度照舊。
+    只動接近中性色的卡片；後面是深色的就再深一點（字本來就是淺色）；卡片本來就明顯比後面亮或暗（例：深色面板上的亮按鈕）不動。
+    換主題／換顏色時（頁面底色變了）自動重算；原本的底色有記下來，可以還原。 */
+ function behind(e){for(var p=e.parentElement,i=0;p&&p!==document.documentElement&&i<40;p=p.parentElement,i++){var g=bgOf(p);if(g)return g}return pageBg()}
+ function deepen(e,cs){try{if(e.closest('.gip-top,#vmPanel,#vpPanel,#vmBox'))return;cs=cs||W.getComputedStyle(e);
+   var img=cs.backgroundImage;if(img&&img!=='none'&&!/^linear-gradient\(150deg, rgba\(255, 255, 255/.test(img)&&!e.classList.contains('vc3-g'))return;   /* 有自己的圖片／漸層 → 不動 */
+   var c=rgb(e.__vcdp?e.__vcdp[2]:cs.backgroundColor);if(!c||c[3]<0.4)return;var b=behind(e),ce=c[3]<1?mix(b,c,c[3]):c;
+   var sat=Math.max(ce[0],ce[1],ce[2])-Math.min(ce[0],ce[1],ce[2]);if(sat>48)return;
+   var Lb=lum(b),d=lum(ce)-Lb;if(d< -0.035||d>0.16||(Lb>=0.4&&Lb<0.5))return;
+   var inv=H.classList.contains('vp-dark');   /* 調色盤深色＝整頁反相：算的時候要反過來，畫出來才會是「比較深」 */
+   var t=inv?(Lb>=0.5?mix(b,[255,255,255],0.06):mix(b,[255,255,255],0.12)):(Lb>=0.5?mix(b,[0,0,0],0.045):mix(b,[0,0,0],0.22));
+   if(!e.__vcdp)e.__vcdp=[e.style.getPropertyValue('background-color'),e.style.getPropertyPriority('background-color'),cs.backgroundColor];
+   var a=c[3];if(e.hasAttribute('data-vpg')){var mm=(e.style.getPropertyValue('background-color').match(/[\d.]+/g)||[]);if(mm.length>3)a=+mm[3]}
+   e.style.setProperty('background-color','rgba('+t[0]+','+t[1]+','+t[2]+','+a+')','important');e.classList.add('vc3-dp')}catch(_){}}
+ var dpSig='';function deepSig(){var p=pageBg();return p.join(',')+'|'+H.className.replace(/\bvc-\S+/g,'')+'|'+(H.getAttribute('data-theme')||'')+'|'+(document.body?document.body.className:'')}
+ function deepAll(){var sg=deepSig();if(sg===dpSig)return;dpSig=sg;[].forEach.call(document.querySelectorAll('.vc3-dp'),function(e){var o=e.__vcdp;if(o){if(o[0])e.style.setProperty('background-color',o[0],o[1]);else e.style.removeProperty('background-color');e.__vcdp=null}e.classList.remove('vc3-dp');deepen(e)})}
  function tag(e,cs,w,hh){var c=rgb(cs.backgroundColor),hasImg=cs.backgroundImage!=='none';
     var dk=c&&c[3]>=0.4?lum(c)<0.42:(function(){var g=bgOf(e);return g?lum(g)<0.42:false})();
     e.classList.add('vc3');if(!hasImg)e.classList.add('vc3-g');if(dk)e.classList.add('vc3-d');
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
-    if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
+    if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p');deepen(e,cs)}
  function cardsRun(){try{vars();inkCards();
    var els=document.querySelectorAll(CSEL),n=0;
    for(var i=0;i<els.length&&n<500;i++){var e=els[i];if(e.__vc3)continue;
@@ -722,7 +739,7 @@
     /* 原本有一邊粗的色條（例如左邊 4px 的分類色）：邊線顏色不動 */
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
     /* 小張、裡面沒有輸入框／表格／影片的，才加按壓動作 */
-    if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
+    if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p');deepen(e,cs)}
    generic();heads()}catch(_){}}
  function cards(){if(ct)return;ct=setTimeout(function(){ct=0;cardsRun()},70)}
  /* v2.17（2026-11-25 Paul：卡片會閃）：平台重畫（換分頁、雲端資料載入）時，新卡片先以「平面」畫出來，70ms 後才加上立體樣式 → 每次重畫都閃一下。
@@ -730,7 +747,7 @@
  var syncN=0,syncAt=0;function cardsMO(ms){var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
   if(add){var now=Date.now();if(now-syncAt>250){syncAt=now;syncN=0}if(++syncN<=4){clearTimeout(ct);ct=0;cardsRun();return}}cards()}
  function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
-  cards();chart3d();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d()}},3000);
+  cards();chart3d();dpSig=deepSig();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d();deepAll()}},3000);
   try{new MutationObserver(cardsMO).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
   /* 手機：要有 touchstart 監聽，:active 才會出現；手指移開（開始捲動）就放開 */
   try{document.addEventListener('touchstart',function(){},{passive:true})}catch(_){}}
