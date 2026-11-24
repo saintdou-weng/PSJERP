@@ -6460,7 +6460,7 @@ init();
  T.rental=['機台租借','Machine rental','ជួលម៉ាស៊ីន'];
  T.sub_rental=['向外租機台的通知（何時、租什麼、多少錢、為哪些單），對照應付／採購有沒有這筆、金額對不對。','Machine rental notices vs payables / purchase records.'];
  { const i=MODS.findIndex(m=>m[0]==='p-spare'); MODS.splice(i>=0?i+1:MODS.length,0,['rental','🛠️','g_make','prod']) }
- const RX=/熱轉印|熱轉|HEAT\s*TRANS|HEAT\s*PRESS|FUSING|燙襯|雙針|DOUBLE\s*NEEDLE|租|RENT/i;
+ const RX=/租|RENT(AL)?\b|LEASE/i;   /* 只認「租」：熱轉印標籤、燙襯等是料，不是租機 */
  const amtOf=r=>{for(const k of ['amount','amt','total','pay_amt','inv_amt','ap_amt','money','sum']){const v=+r[k];if(v)return v}return null};
  const dOf=r=>String(r.pay_date||r.recv_date||r.inv_date||r.date||r.po_date||r.purchase_date||r.voucher_date||'').slice(0,10);
  RENDER.rental=function(){
@@ -6469,7 +6469,7 @@ init();
   const R=refs('rental').sort((a,b)=>String(a.src_date).localeCompare(String(b.src_date))); let h=pageHead('rental'); if(!R.length)return h+empty();
   const pool=[...live(DB.payables||[]).map(r=>['AP',r]),...live(DB.purchase||[]).map(r=>[L('採購','PO'),r])].filter(([,r])=>RX.test(Object.values(r).filter(v=>typeof v==='string').join(' ')));
   const tot=R.reduce((s,r)=>s+(+r.amount||0),0);
-  h+=`<div class="kpis">${kpi(L('租借通知','Notices'),fmt(R.length))}${kpi(L('通知金額合計','Notified total'),money(tot,0),'',L('每月租金合計（照通知）','monthly rents as notified'))}${kpi(L('應付／採購裡找到的租借相關列','Matching AP / PO lines'),fmt(pool.length),'',pool.length?L('依關鍵字：租、熱轉印、燙襯、雙針…','by keyword'):L('目前 ERP 應付、採購都找不到','none found in AP / PO'),pool.length?'':'warn')}</div>`;
+  h+=`<div class="kpis">${kpi(L('租借通知','Notices'),fmt(R.length))}${kpi(L('通知金額合計','Notified total'),money(tot,0),'',L('每月租金合計（照通知）','monthly rents as notified'))}${kpi(L('應付／採購裡找到的租借相關列','Matching AP / PO lines'),fmt(pool.length),'',pool.length?L('依關鍵字：租、RENT','by keyword'):L('ERP 應付、採購都沒有租機紀錄（租金多半走總務零用金，請在 PSJGA 費用核對）','No rental lines in ERP AP / PO — likely paid via GA petty cash'),pool.length?'':'warn')}</div>`;
   h+=`<div class="tbl-wrap mt"><table class="t cards"><thead><tr><th>${L('通知日期','Notice')}</th><th>${L('機台','Machine')}</th><th>${L('台數','Units')}</th><th class="r">${L('金額','Amount')}</th><th>${L('期間','Period')}</th><th class="r">${L('件數','Qty')}</th><th>${L('訂單','Orders')}</th><th>${L('ERP 對照','ERP check')}</th><th>${L('備註','Note')}</th></tr></thead><tbody>
    ${R.map(r=>{ const d0=r.src_date, d1=new Date(new Date(d0).getTime()+75*864e5).toISOString().slice(0,10), d00=new Date(new Date(d0).getTime()-15*864e5).toISOString().slice(0,10);
     const hit=pool.filter(([,x])=>{const d=dOf(x);return d&&d>=d00&&d<=d1}); const same=hit.filter(([,x])=>{const a=amtOf(x);return a!=null&&Math.abs(a-(+r.amount||0))<=1});
@@ -6477,7 +6477,7 @@ init();
     return `<tr><td class="lead">${esc(r.src_date)}</td><td data-l="${L('機台','M/C')}">${esc(r.machine)}</td><td data-l="${L('台數','Units')}">${esc(r.units||'')}</td><td class="r" data-l="${L('金額','Amt')}">${money(+r.amount||0,0)}</td><td class="wrap small" data-l="${L('期間','Period')}">${esc(r.period||'')}</td><td class="r" data-l="${L('件數','Qty')}">${fmt(+r.qty||0)}</td><td class="wrap small" data-l="${L('訂單','Orders')}">${esc(r.orders||'')}<div class="muted">${esc(r.note||'')}</div></td>
      <td class="wrap small" data-l="ERP">${chk}${hit.slice(0,4).map(([k,x])=>`<div class="muted">${esc(k)} ${esc(dOf(x))} ${esc(x.supplier||x.supplier_id||'')} ${amtOf(x)!=null?money(amtOf(x),2):''}</div>`).join('')}</td><td class="wrap" data-l="${L('備註','Note')}">${noteBox(r,L('例如：發票已到、金額已核','e.g. invoice checked'))}</td></tr>` }).join('')}</tbody></table></div>`;
   refs('rnote').forEach(n=>{h+=`<div class="panel mt"><h2>📝 ${esc(n.title)}</h2>${src(n)}${pts(n.points)}${full(n)}</div>`});
-  h+=`<p class="small muted">${L('對法：通知日前 15 天到後 75 天內，應付（W_AR700）與採購裡有「租、熱轉印、燙襯、雙針、RENT、HEAT TRANSFER、FUSING」字樣的列；金額相差 $1 以內算相同。','AP / PO lines with rental keywords within −15 / +75 days; same amount within $1.')}</p>`;
+  h+=`<p class="small muted">${L('對法：通知日前 15 天到後 75 天內，應付（W_AR700）與採購裡有「租、RENT、LEASE」字樣的列；金額相差 $1 以內算相同。核對後請在備註寫下付款單或收據號碼。','AP / PO lines with rental keywords within −15 / +75 days; same amount within $1.')}</p>`;
   return h };
 
  /* ══════════ 4. 📘 生產作業守則／原則 ══════════ */
