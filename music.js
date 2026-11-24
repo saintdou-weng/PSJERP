@@ -1,3 +1,4 @@
+/* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變。
 /* v2.17（2026-11-24）：Paul：傾斜太敏感，手機一動就開始斜跟閃 → 拿掉「歪一下再擺正」的效果（含重力感應觸發和轉向時的那一下），轉手機時只維持直立。
    v2.16（2026-11-23 夜）：照片改成鋪在最後面當背景（跟壁紙一樣，不蓋住選單、卡片、字）；混色改成斜向漸層，兩個顏色都看得到；字可以調大小（90–110%）；
    字色跟底色太接近時自動換成看得清楚的顏色；音樂：手機休眠或離開畫面超過 30 分鐘自動停，回來再接著播（到設定的關閉時間或離開為止）。
@@ -400,7 +401,7 @@
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]',ct=0;
  /* 連嵌在裡面的分頁（同網域 iframe，最多兩層）一起處理：色片本來就蓋得到，卡片的影子／按鈕顏色要另外送進去 */
  function docsAll(){var out=[document];try{[].forEach.call(document.querySelectorAll('iframe'),function(f){try{var d=f.contentDocument;if(d&&d.documentElement&&d.body){out.push(d);[].forEach.call(d.querySelectorAll('iframe'),function(g){try{var e=g.contentDocument;if(e&&e.documentElement&&e.body)out.push(e)}catch(_){}})}}catch(_){}})}catch(_){}return out}
- function cards(){ if(ct)return; ct=setTimeout(function(){ct=0;try{
+ function palRun(){try{
    var H=document.documentElement,on=H.classList.contains('vp-on'),acc=H.classList.contains('vp-acc')?H.style.getPropertyValue('--vp-acc'):'';
    docsAll().forEach(function(d){try{var h=d.documentElement;
     if(d!==document){if(on&&!d.getElementById('vrt-pal-card')){var s2=d.createElement('style');s2.id='vrt-pal-card';s2.textContent=CARDCSS;(d.head||h).appendChild(s2)}
@@ -412,7 +413,11 @@
      if(e.closest('#vmPanel,#vpPanel,#vmBox'))continue;var w=e.offsetWidth,hh=e.offsetHeight;if(w<70||hh<36){continue}
      var cs=w0.getComputedStyle(e);e.__vpc=1;if(cs.backgroundImage!=='none'||cs.position==='fixed')continue;var bg=cs.backgroundColor.match(/[\d.]+/g)||[];if(bg.length>3&&+bg[3]<0.4)continue;
      e.classList.add('vp-card')}
-    glass(d,on&&st.co<100&&!!(st.wp||st.img||st.c||st.co<85));fontPass(d,on&&!!H.style.getPropertyValue('--vp-fc')&&!(function(){try{return isMenu(d.location.pathname)}catch(_){return false}})())}catch(_){}})}catch(_){}},160)}
+    glass(d,on&&st.co<100&&!!(st.wp||st.img||st.c||st.co<85));fontPass(d,on&&!!H.style.getPropertyValue('--vp-fc')&&!(function(){try{return isMenu(d.location.pathname)}catch(_){return false}})())}catch(_){}})}catch(_){}}
+ function cards(){ if(ct)return; ct=setTimeout(function(){ct=0;palRun()},160)}
+ /* v2.17：新加進來的卡片在畫面更新前就套好透明度／字色，不會先閃出原本顏色（同上，連續很多次才退回節流） */
+ var pN=0,pAt=0;function palMO(ms){if(!document.documentElement.classList.contains('vp-on'))return;var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
+  if(add){var now=Date.now();if(now-pAt>250){pAt=now;pN=0}if(++pN<=4){clearTimeout(ct);ct=0;palRun();return}}cards()}
  /* v2.13 有壁紙時，卡片稍微透明（約 85%），隱約看得到後面的花紋；字、按鈕都不變。關掉壁紙就還原。 */
  function glass(d,on2){try{d.documentElement.classList.toggle('vp-glass',on2);if(on2&&!d.getElementById('vrt-pal-glass')){var g=d.createElement('style');g.id='vrt-pal-glass';g.textContent='html.vp-glass [data-vpg]{-webkit-backdrop-filter:blur(2px) saturate(1.05);backdrop-filter:blur(2px) saturate(1.05)}';(d.head||d.documentElement).appendChild(g)}
    var w0=d.defaultView;
@@ -446,7 +451,7 @@
     if(mx-mn>42)continue;if(nd?L<0.55:L>0.55)continue;
     e.__vpf=[e.style.getPropertyValue('color'),e.style.getPropertyPriority('color')];e.style.setProperty('color',best(e),'important');e.setAttribute('data-vpf','')}}catch(_){}}
  setInterval(function(){if(!document.hidden&&document.documentElement.classList.contains('vp-on')){cards();if(st.wp)wpAll()}},2500);
- try{new MutationObserver(function(){if(document.documentElement.classList.contains('vp-on'))cards()}).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
+ try{new MutationObserver(palMO).observe(document.documentElement,{subtree:true,childList:true})}catch(_){}
  function draw(){ if(!panel||panel.hidden)return;
   var wpRow='<div class="swl">🧱 壁紙 Wallpaper'+(WPONLY?'':'（可以跟顏色、混色一起用 · works with any colour or mix）')+'</div><div class="wp">'+WPS.map(function(x){var w=x[0]?wpCss(x[0],false):null;return '<button data-w="'+x[0]+'" class="'+(st.wp===x[0]?'on':'')+'"><i style="'+(w?'background-image:'+w.i.join(',').replace(/"/g,"&quot;")+(w.pv===2?';background-size:cover;background-position:center bottom':w.pv?';background-size:auto 100%,100% 100%;background-position:30% 100%,0 0;background-color:#eef4fa':';background-size:'+w.s.join(',')):'background-color:#fff')+'"></i>'+x[1]+'</button>'}).join('')+'</div>';
   if(WPONLY){panel.innerHTML='<b class="h">🧱 壁紙 Wallpaper（這個平台自己記住）</b>'+wpRow+rotHtml(false)+'<small>顏色請用這個平台原本的 🎨；這裡只管壁紙，每個平台各設各的。<br>Colours stay in this platform’s own 🎨; wallpaper is saved per platform.</small>';panel.innerHTML=tabBar()+(PTAB==='ty'?styHtml():panel.innerHTML);place2();return}
@@ -705,7 +710,7 @@
     e.classList.add('vc3');if(!hasImg)e.classList.add('vc3-g');if(dk)e.classList.add('vc3-d');
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
     if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
- function cards(){if(ct)return;ct=setTimeout(function(){ct=0;try{vars();inkCards();
+ function cardsRun(){try{vars();inkCards();
    var els=document.querySelectorAll(CSEL),n=0;
    for(var i=0;i<els.length&&n<500;i++){var e=els[i];if(e.__vc3)continue;
     var w=e.offsetWidth,hh=e.offsetHeight;if(!w&&!hh)continue;   /* 還沒顯示的下次再看 */
@@ -718,10 +723,15 @@
     if(parseFloat(cs.borderLeftWidth)>=3||parseFloat(cs.borderTopWidth)>=3||parseFloat(cs.borderBottomWidth)>=3||parseFloat(cs.borderRightWidth)>=3)e.classList.add('vc3-a');
     /* 小張、裡面沒有輸入框／表格／影片的，才加按壓動作 */
     if(hh<=340&&w<=760&&!e.querySelector('input,select,textarea,table,iframe,video,canvas')&&!/^(TABLE|TR|TD|FORM|BODY|MAIN|SECTION)$/.test(e.tagName))e.classList.add('vc3-p')}
-   generic();heads()}catch(_){}},70)}
+   generic();heads()}catch(_){}}
+ function cards(){if(ct)return;ct=setTimeout(function(){ct=0;cardsRun()},70)}
+ /* v2.17（2026-11-25 Paul：卡片會閃）：平台重畫（換分頁、雲端資料載入）時，新卡片先以「平面」畫出來，70ms 後才加上立體樣式 → 每次重畫都閃一下。
+    改成：有新元素加進來就在同一個畫面更新前（MutationObserver 回呼裡）直接套上；短時間內連續很多次才退回原本的 70ms 節流。 */
+ var syncN=0,syncAt=0;function cardsMO(ms){var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
+  if(add){var now=Date.now();if(now-syncAt>250){syncAt=now;syncN=0}if(++syncN<=4){clearTimeout(ct);ct=0;cardsRun();return}}cards()}
  function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
   cards();chart3d();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d()}},3000);
-  try{new MutationObserver(cards).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
+  try{new MutationObserver(cardsMO).observe(H,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','data-tint','data-theme']})}catch(_){}
   /* 手機：要有 touchstart 監聽，:active 才會出現；手指移開（開始捲動）就放開 */
   try{document.addEventListener('touchstart',function(){},{passive:true})}catch(_){}}
  /* v2.5 滑鼠經過／按下的浮凸感（事件掛在整頁，一次只標一個元素；不動各頁自己的樣式表） */
@@ -740,8 +750,16 @@
  function up(){clearTimeout(dnT);if(dnEl){var x=dnEl;dnEl=null;dnT=setTimeout(function(){x.classList.remove('vc-dn')},110)}}
  try{document.addEventListener('pointerover',function(e){if(e.pointerType==='touch')return;setHov(clk(e.target))},{passive:true});
   document.addEventListener('pointerleave',function(){setHov(null)},{passive:true});H.addEventListener('mouseleave',function(){setHov(null)},{passive:true});
-  document.addEventListener('pointerdown',function(e){var t=clk(e.target);if(!t)return;mark(t);if(dnEl&&dnEl!==t)dnEl.classList.remove('vc-dn');dnEl=t;t.classList.add('vc-dn');
-    if(e.pointerType==='touch'){setHov(t);setTimeout(function(){if(hovEl===t)setHov(null)},520)}},{passive:true});
+  /* v2.17（2026-11-25 Paul：首頁／分頁的卡片會閃）：手指一碰卡片就馬上「按下去＋亮起來」，結果只是要往下滑也每張卡閃一下。
+     手機改成：手指停在卡片上 120ms、沒有移動才顯示按下效果；一開始滑動（移動超過 8px、捲動、pointercancel）就取消，也不再亮 0.5 秒。滑鼠照舊。 */
+  var tdn=null;function tcancel(){if(tdn){clearTimeout(tdn.t);tdn=null}}
+  document.addEventListener('pointerdown',function(e){var t=clk(e.target);if(!t)return;mark(t);if(dnEl&&dnEl!==t)dnEl.classList.remove('vc-dn');
+    if(e.pointerType==='touch'){tcancel();tdn={el:t,x:e.clientX,y:e.clientY,t:setTimeout(function(){tdn=null;dnEl=t;t.classList.add('vc-dn')},120)};return}
+    dnEl=t;t.classList.add('vc-dn')},{passive:true});
+  document.addEventListener('pointermove',function(e){if(tdn&&(Math.abs(e.clientX-tdn.x)>8||Math.abs(e.clientY-tdn.y)>8))tcancel()},{passive:true});
+  document.addEventListener('pointerup',function(){if(!tdn)return;var t=tdn.el;tcancel();dnEl=t;t.classList.add('vc-dn');up()},{passive:true,capture:true});   /* 很快點一下：放開時才閃一下按下效果 */
+  document.addEventListener('pointercancel',tcancel,{passive:true});
+  document.addEventListener('scroll',tcancel,{passive:true,capture:true});
   ['pointerup','pointercancel','dragend'].forEach(function(n){document.addEventListener(n,up,{passive:true})});
   document.addEventListener('scroll',function(){if(dnEl)up()},{passive:true,capture:true})}catch(_){}
  /* v2.7 圖表（Chart.js）立體感：長條＝圓柱（左右暗、中間偏左一道亮）、圓環＝有厚度的環、折線＝底下一道影子。
