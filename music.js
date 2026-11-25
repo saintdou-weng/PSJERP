@@ -1,5 +1,6 @@
 /* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變；③ 卡片底色改成比後面的底色稍深一點（約 4.5%），立體卡片左上的白色反光調淡，卡片不再比背景亮；④ 立體按鈕拿掉 CSS 的 :active（手指一碰就下沉，捲動時整排按鈕閃），按下效果統一由上面的 120ms 判斷來加。
-/* v2.21（2026-11-25 晚）：Paul：換色後字看不到 → 全頁對比檢查（字跟底太接近就自動換深字／白字）。
+/* v2.22（2026-11-25 晚）：大字卡內不套質感／3D 卡片（深色主題下字看不到）；展開名單時不重跑整頁，減少卡頓閃爍。
+   v2.21（2026-11-25 晚）：Paul：換色後字看不到 → 全頁對比檢查（字跟底太接近就自動換深字／白字）。
    v2.20（2026-11-25 晚）：Paul：按鈕和卡片同一個顏色、混色＝漸層、字色跟著選（看不清楚就自動黑／白，淺底不會白字）。
    v2.19（2026-11-25）：Paul：HRA Portal／HRA-PAY／GASCheck／GA-EXP／SEC／Audit 預設平面（要 3D 再自己選），PSJ 系列、Admin 維持 3D；
    新增按鈕／卡片「質感」（金屬、木質、石壁、玻璃、皮革）、形狀（方正、圓角、膠囊、石塊）、顏色（調色盤色、比背景深）、按下效果（下沉、彈縮、發光、變暗、不動）；
@@ -404,8 +405,8 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
   stone:[NOISE,'linear-gradient(160deg,rgba(255,255,255,.28),rgba(0,0,0,.14))','140px 140px','0 3px 6px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.30),inset 0 -2px 0 rgba(0,0,0,.20)'],
   glass:['linear-gradient(120deg,rgba(255,255,255,.0) 40%,rgba(255,255,255,.35) 50%,rgba(255,255,255,0) 60%)','linear-gradient(180deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.10) 50%,rgba(255,255,255,.02) 100%)','auto','0 4px 14px rgba(15,23,42,.18),inset 0 1px 0 rgba(255,255,255,.85)'],
   leather:['radial-gradient(rgba(0,0,0,.10) 1px,transparent 1.3px)','linear-gradient(180deg,rgba(255,255,255,.14),rgba(0,0,0,.12))','5px 5px','0 2px 5px rgba(40,20,10,.30),inset 0 1px 0 rgba(255,255,255,.25)']};
- var TXB=':is(button,.btn,a.btn,[role=button],input[type=button],input[type=submit]):not(#vpPanel *):not(#vmPanel *):not(#vmBox *):not(#vpBtn):not([role=tab]):not([role=switch]):not([data-vt=off]):not(.kn-n):not(.vc3)';
- var TXC=':is(.vc3,.vp-card,[data-vpg]):not(#vpPanel *):not(#vmPanel *):not([data-vt=off])';
+ var TXB=':is(button,.btn,a.btn,[role=button],input[type=button],input[type=submit]):not(#kn-box *):not(.pkn-box *):not(#vpPanel *):not(#vmPanel *):not(#vmBox *):not(#vpBtn):not([role=tab]):not([role=switch]):not([data-vt=off]):not(.kn-n):not(.vc3)';
+ var TXC=':is(.vc3,.vp-card,[data-vpg]):not(#kn-box *):not(.pkn-box *):not(#vpPanel *):not(#vmPanel *):not([data-vt=off])';
  var TXCSS=(function(){var B='html.vt-on '+TXB,C='html.vt-on '+TXC,o='';
   o+=B+'{background-color:var(--vt-b)!important;color:var(--vt-bt)!important;border:1px solid var(--vt-bd)!important;background-image:var(--vt-tex),var(--vt-hl),var(--vt-gr)!important;background-size:var(--vt-ts),auto,auto!important;text-shadow:none!important}';
   o+=B+' *{color:inherit}';
@@ -544,7 +545,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
  function cards(){ if(ct)return; ct=setTimeout(function(){ct=0;palRun()},160)}
  /* v2.17：新加進來的卡片在畫面更新前就套好透明度／字色，不會先閃出原本顏色（同上，連續很多次才退回節流） */
  var pN=0,pAt=0;function palMO(ms){if(!document.documentElement.classList.contains('vp-on'))return;var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
-  if(add){var now=Date.now();if(now-pAt>250){pAt=now;pN=0}if(++pN<=4){clearTimeout(ct);ct=0;palRun();return}}cards()}
+  if(add){var tg=ms[0]&&ms[0].target;try{if(tg&&tg.closest&&tg.closest('#kn-box,.pkn-box,#kn-mask'))return}catch(_){}var now=Date.now();if(now-pAt>250){pAt=now;pN=0}if(++pN<=2){clearTimeout(ct);ct=0;palRun();return}}cards()}   /* v2.22 大字卡裡展開名單／員工卡不再每次重跑整頁（會卡、會閃） */
  /* v2.13 有壁紙時，卡片稍微透明（約 85%），隱約看得到後面的花紋；字、按鈕都不變。關掉壁紙就還原。 */
  function glass(d,on2){try{d.documentElement.classList.toggle('vp-glass',on2);if(on2&&!d.getElementById('vrt-pal-glass')){var g=d.createElement('style');g.id='vrt-pal-glass';g.textContent='html.vp-glass [data-vpg]{-webkit-backdrop-filter:blur(2px) saturate(1.05);backdrop-filter:blur(2px) saturate(1.05)}';(d.head||d.documentElement).appendChild(g)}
    var w0=d.defaultView;
@@ -768,7 +769,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
   (/^\/vrt-prod\//i.test(location.pathname)?'.hdr{padding-top:3px!important;padding-bottom:3px!important;min-height:0!important;height:auto!important;row-gap:1px!important;column-gap:12px!important}.hdr .sub{display:none!important}.hdr .logo{font-size:13px!important;letter-spacing:1px!important}.hdr .hstat{display:flex!important;flex-direction:row-reverse;align-items:baseline;gap:4px;min-width:0!important;flex:none!important}.hdr .hsv{font-size:13px!important}.hdr .hbtn{padding:3px 9px!important}.hdr-r{width:auto!important;margin-left:auto!important}@media(min-width:900px){.hdr{padding-right:292px!important}}'+(W.top!==W?'#vrtLangSw{left:auto!important;right:8px!important;transform:none!important}':'')+'':'')+
   '@media(prefers-reduced-motion:reduce){html .vc3.vc3-p{transition:none}html .vc3.vc3-p.vc-hov,html .vc3.vc3-p.vc-dn,.vc-bk.vc-dn{transform:none}}'+
   '@media print{.vc3{box-shadow:none!important;background-image:none!important}}';
- var SIDE=/^\/(psjerp|psjhr|psjgas)\//i.test(location.pathname)?',aside,#rail,.rail,.sidebar,#ga-sidebar,.mobile-nav,#drawer':'';
+ var SIDE=(/^\/(psjerp|psjhr|psjgas)\//i.test(location.pathname)?',aside,#rail,.rail,.sidebar,#ga-sidebar,.mobile-nav,#drawer':'')+',#kn-box,.pkn-box,.kn-db';   /* v2.22 Paul 11/25：大字卡（重點卡）內不套金屬／石頭卡片，免得深底配深字看不到 */
  var CSEL='.kpi,.kpi-card,.stat-card,.sum-card,.summary-card,.metric,.kc,.kcard,.card,.exp-card,.sew-card,.tile,.panel,.box,.sbox,.kn-n,.gip-kpi,.gcpt,.gcpt-kpi,[class*="kpi-"],[class*="-kpi"],[class$="-card"],[class*="-card "]';
  var HSEL='.ic-h,.pc-h,.mh,.dh,.modal-head,.modal-header,.m-head,.gc-modal-head,.cmp-dh,.gip-top,#kn-head,.pkn-head,.drawer-head,.dlg-head,.sheet-head,[class*="-head"],[class*="-hd"],[class*="-top"],[class$="-h"],header';
  var OSEL='.gip-ov,.cmp-mask,#kn-mask,.pkn-mask,.gcpt-ov,.modal,.modal-bg,.modal-overlay,.modal-mask,.ovl,.overlay,.mask,[role=dialog],dialog[open],.gc-common-modal,#drawer,.drawer,.sheet,[class*="modal"],[class*="-mask"],[class*="overlay"]';
@@ -875,6 +876,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
  /* v2.17（2026-11-25 Paul：卡片會閃）：平台重畫（換分頁、雲端資料載入）時，新卡片先以「平面」畫出來，70ms 後才加上立體樣式 → 每次重畫都閃一下。
     改成：有新元素加進來就在同一個畫面更新前（MutationObserver 回呼裡）直接套上；短時間內連續很多次才退回原本的 70ms 節流。 */
  var syncN=0,syncAt=0;function cardsMO(ms){var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
+  var inKn=true;for(var z=0;z<ms.length;z++){var tz=ms[z].target;if(!(tz&&tz.closest&&tz.closest('#kn-box,.pkn-box,#kn-mask,.kn-db'))){inKn=false;break}}if(inKn)return;   /* v2.22 大字卡裡的變動不重跑 */
   if(add){var now=Date.now();if(now-syncAt>250){syncAt=now;syncN=0}if(++syncN<=4){clearTimeout(ct);ct=0;cardsRun();return}}cards()}
  function start(){try{var s=document.createElement('style');s.id='vrt-card3d-css';s.textContent=CSS;(document.head||H).appendChild(s)}catch(_){}
   cards();chart3d();dpSig=deepSig();setInterval(function(){if(!document.hidden){H.__vcK='';cards();chart3d();deepAll()}},3000);
