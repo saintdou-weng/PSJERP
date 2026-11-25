@@ -24,7 +24,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
 
 (function(){
  if(window.__VRT_MUSIC)return; try{ if(window.top!==window&&window.top.__VRT_MUSIC)return }catch(e){} window.__VRT_MUSIC=1;
- var MM_SRC=((document.currentScript&&document.currentScript.src)||'https://saintdou-weng.github.io/psjerp/music.js').replace(/music\.js.*$/,'my-music.js?v=1');
+ var MM_SRC=((document.currentScript&&document.currentScript.src)||'https://saintdou-weng.github.io/psjerp/music.js').replace(/music\.js.*$/,'my-music.js?v=2');
  var SRC=[{k:'rain',ic:'🌧️',t:'雨聲 Rain',gen:1},{k:'sea',ic:'🌊',t:'海浪 Ocean',gen:1},{k:'piano',ic:'🎹',t:'輕鋼琴 Soft piano',gen:1},
   {k:'mine',ic:'🎧',t:'我的音樂 My music',mine:1},{k:'classic',ic:'🎻',t:'古典電台 Classical radio',note:'Radio Swiss Classic',urls:['https://stream.srg-ssr.ch/srgssr/rsc_de/mp3/128','https://stream.srg-ssr.ch/srgssr/rsc_de/aac/96','https://stream.srg-ssr.ch/srgssr/rsc_fr/mp3/128']},
   {k:'pianor',ic:'🎼',t:'鋼琴電台 Piano radio',note:'Capriccio Piano',urls:['https://live.hdradiostreaming.com:10443/listen/capriccio_piano/stream']},
