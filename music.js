@@ -1,4 +1,5 @@
-/* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變；③ 卡片底色改成比後面的底色稍深一點（約 4.5%），立體卡片左上的白色反光調淡，卡片不再比背景亮；④ 立體按鈕拿掉 CSS 的 :active（手指一碰就下沉，捲動時整排按鈕閃），按下效果統一由上面的 120ms 判斷來加。
+/* v2.23（2026-11-25）：🎧 我的音樂——手機／雲端的歌（含 .dsf）匯入這台裝置播放，只給自己用（my-music.js）
+   v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變；③ 卡片底色改成比後面的底色稍深一點（約 4.5%），立體卡片左上的白色反光調淡，卡片不再比背景亮；④ 立體按鈕拿掉 CSS 的 :active（手指一碰就下沉，捲動時整排按鈕閃），按下效果統一由上面的 120ms 判斷來加。
 /* v2.22（2026-11-25 晚）：大字卡內不套質感／3D 卡片（深色主題下字看不到）；展開名單時不重跑整頁，減少卡頓閃爍。
    v2.21（2026-11-25 晚）：Paul：換色後字看不到 → 全頁對比檢查（字跟底太接近就自動換深字／白字）。
    v2.20（2026-11-25 晚）：Paul：按鈕和卡片同一個顏色、混色＝漸層、字色跟著選（看不清楚就自動黑／白，淺底不會白字）。
@@ -23,8 +24,9 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
 
 (function(){
  if(window.__VRT_MUSIC)return; try{ if(window.top!==window&&window.top.__VRT_MUSIC)return }catch(e){} window.__VRT_MUSIC=1;
+ var MM_SRC=((document.currentScript&&document.currentScript.src)||'https://saintdou-weng.github.io/psjerp/music.js').replace(/music\.js.*$/,'my-music.js?v=1');
  var SRC=[{k:'rain',ic:'🌧️',t:'雨聲 Rain',gen:1},{k:'sea',ic:'🌊',t:'海浪 Ocean',gen:1},{k:'piano',ic:'🎹',t:'輕鋼琴 Soft piano',gen:1},
-  {k:'classic',ic:'🎻',t:'古典電台 Classical radio',note:'Radio Swiss Classic',urls:['https://stream.srg-ssr.ch/srgssr/rsc_de/mp3/128','https://stream.srg-ssr.ch/srgssr/rsc_de/aac/96','https://stream.srg-ssr.ch/srgssr/rsc_fr/mp3/128']},
+  {k:'mine',ic:'🎧',t:'我的音樂 My music',mine:1},{k:'classic',ic:'🎻',t:'古典電台 Classical radio',note:'Radio Swiss Classic',urls:['https://stream.srg-ssr.ch/srgssr/rsc_de/mp3/128','https://stream.srg-ssr.ch/srgssr/rsc_de/aac/96','https://stream.srg-ssr.ch/srgssr/rsc_fr/mp3/128']},
   {k:'pianor',ic:'🎼',t:'鋼琴電台 Piano radio',note:'Capriccio Piano',urls:['https://live.hdradiostreaming.com:10443/listen/capriccio_piano/stream']},
   {k:'jazz',ic:'🎷',t:'輕爵士電台 Jazz radio',note:'Radio Swiss Jazz',urls:['https://stream.srg-ssr.ch/srgssr/rsj/mp3/128','https://stream.srg-ssr.ch/srgssr/rsj/aac/96']},
   {k:'pop',ic:'🎤',t:'抒情流行電台 Soft pop radio',note:'Radio Swiss Pop',urls:['https://stream.srg-ssr.ch/srgssr/rsp/mp3/128','https://stream.srg-ssr.ch/srgssr/rsp/aac/96']},
@@ -61,9 +63,12 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
    clearTimeout(rWatch);rWatch=setTimeout(function(){if(radio===a&&!ok){try{a.pause()}catch(e){}next()}},15000);var p=a.play();if(p&&p.catch)p.catch(function(err){if(radio!==a||ok)return;if(err&&err.name==='NotAllowedError'){needGesture()}else next()})};next()}
  function needGesture(){ if(waitGesture)return; waitGesture=true; var h=function(){document.removeEventListener('pointerdown',h,true);document.removeEventListener('keydown',h,true);waitGesture=false;if(on)play()};document.addEventListener('pointerdown',h,true);document.addEventListener('keydown',h,true) }
  function play(){on=true;try{sessionStorage.setItem('vrt_music_on','1')}catch(e){}var S=SRC.filter(function(x){return x.k===st.src})[0]||SRC[0];
-  try{if(S.gen){radioStop();genStart(S.k);setTimeout(function(){if(on&&ctx&&ctx.state!=='running')needGesture()},400)}else radioStart(S)}catch(e){on=false;tip('這個瀏覽器不能播放聲音 · Audio not supported')}draw()}
- function stop(){on=false;try{sessionStorage.removeItem('vrt_music_on')}catch(e){}radioStop();clearTimeout(timer);if(ctx&&master){master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setTargetAtTime(0,ctx.currentTime,.25);setTimeout(function(){if(!on){genStop();try{ctx.suspend()}catch(e){}}},900)}draw()}
- function setVol(v){st.v=Math.max(0,Math.min(100,Math.round(v)));save();if(ctx&&master&&on)master.gain.setTargetAtTime(G(),ctx.currentTime,.1);if(radio)radio.volume=Math.min(1,G()*1.4);draw(true)}
+  if(!S.mine&&window.VRTMyMusic)VRTMyMusic.stop();
+  try{if(S.mine){radioStop();if(ctx&&master)master.gain.setTargetAtTime(0,ctx.currentTime,.2);genStop();mm(function(M){M.play(Math.min(1,G()*1.4)).then(function(ok){if(!ok){on=false;draw();}})})}else if(S.gen){radioStop();genStart(S.k);setTimeout(function(){if(on&&ctx&&ctx.state!=='running')needGesture()},400)}else radioStart(S)}catch(e){on=false;tip('這個瀏覽器不能播放聲音 · Audio not supported')}draw()}
+ function stop(){on=false;try{sessionStorage.removeItem('vrt_music_on')}catch(e){}radioStop();if(window.VRTMyMusic)VRTMyMusic.stop();clearTimeout(timer);if(ctx&&master){master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setTargetAtTime(0,ctx.currentTime,.25);setTimeout(function(){if(!on){genStop();try{ctx.suspend()}catch(e){}}},900)}draw()}
+ function setVol(v){st.v=Math.max(0,Math.min(100,Math.round(v)));save();if(ctx&&master&&on)master.gain.setTargetAtTime(G(),ctx.currentTime,.1);if(radio)radio.volume=Math.min(1,G()*1.4);if(window.VRTMyMusic)VRTMyMusic.vol(Math.min(1,G()*1.4));draw(true)}
+ /* 🎧 我的音樂（2026-11-25）：歌存在這台裝置；第一次用才載入 my-music.js */
+ function mm(cb){if(window.VRTMyMusic)return cb(window.VRTMyMusic);var s0=document.createElement('script');s0.src=MM_SRC;s0.onload=function(){if(window.VRTMyMusic)cb(window.VRTMyMusic)};s0.onerror=function(){tip('我的音樂載入失敗，請重新整理 · My music failed to load')};document.head.appendChild(s0)}
  function setSrc(k){st.src=k;save();if(on)play();else draw()}
  var css='#vmBox{display:inline-flex;align-items:center;gap:3px;font:600 10px/1 system-ui,-apple-system,"Segoe UI",sans-serif;vertical-align:middle;flex:none;-webkit-user-select:none;user-select:none}'+
  '#vmBox.float{position:fixed;z-index:9990}#vmDot{display:none}#vmBox.float.pill{gap:5px}#vmBox.pill #vpBtn{display:none}#vmBox.pill #vmSw{transform:scale(.9);transform-origin:left center;margin-right:-4px}#vmBox.pill #vmMore{width:20px;height:20px;background:rgba(20,33,61,.5);color:#fff;opacity:.85}'+
@@ -146,7 +151,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
   sw.addEventListener('click',function(){if(lpFired){lpFired=false;return}if(on)stop();else{play();if(box.classList.contains('nar'))openP()}});
   more.addEventListener('click',function(){panel.hidden=!panel.hidden;draw();place()});
   box.addEventListener('wheel',function(e){e.preventDefault();setVol(st.v+(e.deltaY<0?5:-5));tip('🔊 '+st.v+'%')},{passive:false});
-  panel.addEventListener('click',function(e){var fb=e.target.closest('[data-fx]');if(fb){try{localStorage.setItem('vrt_fx2',fb.dataset.fx)}catch(_){}draw();window.vrtFx(panel,1);return}if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var sb=e.target.closest('.star');if(sb){var sk=sb.dataset.st,ix=st.rl.indexOf(sk);if(ix>=0)st.rl.splice(ix,1);else st.rl.push(sk);save();draw();return}var rb=e.target.closest('[data-ri]');if(rb){st.ri=rb.dataset.ri;save();autoRot();draw();return}var r=e.target.closest('.row');if(r){setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
+  panel.addEventListener('click',function(e){var fb=e.target.closest('[data-fx]');if(fb){try{localStorage.setItem('vrt_fx2',fb.dataset.fx)}catch(_){}draw();window.vrtFx(panel,1);return}if(e.target.closest('.psw')){if(on)stop();else play();draw();return}if(e.target.closest('.pal')){panel.hidden=true;var vb=document.getElementById('vpBtn');if(vb)vb.click();return}var sb=e.target.closest('.star');if(sb){var sk=sb.dataset.st,ix=st.rl.indexOf(sk);if(ix>=0)st.rl.splice(ix,1);else st.rl.push(sk);save();draw();return}var rb=e.target.closest('[data-ri]');if(rb){st.ri=rb.dataset.ri;save();autoRot();draw();return}var r=e.target.closest('.row');if(r){if(r.dataset.k==='mine'){panel.hidden=true;mm(function(M){M.open()})}setSrc(r.dataset.k);if(!on)play();return}var q=e.target.closest('.q button');if(q)setVol(+q.dataset.v)});
   panel.addEventListener('input',function(e){if(e.target.type==='range')setVol(+e.target.value)});
   panel.addEventListener('change',function(e){var a=e.target.dataset&&e.target.dataset.at;if(a){st[a]=/^\d\d:\d\d$/.test(e.target.value)?e.target.value:'';save();tip(st[a]?'⏰ 每天 '+st[a]+(a==='at'?' 自動開':' 自動關'):'⏰ 已取消')}});
   document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&!box.contains(e.target))panel.hidden=true},true);
@@ -189,6 +194,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
    if(document.hidden){hidAt=Date.now();clearTimeout(slT);if(on)slT=setTimeout(function(){if(document.hidden&&on){stop();slept=true}},30*60e3)}
    else{clearTimeout(slT);if(on&&hidAt&&Date.now()-hidAt>=30*60e3){stop();slept=true}
     if(slept){slept=false;if(!pastOff()){play();tip('▶️ 歡迎回來，音樂繼續 · Music resumed')}}hidAt=0}}catch(e){}});
+ window.addEventListener('vrt-mymusic',function(e){var pl=e.detail&&e.detail.playing;if(pl){if(st.src!=='mine'){st.src='mine';save()}if(!on){on=true;radioStop();genStop();try{sessionStorage.setItem('vrt_music_on','1')}catch(_){}}draw()}});
  window.vrtMusic={place:function(){place()},toggle:function(){on?stop():play()},set:setSrc,vol:setVol,state:function(){return {on:on,src:st.src,v:st.v,ctx:ctx&&ctx.state,nodes:nodes.length,radio:!!radio,wait:waitGesture}}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();
