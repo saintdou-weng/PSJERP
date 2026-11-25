@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>🎧 我的音樂 · VRT</title>
+<!-- 2026-11-26 Paul：在 Telegram 裡開，切到別的 App 音樂就停（Telegram 會把網頁暫停）。
+     這一頁用 Chrome 開、再「加到主畫面」，就像一個音樂 App：切到別的 App、關螢幕都會繼續播，鎖屏有播放鍵。
+     歌只存在這台裝置的 Chrome 裡（跟 Telegram 裡那份是分開的，第一次要在這裡加一次歌）。 -->
+<style>
+html,body{margin:0;height:100%;background:linear-gradient(160deg,#eef2ff,#f8fafc);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#0f172a}
+.wrap{max-width:560px;margin:0 auto;padding:28px 18px 120px;text-align:center}
+h1{font-size:24px;margin:10px 0 4px}p{color:#475569;line-height:1.7;font-size:14.5px}
+button.big{font:inherit;font-size:18px;font-weight:700;border:0;border-radius:14px;padding:14px 22px;background:#4f46e5;color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.3);cursor:pointer}
+.tip{margin-top:22px;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;font-size:13.5px;color:#334155;line-height:1.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="font-size:54px">🎧</div>
+  <h1>VRT 我的音樂</h1>
+  <p>歌只存在這台裝置，不上傳。</p>
+  <button class="big" id="go">打開播放器</button>
+  <div class="tip" id="tip"></div>
+</div>
+<script>
+(function(){
+  var tg=/Telegram/i.test(navigator.userAgent)||!!(window.TelegramWebviewProxy||window.Telegram);
+  document.getElementById('tip').innerHTML=tg
+    ?'⚠️ 你現在是在 <b>Telegram</b> 裡開的：切到別的 App 音樂會停。<br>請按右上角 <b>⋮ → 在 Chrome 中開啟</b>，再按 Chrome 的 <b>⋮ → 加到主畫面</b>，以後從主畫面的「🎧 我的音樂」打開，就能像 YouTube 一樣在背景播。'
+    :'✅ 在 Chrome 裡：切到別的 App、關螢幕都會繼續播，鎖屏有 ⏮ ⏯ ⏭。<br>想要像 App 一樣：按 Chrome 右上角 <b>⋮ → 加到主畫面</b>。<br>📌 這裡的歌跟 Telegram 裡那份是分開存的，第一次請在這裡用「📁 加入整個資料夾」加一次。';
+  var s=document.createElement('script');s.src='my-music.js?v=6';s.onload=function(){try{VRTMyMusic.open();}catch(e){}};document.head.appendChild(s);
+  document.getElementById('go').onclick=function(){if(window.VRTMyMusic)VRTMyMusic.open();};
+})();
+</script>
+</body>
+</html>
