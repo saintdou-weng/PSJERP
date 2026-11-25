@@ -429,6 +429,7 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
   var bb,kk;if(st.tc){var t=colOf(st.tc)[2];bb=t;var guard=0;while(hlum(bb)>0.62&&guard++<10)bb=hxm(bb,'#000000',.12);kk=hxm(t,'#ffffff',.25);if(hlum(kk)>0.92)kk=hxm(kk,'#000000',.06)}
   else if(c&&c[0]&&!c[4]&&ACC[c[0]]){bb=hxm(ACC[c[0]],c[2],.25);kk=hxm(c[2],'#000000',.05)}
   else{bb=nat[0];kk=nat[1]}
+  var g2=0;while(hlum(kk)<0.78&&g2++<12)kk=hxm(kk,'#ffffff',.18);   /* 卡片一定夠淺，原本的深色字看得清楚 */
   var bt=hlum(bb)<0.55?'#ffffff':'#1f2937',bd=hxm(bb,'#000000',.25),gl=hxm(bb,'#ffffff',.35);
   if(dark){bb=preInv(bb);kk=preInv(hxm(kk,'#000000',.55));bt=preInv(bt);bd=preInv(bd);gl=preInv(gl)}
   if(k==='glass'){kk=kk+'b3';bb=bb+'d9'}
