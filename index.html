@@ -6711,7 +6711,7 @@ init();
 })();
 </script>
 
-<script src="music.js?v=2.16.0" defer></script>
+<script src="music.js?v=2.18.0" defer></script>
 <script src="psj-links.js?v=3" defer></script>
 <!-- VRT swipe-tabs：左右滑動（手指／滑鼠拖曳）切換分頁，只聽手勢、不改資料 -->
 <script src="https://saintdou-weng.github.io/ac-admin/shared/swipe-tabs.js" defer></script>
@@ -6719,4 +6719,30 @@ init();
 <script src="https://saintdou-weng.github.io/ac-admin/shared/home-deck.js" defer></script>
 <script src="https://saintdou-weng.github.io/ac-admin/shared/psj-keynote.js" defer></script>
 <script src="https://saintdou-weng.github.io/ac-admin/shared/vrt-shell.js" defer></script>
+<script>
+/* ══════════ 2026-11-25 Paul：調色盤顏色太少、卡片要比背景深一點、手機上還是有點閃 ══════════
+   ① 顏色跟其他平台的共用調色盤一樣 20 色（舊的白／淡綠／淡黃／淡藍／粉紅／米色／海軍藍／墨綠／黑色／酒紅／紫色存檔照樣認得）。
+   ② 每個顏色的卡片底（--surface）都算成「比頁面底色深一點」：淺色系深 5%、深色系深 28%（字是淺色）。
+   ③ 手機的頂端列不用毛玻璃（捲動時每一格都要重算模糊，會閃），改成實色。 */
+(function(){try{
+ const ADD=[['ivory','#F5EFDC','象牙','Ivory','ភ្លុក'],['orange','#F7D9B5','淡橘','Light orange','ទឹកក្រូចខ្ចី'],['lpurple','#DCD3F2','淡紫','Light purple','ស្វាយខ្ចី'],['grey','#E1E5EA','淺灰','Light grey','ប្រផេះខ្ចី'],
+  ['brown','#33251C','深咖啡','Brown','ត្នោតចាស់'],['slate','#262E38','石板灰','Slate','ប្រផេះថ្ម'],['teal','#123437','深青','Teal','ខៀវបៃតងចាស់'],['olive','#2C301A','橄欖','Olive','អូលីវ'],['midnight','#101830','午夜藍','Midnight','ខៀវពាក់កណ្ដាលអធ្រាត្រ']];
+ const T=window.TINTS;if(!Array.isArray(T))return;
+ ADD.forEach(a=>{if(!T.some(t=>t[0]===a[0])){const i=a[1].match(/^#[0-3]/)?T.length:T.findIndex(t=>/^#[0-3]/.test(t[1]));if(i<0||i>=T.length)T.push(a);else T.splice(i,0,a)}});
+ const isDark=h=>{const v=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));return (0.2126*v[0]+0.7152*v[1]+0.0722*v[2])/255<0.35};
+ const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),mx=(a,b,t)=>'#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join(''),K=[0,0,0],W=[255,255,255];
+ let c='';T.forEach(([k,h])=>{if(k==='white')return;const b=hx(h);
+  if(isDark(h))c+=`html:root[data-tint="${k}"]{--bg:${h}!important;--surface:${mx(b,K,.28)}!important;--surface-2:${mx(b,K,.18)}!important;--sunk:${mx(b,K,.40)}!important;--line:${mx(b,W,.20)}!important;--line-2:${mx(b,W,.13)}!important;--accent:${mx(b,W,.62)}!important;--accent-2:${mx(b,W,.62)}!important;--accent-soft:${mx(b,W,.14)}!important;--on-accent:${h}!important;--bar:${mx(b,W,.62)}!important;--grid:${mx(b,W,.13)}!important}`;
+  else c+=`html:root[data-tint="${k}"]{--bg:${h}!important;--surface:${mx(b,K,.05)}!important;--surface-2:${mx(b,K,.08)}!important;--sunk:${mx(b,K,.12)}!important;--line-2:${mx(b,K,.15)}!important}`;});
+ c+='@media (prefers-color-scheme: light){html:root:not([data-tint]):not([data-theme="dark"]){--surface:#E2E6EA;--surface-2:#DCE1E6;--sunk:#D2D8DE}}html:root[data-theme="light"]:not([data-tint]){--surface:#E2E6EA;--surface-2:#DCE1E6;--sunk:#D2D8DE}';
+ c+='@media (prefers-color-scheme: dark){html:root:not([data-theme="light"]):not([data-tint]){--bg:#151E27;--surface:#0E141A;--surface-2:#121A22;--sunk:#0A0F14}}html:root[data-theme="dark"]:not([data-tint]){--bg:#151E27;--surface:#0E141A;--surface-2:#121A22;--sunk:#0A0F14}';
+ c+='@media (max-width:900px),(pointer:coarse){.top,.top.fx-stuck{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}.top:not(.fx-stuck){background:var(--bg)}}';
+ const st=document.createElement('style');st.id='tintGen';st.textContent=c;document.head.appendChild(st);
+ /* 新加的深色系也要切成深色字（原本的深色系由上面 v1.0.0 處理） */
+ const DN=new Set(T.filter(t=>isDark(t[1])).map(t=>t[0]));
+ const dk=k=>{const d=document.documentElement;if(DN.has(k)){d.dataset.dark='1';d.dataset.tint=k}};
+ const _st=window.setTint;window.setTint=function(k){_st(k);dk(k)};
+ dk(LS.get('psjerp_tint','white'));
+}catch(e){console.warn('tint+',e)}})();
+</script>
 </body></html>
