@@ -13,7 +13,7 @@
   function all(){return tx('readonly',function(s){return s.getAll();}).then(function(a){return (a||[]).sort(function(x,y){return (x.album||'').localeCompare(y.album||'')||(x.no||0)-(y.no||0)||x.name.localeCompare(y.name);});});}
   /* v3（2026-11-26）：清單只讀「目錄」，不再每次把整首歌（每首約 50MB）全部讀進來 → 換頁接著播不會卡 */
   var IDX='vrt_mymusic_idx';
-  function mOf(t){return {id:t.id,name:t.name,album:t.album,no:t.no,size:t.size,src:t.src,dur:t.dur};}
+  function mOf(t){return {id:t.id,name:t.name,album:t.album,no:t.no,size:t.size,src:t.src,dur:t.dur,osz:t.osz||0,v16:t.v16||0};}
   function sortM(a){return a.sort(function(x,y){return (x.album||'').localeCompare(y.album||'')||(x.no||0)-(y.no||0)||String(x.name).localeCompare(String(y.name));});}
   function idxGet(){try{var j=JSON.parse(localStorage.getItem(IDX)||'null');return Array.isArray(j)?j:null;}catch(e){return null;}}
   function idxSet(a){try{localStorage.setItem(IDX,JSON.stringify(a));}catch(e){}}
@@ -66,6 +66,26 @@
     function mainThread(){var C=DSFCORE();return C.decode(function(o,l){return new Promise(function(ok){setTimeout(function(){file.slice(o,o+l).arrayBuffer().then(ok);},0);});},file.size,prog);}
   }
   window.__vrtDSF=DSFCORE;window.__vrtWav=wav;
+  /* v5（2026-11-26 Paul：WAV 加得進來卻播不了）：手機的瀏覽器對某些 WAV（24-bit、32-bit、浮點、特殊表頭、超大檔 RF64…）會讀不出來
+     → 匯入時自己把 WAV 轉成最通用的 16-bit WAV（取樣率不變）；自己讀不懂的，再請瀏覽器解碼一次；都不行才原樣存 */
+  function wavNorm(ab){var v=new DataView(ab),id=function(o){return String.fromCharCode(v.getUint8(o),v.getUint8(o+1),v.getUint8(o+2),v.getUint8(o+3));};
+    var riff=id(0);if((riff!=='RIFF'&&riff!=='RF64')||id(8)!=='WAVE')return null;var o=12,fmt=null,dOff=-1,dLen=0,ds64=0;
+    while(o+8<=ab.byteLength){var cid=id(o),sz=v.getUint32(o+4,true);
+      if(cid==='ds64'){ds64=v.getUint32(o+16,true)+v.getUint32(o+20,true)*4294967296;}
+      if(cid==='fmt '){var tag=v.getUint16(o+8,true);if(tag===0xFFFE&&sz>=26)tag=v.getUint16(o+32,true);fmt={tag:tag,ch:v.getUint16(o+10,true),rate:v.getUint32(o+12,true),ba:v.getUint16(o+20,true),bits:v.getUint16(o+22,true)};}
+      if(cid==='data'){dOff=o+8;dLen=(sz===0xFFFFFFFF&&ds64)?ds64:sz;if(dOff+dLen>ab.byteLength||sz===0)dLen=ab.byteLength-dOff;break;}
+      o+=8+sz+(sz&1);}
+    if(!fmt||dOff<0||!fmt.ch||!fmt.rate)return null;var B=fmt.bits/8,ba=fmt.ba||B*fmt.ch;if(!(fmt.tag===1&&(B===1||B===2||B===3||B===4))&&!(fmt.tag===3&&(B===4||B===8)))return null;
+    var oc=Math.min(2,fmt.ch),n=Math.floor(dLen/ba),out=new Int16Array(n*oc),u8=new Uint8Array(ab);
+    for(var i=0;i<n;i++){var base=dOff+i*ba;for(var c=0;c<oc;c++){var q=base+c*B,x;
+      if(fmt.tag===3){x=B===4?v.getFloat32(q,true):v.getFloat64(q,true);x=x>1?32767:x<-1?-32768:Math.round(x*32767);}
+      else if(B===2)x=v.getInt16(q,true);else if(B===3)x=(u8[q+2]<<24|u8[q+1]<<16)>>16;else if(B===4)x=v.getInt32(q,true)>>16;else x=(u8[q]-128)<<8;
+      out[i*oc+c]=x;}}
+    return {rate:fmt.rate,ch:oc,pcm:out,n:n,same:fmt.tag===1&&B===2&&fmt.ch<=2&&riff==='RIFF'};}
+  function viaBrowser(ab){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return Promise.reject(new Error('no decoder'));var ac=new AC();
+    return new Promise(function(ok,no){try{var p=ac.decodeAudioData(ab.slice(0),ok,no);if(p&&p.then)p.then(ok,no);}catch(e){no(e);}}).then(function(bf){var oc=Math.min(2,bf.numberOfChannels),n=bf.length,out=new Int16Array(n*oc);for(var c=0;c<oc;c++){var d=bf.getChannelData(c);for(var i=0;i<n;i++){var x=d[i];out[i*oc+c]=x>1?32767:x<-1?-32768:Math.round(x*32767);}}try{ac.close();}catch(e){}return {rate:bf.sampleRate,ch:oc,pcm:out,n:n};},function(e){try{ac.close();}catch(_){}throw e;});}
+  function fixWav(blob){return blob.arrayBuffer().then(function(ab){var r=null;try{r=wavNorm(ab);}catch(e){r=null;}if(r)return {blob:wav(r),dur:r.n/r.rate};return viaBrowser(ab).then(function(r2){return {blob:wav(r2),dur:r2.n/r2.rate};});});}
+
 
   /* ---------- 匯入 ---------- */
   var OK_RE=/\.(mp3|flac|m4a|aac|wav|ogg|oga|opus|webm|mp4|dsf)$/i;
@@ -73,9 +93,9 @@
   function durOf(blob){return new Promise(function(ok){var a=new Audio(),u=URL.createObjectURL(blob),done=function(v){URL.revokeObjectURL(u);ok(v||0);};a.preload='metadata';a.onloadedmetadata=function(){done(isFinite(a.duration)?a.duration:0);};a.onerror=function(){done(0);};setTimeout(function(){done(0);},8000);a.src=u;});}
   function importFiles(files,ui){files=[].filter.call(files,function(f){return OK_RE.test(f.name);});if(!files.length){ui('沒有可以播的音樂檔（mp3／flac／m4a／wav／ogg／dsf）');return Promise.resolve(0);}
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
-    var i=0,n=0;function nx(){if(i>=files.length){ui('✅ 加入 '+n+' 首');return Promise.resolve(n);}var f=files[i++],P=parseName(f),tag='（'+i+'/'+files.length+'）'+P.name;
-      var job=/\.dsf$/i.test(f.name)?(ui('🔄 轉檔中 '+tag+' 0%'),decodeDSF(f,function(p){ui('🔄 轉檔中 '+tag+' '+Math.round(p*100)+'%');}).then(function(r){return {blob:wav(r),dur:r.n/r.rate,src:'dsf'};})):(ui('📥 加入中 '+tag),f.arrayBuffer().then(function(ab){var b=new Blob([ab],{type:f.type||'audio/'+((f.name.split('.').pop()||'').toLowerCase())});return durOf(b).then(function(d){return {blob:b,dur:d,src:(f.name.split('.').pop()||'').toLowerCase()};});})/* v4：把檔案內容真的複製進來；只存「檔案位置」的話，過一陣子手機會收回權限，歌就播不了 */);
-      return job.then(function(x){var t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:P.name,no:P.no,album:P.album,src:x.src,dur:x.dur,size:x.blob.size,blob:x.blob,added:Date.now()};return tx('readwrite',function(s){s.put(t);}).then(function(){n++;var ix=idxGet()||[];ix=ix.filter(function(z){return z.id!==t.id;});ix.push(mOf(t));idxSet(ix);});}).catch(function(e){ui('⚠️ '+P.name+'：'+(e&&e.name==='QuotaExceededError'?'這台裝置空間不夠':(e&&e.message||e)));return new Promise(function(r){setTimeout(r,1500);});}).then(nx);}
+    var i=0,n=0,skip=0;function nx(){if(i>=files.length){ui('✅ 加入 '+n+' 首'+(skip?'（'+skip+' 首已經有了，沒有重複加）':''));return Promise.resolve(n);}var f=files[i++],P=parseName(f),tag='（'+i+'/'+files.length+'）'+P.name;var dup=(idxGet()||[]).some(function(z){return z.name===P.name&&(z.osz===f.size||(!z.osz&&z.album===P.album));});if(dup){ui('⏭ 已經有了，跳過 '+tag);skip++;return nx();}
+      var job=/\.wav$/i.test(f.name)?(ui('🔄 轉成手機能播的格式 '+tag),fixWav(f).then(function(x){return {blob:x.blob,dur:x.dur,src:'wav',v16:1};},function(){return f.arrayBuffer().then(function(ab){var b=new Blob([ab],{type:'audio/wav'});return durOf(b).then(function(d){return {blob:b,dur:d,src:'wav'};});});})):/\.dsf$/i.test(f.name)?(ui('🔄 轉檔中 '+tag+' 0%'),decodeDSF(f,function(p){ui('🔄 轉檔中 '+tag+' '+Math.round(p*100)+'%');}).then(function(r){return {blob:wav(r),dur:r.n/r.rate,src:'dsf'};})):(ui('📥 加入中 '+tag),f.arrayBuffer().then(function(ab){var b=new Blob([ab],{type:f.type||'audio/'+((f.name.split('.').pop()||'').toLowerCase())});return durOf(b).then(function(d){return {blob:b,dur:d,src:(f.name.split('.').pop()||'').toLowerCase()};});})/* v4：把檔案內容真的複製進來；只存「檔案位置」的話，過一陣子手機會收回權限，歌就播不了 */);
+      return job.then(function(x){var t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:P.name,no:P.no,album:P.album,src:x.src,dur:x.dur,size:x.blob.size,blob:x.blob,added:Date.now(),v16:x.v16||(x.src==='dsf'?1:0),osz:f.size};return tx('readwrite',function(s){s.put(t);}).then(function(){n++;var ix=idxGet()||[];ix=ix.filter(function(z){return z.id!==t.id;});ix.push(mOf(t));idxSet(ix);});}).catch(function(e){ui('⚠️ '+P.name+'：'+(e&&e.name==='QuotaExceededError'?'這台裝置空間不夠':(e&&e.message||e)));return new Promise(function(r){setTimeout(r,1500);});}).then(nx);}
     return nx();}
 
   /* ---------- 播放 ---------- */
@@ -83,7 +103,7 @@
   function sig(){try{window.dispatchEvent(new CustomEvent('vrt-mymusic',{detail:{playing:playing}}));}catch(e){}}
   function ensureA(){if(A)return A;A=new Audio();A.preload='auto';A.addEventListener('ended',function(){next(1);});A.addEventListener('error',function(){if(cur>=0&&list[cur]){list[cur].bad=1;msg('⚠️ 「'+list[cur].name+'」播不了，請重新加入這首');draw();}});A.addEventListener('play',function(){playing=true;sig();draw();});A.addEventListener('pause',function(){playing=false;sig();draw();});A.addEventListener('timeupdate',function(){prog();var n=Date.now();if(n-lastSave>4000&&cur>=0&&list[cur]){lastSave=n;try{localStorage.setItem('vrt_mymusic_pos',JSON.stringify({id:list[cur].id,t:A.currentTime}));}catch(e){}}});return A;}
   var badRun=0;
-  function load(i,at){return tx('readonly',function(s){return s.get(list[i].id);}).then(function(t){if(!t)return;return t.blob.slice(0,16).arrayBuffer().then(function(){badRun=0;return t;},function(){list[i].bad=1;badRun++;msg('⚠️ 「'+list[i].name+'」的檔案已經讀不到了（手機收回了檔案權限），請按「➕ 加入歌曲」重新加入這首');draw();if(badRun<list.length){setTimeout(function(){next(1);},400);}else{badRun=0;}return null;});}).then(function(t){if(!t)return;ensureA();if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(t.blob);cur=i;A.src=url;A.volume=Math.min(1,volume);if(at>0){var sk=function(){A.removeEventListener('loadedmetadata',sk);try{A.currentTime=at;}catch(e){}};A.addEventListener('loadedmetadata',sk);}
+  function load(i,at){return tx('readonly',function(s){return s.get(list[i].id);}).then(function(t){if(!t)return;return t.blob.slice(0,16).arrayBuffer().then(function(){badRun=0;if(t.src!=='wav'||t.v16)return t;msg('🔧 第一次播放，正在把「'+t.name+'」轉成手機能播的格式…');return fixWav(t.blob).then(function(x){t.blob=x.blob;t.dur=x.dur;t.size=x.blob.size;t.v16=1;return tx('readwrite',function(s2){s2.put(t);}).then(function(){var ix=idxGet()||[];ix=ix.map(function(z){return z.id===t.id?mOf(t):z;});idxSet(ix);list[i].dur=t.dur;list[i].size=t.size;list[i].bad=0;msg('✅ 「'+t.name+'」已修好');return t;});},function(){return t;});},function(){list[i].bad=1;badRun++;msg('⚠️ 「'+list[i].name+'」的檔案已經讀不到了（手機收回了檔案權限），請按「➕ 加入歌曲」重新加入這首');draw();if(badRun<list.length){setTimeout(function(){next(1);},400);}else{badRun=0;}return null;});}).then(function(t){if(!t)return;ensureA();if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(t.blob);cur=i;A.src=url;A.volume=Math.min(1,volume);if(at>0){var sk=function(){A.removeEventListener('loadedmetadata',sk);try{A.currentTime=at;}catch(e){}};A.addEventListener('loadedmetadata',sk);}
     try{if('mediaSession' in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:t.name,artist:t.album||'我的音樂',album:t.album||''});
       navigator.mediaSession.setActionHandler('previoustrack',function(){next(-1);});navigator.mediaSession.setActionHandler('nexttrack',function(){next(1);});navigator.mediaSession.setActionHandler('play',function(){tryPlay();});navigator.mediaSession.setActionHandler('pause',function(){A.pause();});}}catch(e){}
     tryPlay();draw();});}
@@ -109,6 +129,7 @@
     box.addEventListener('click',function(e){if(e.target===box){box.hidden=true;return;}var b=e.target.closest('[data-a]');if(b){var a=b.dataset.a;e.stopPropagation();
       if(a==='close')box.hidden=true;else if(a==='play'){if(A&&A.src&&!A.paused)A.pause();else play();}else if(a==='prev')next(-1);else if(a==='next')next(1);else if(a==='shuf'){shuf=!shuf;draw();}
       else if(a==='add'||a==='dir'){var inp=document.createElement('input');inp.type='file';inp.multiple=true;if(a==='dir')inp.webkitdirectory=true;else inp.accept='audio/*,.dsf,.flac,.m4a,.opus,.ogg';inp.onchange=function(){importFiles(inp.files,msg).then(function(){refresh().then(draw);});};inp.click();}
+      else if(a==='delall'){if(confirm('從這台裝置刪掉全部 '+list.length+' 首？（原始檔不受影響）')){stop();cur=-1;if(A)A.removeAttribute('src');idb().then(function(d){return new Promise(function(ok){var t2=d.transaction(ST,'readwrite');t2.objectStore(ST).clear();t2.oncomplete=ok;t2.onerror=ok;});}).then(function(){idxSet([]);try{localStorage.removeItem('vrt_mymusic_pos');}catch(e){}msg('🗑 已全部刪除');refresh().then(draw);});}}
       else if(a==='del'){var id=b.dataset.id,t=list.find(function(x){return x.id===id;});if(t&&confirm('從這台裝置刪掉「'+t.name+'」？（原始檔不受影響）'))tx('readwrite',function(s){s.delete(id);}).then(function(){idxSet((idxGet()||[]).filter(function(z){return z.id!==id;}));if(cur>=0&&list[cur]&&list[cur].id===id){stop();cur=-1;if(A)A.removeAttribute('src');}refresh().then(draw);});}
       return;}
       var r=e.target.closest('.mmR');if(r)load(+r.dataset.i);var pr=e.target.closest('.mmPr');if(pr&&A&&A.duration){var R=pr.getBoundingClientRect();A.currentTime=(e.clientX-R.left)/R.width*A.duration;}});
@@ -119,7 +140,7 @@
      +'<div class="mmNow"><div class="n">'+(now?esc(now.name):'還沒播放')+'</div><small>'+(now?[now.album,now.src==='dsf'?'DSF→WAV':String(now.src||'').toUpperCase(),tm(now.dur)].filter(Boolean).map(esc).join(' · '):list.length+' 首 · '+mb(tot))+'</small><div class="mmPr"><i></i></div><small class="mmT">0:00 / 0:00</small>'
      +'<div class="mmC"><button data-a="prev">⏮</button><button data-a="play">'+(playing?'⏸':'▶️')+'</button><button data-a="next">⏭</button></div></div>'
      +'<div class="mmL">'+(list.length?list.map(function(t,i){return '<div class="mmR'+(i===cur?' cur':'')+'" data-i="'+i+'"><span>'+(i===cur&&playing?'🔊':'🎵')+'</span><div class="t"><div>'+(t.bad?'⚠️ ':'')+esc(t.name)+'</div><small>'+esc(t.album||'')+(t.album?' · ':'')+tm(t.dur)+' · '+String(t.src||'').toUpperCase()+' · '+mb(t.size||0)+'</small></div><button class="x" data-a="del" data-id="'+t.id+'" title="刪除">🗑</button></div>';}).join(''):'<div class="mmE">還沒有歌。<br>按下面「➕ 加入歌曲」，從手機或雲端硬碟選音樂檔（可以一次選很多首）。<br>.dsf 會在這台裝置上轉成 WAV 再存，每首大約要 10–40 秒。<br>歌只存在這台裝置，不會上傳。</div>')+'</div>'
-     +'<div class="mmA"><button data-a="add">➕ 加入歌曲</button><button data-a="dir">📁 加入整個資料夾</button><small style="color:#64748b">'+list.length+' 首 · 佔用 '+mb(tot)+'</small><div class="mmMsg">'+esc(keepMsg)+'</div></div></div>';
+     +'<div class="mmA"><button data-a="add">➕ 加入歌曲</button><button data-a="dir">📁 加入整個資料夾</button> '+(list.length?'<button data-a="delall">🗑 全部刪除</button>':'')+'<small style="color:#64748b">'+list.length+' 首 · 佔用 '+mb(tot)+'</small><div class="mmMsg">'+esc(keepMsg)+'</div></div></div>';
     prog();}
   function open(){mount();box.hidden=false;refresh().then(draw);}
   window.VRTMyMusic={open:open,play:play,stop:stop,vol:function(v){volume=v;if(A)A.volume=Math.min(1,v);},state:function(){return {n:list.length,playing:playing,cur:cur};},_import:importFiles};
