@@ -11,7 +11,14 @@
   function idb(){return db?Promise.resolve(db):new Promise(function(ok,no){var r=indexedDB.open(DBN,1);r.onupgradeneeded=function(){r.result.createObjectStore(ST,{keyPath:'id'});};r.onsuccess=function(){db=r.result;ok(db);};r.onerror=function(){no(r.error);};});}
   function tx(mode,fn){return idb().then(function(d){return new Promise(function(ok,no){var t=d.transaction(ST,mode),s=t.objectStore(ST),res=fn(s);t.oncomplete=function(){ok(res&&res.result!==undefined?res.result:res);};t.onerror=function(){no(t.error);};t.onabort=function(){no(t.error);};});});}
   function all(){return tx('readonly',function(s){return s.getAll();}).then(function(a){return (a||[]).sort(function(x,y){return (x.album||'').localeCompare(y.album||'')||(x.no||0)-(y.no||0)||x.name.localeCompare(y.name);});});}
-  function meta(){return all().then(function(a){return a.map(function(t){return {id:t.id,name:t.name,album:t.album,no:t.no,size:t.size,src:t.src,dur:t.dur};});});}
+  /* v3（2026-11-26）：清單只讀「目錄」，不再每次把整首歌（每首約 50MB）全部讀進來 → 換頁接著播不會卡 */
+  var IDX='vrt_mymusic_idx';
+  function mOf(t){return {id:t.id,name:t.name,album:t.album,no:t.no,size:t.size,src:t.src,dur:t.dur};}
+  function sortM(a){return a.sort(function(x,y){return (x.album||'').localeCompare(y.album||'')||(x.no||0)-(y.no||0)||String(x.name).localeCompare(String(y.name));});}
+  function idxGet(){try{var j=JSON.parse(localStorage.getItem(IDX)||'null');return Array.isArray(j)?j:null;}catch(e){return null;}}
+  function idxSet(a){try{localStorage.setItem(IDX,JSON.stringify(a));}catch(e){}}
+  function rebuild(){return idb().then(function(d){return new Promise(function(ok){var out=[];try{var c=d.transaction(ST,'readonly').objectStore(ST).openCursor();c.onsuccess=function(){var cu=c.result;if(cu){out.push(mOf(cu.value));cu.continue();}else{idxSet(out);ok(out);}};c.onerror=function(){ok(out);};}catch(e){ok(out);}});});}
+  function meta(){var a=idxGet();return (a?Promise.resolve(a):rebuild()).then(function(x){return sortM(x.slice());});}
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function mb(n){return (n/1048576).toFixed(n>104857600?0:1)+' MB';}
   function tm(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+('0'+s%60).slice(-2);}
@@ -68,7 +75,7 @@
     try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
     var i=0,n=0;function nx(){if(i>=files.length){ui('✅ 加入 '+n+' 首');return Promise.resolve(n);}var f=files[i++],P=parseName(f),tag='（'+i+'/'+files.length+'）'+P.name;
       var job=/\.dsf$/i.test(f.name)?(ui('🔄 轉檔中 '+tag+' 0%'),decodeDSF(f,function(p){ui('🔄 轉檔中 '+tag+' '+Math.round(p*100)+'%');}).then(function(r){return {blob:wav(r),dur:r.n/r.rate,src:'dsf'};})):(ui('📥 加入中 '+tag),durOf(f).then(function(d){return {blob:f,dur:d,src:(f.name.split('.').pop()||'').toLowerCase()};}));
-      return job.then(function(x){var t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:P.name,no:P.no,album:P.album,src:x.src,dur:x.dur,size:x.blob.size,blob:x.blob,added:Date.now()};return tx('readwrite',function(s){s.put(t);}).then(function(){n++;});}).catch(function(e){ui('⚠️ '+P.name+'：'+(e&&e.name==='QuotaExceededError'?'這台裝置空間不夠':(e&&e.message||e)));return new Promise(function(r){setTimeout(r,1500);});}).then(nx);}
+      return job.then(function(x){var t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:P.name,no:P.no,album:P.album,src:x.src,dur:x.dur,size:x.blob.size,blob:x.blob,added:Date.now()};return tx('readwrite',function(s){s.put(t);}).then(function(){n++;var ix=idxGet()||[];ix=ix.filter(function(z){return z.id!==t.id;});ix.push(mOf(t));idxSet(ix);});}).catch(function(e){ui('⚠️ '+P.name+'：'+(e&&e.name==='QuotaExceededError'?'這台裝置空間不夠':(e&&e.message||e)));return new Promise(function(r){setTimeout(r,1500);});}).then(nx);}
     return nx();}
 
   /* ---------- 播放 ---------- */
@@ -101,7 +108,7 @@
     box.addEventListener('click',function(e){if(e.target===box){box.hidden=true;return;}var b=e.target.closest('[data-a]');if(b){var a=b.dataset.a;e.stopPropagation();
       if(a==='close')box.hidden=true;else if(a==='play'){if(A&&A.src&&!A.paused)A.pause();else play();}else if(a==='prev')next(-1);else if(a==='next')next(1);else if(a==='shuf'){shuf=!shuf;draw();}
       else if(a==='add'||a==='dir'){var inp=document.createElement('input');inp.type='file';inp.multiple=true;if(a==='dir')inp.webkitdirectory=true;else inp.accept='audio/*,.dsf,.flac,.m4a,.opus,.ogg';inp.onchange=function(){importFiles(inp.files,msg).then(function(){refresh().then(draw);});};inp.click();}
-      else if(a==='del'){var id=b.dataset.id,t=list.find(function(x){return x.id===id;});if(t&&confirm('從這台裝置刪掉「'+t.name+'」？（原始檔不受影響）'))tx('readwrite',function(s){s.delete(id);}).then(function(){if(cur>=0&&list[cur]&&list[cur].id===id){stop();cur=-1;if(A)A.removeAttribute('src');}refresh().then(draw);});}
+      else if(a==='del'){var id=b.dataset.id,t=list.find(function(x){return x.id===id;});if(t&&confirm('從這台裝置刪掉「'+t.name+'」？（原始檔不受影響）'))tx('readwrite',function(s){s.delete(id);}).then(function(){idxSet((idxGet()||[]).filter(function(z){return z.id!==id;}));if(cur>=0&&list[cur]&&list[cur].id===id){stop();cur=-1;if(A)A.removeAttribute('src');}refresh().then(draw);});}
       return;}
       var r=e.target.closest('.mmR');if(r)load(+r.dataset.i);var pr=e.target.closest('.mmPr');if(pr&&A&&A.duration){var R=pr.getBoundingClientRect();A.currentTime=(e.clientX-R.left)/R.width*A.duration;}});
     return box;}
