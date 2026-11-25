@@ -1,5 +1,6 @@
 /* v2.18（2026-11-25）：Paul：PSJGA 首頁跟分頁的卡片會閃 → ① 手指碰到卡片只是要捲動時，不再馬上顯示「按下／亮起」（停 120ms 沒移動才算按）；② 平台重畫時新卡片立刻套好立體樣式、透明度、字色，不再先平面 70～160ms 再變；③ 卡片底色改成比後面的底色稍深一點（約 4.5%），立體卡片左上的白色反光調淡，卡片不再比背景亮；④ 立體按鈕拿掉 CSS 的 :active（手指一碰就下沉，捲動時整排按鈕閃），按下效果統一由上面的 120ms 判斷來加。
-/* v2.20（2026-11-25 晚）：Paul：按鈕和卡片同一個顏色、混色＝漸層、字色跟著選（看不清楚就自動黑／白，淺底不會白字）。
+/* v2.21（2026-11-25 晚）：Paul：換色後字看不到 → 全頁對比檢查（字跟底太接近就自動換深字／白字）。
+   v2.20（2026-11-25 晚）：Paul：按鈕和卡片同一個顏色、混色＝漸層、字色跟著選（看不清楚就自動黑／白，淺底不會白字）。
    v2.19（2026-11-25）：Paul：HRA Portal／HRA-PAY／GASCheck／GA-EXP／SEC／Audit 預設平面（要 3D 再自己選），PSJ 系列、Admin 維持 3D；
    新增按鈕／卡片「質感」（金屬、木質、石壁、玻璃、皮革）、形狀（方正、圓角、膠囊、石塊）、顏色（調色盤色、比背景深）、按下效果（下沉、彈縮、發光、變暗、不動）；
    每個平台各自記住（另備份 IndexedDB，localStorage 滿了也記得）；放開／捲動時清掉按下狀態，不會陷下去彈不回來。
@@ -518,7 +519,28 @@ window.__vcs=window.__vcs||function(m){var v=String(m).match(/color\(srgb\s+([\d
      if(e.closest('#vmPanel,#vpPanel,#vmBox'))continue;var w=e.offsetWidth,hh=e.offsetHeight;if(w<70||hh<36){continue}
      var cs=w0.getComputedStyle(e);e.__vpc=1;if(cs.backgroundImage!=='none'||cs.position==='fixed')continue;var bg=cs.backgroundColor.replace(/^\s*color\(srgb[^)]*\)/i,window.__vcs).match(/[\d.]+/g)||[];if(bg.length>3&&+bg[3]<0.4)continue;
      e.classList.add('vp-card')}
-    glass(d,on&&!TXV.__on&&st.co<100&&!!(st.wp||st.img||st.c||st.co<85));fontPass(d,on&&!!H.style.getPropertyValue('--vp-fc')&&!(function(){try{return isMenu(d.location.pathname)}catch(_){return false}})());txText(d)}catch(_){}})}catch(_){}}
+    glass(d,on&&!TXV.__on&&st.co<100&&!!(st.wp||st.img||st.c||st.co<85));fontPass(d,on&&!!H.style.getPropertyValue('--vp-fc')&&!(function(){try{return isMenu(d.location.pathname)}catch(_){return false}})());txText(d);cgPass(d,on)}catch(_){}})}catch(_){}}
+ /* v2.21（2026-11-25 Paul：換色後字有時看不到——字跟卡片／背景太接近、淺字配淺底）
+    全頁檢查：每個有字的元素，找它實際的底色（不透明的底色，或漸層的平均色；圖片底不猜），對比不到 2.5 倍 → 換成看得清楚的深字或白字。
+    有選字色而且夠清楚就用字色。換主題時先全部還原再重算。 */
+ function cgRgb(str){var out=[],re=/rgba?\(([^)]+)\)|#([0-9a-f]{6}|[0-9a-f]{3})\b/gi,m;str=String(str||'').replace(/color\(srgb[^)]*\)/gi,window.__vcs);while((m=re.exec(str))){if(m[1]){var p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);if(p.length>=3)out.push([p[0],p[1],p[2],p.length>3?p[3]:1])}else{var h=m[2];if(h.length===3)h=h.replace(/./g,'$&$&');out.push([parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16),1])}}return out}
+ function cgBg(e,w0){for(var x=e,k=0;x&&x.nodeType===1&&k<14;x=x.parentElement,k++){var cs=w0.getComputedStyle(x),c=cgRgb(cs.backgroundColor)[0],bi=cs.backgroundImage||'';
+   if(bi.indexOf('gradient')>=0){var cl=cgRgb(bi).filter(function(q){return q[3]>=0.35});if(cl.length){var r=0,g=0,b=0,wt=0;cl.forEach(function(q){r+=q[0]*q[3];g+=q[1]*q[3];b+=q[2]*q[3];wt+=q[3]});var av=[r/wt,g/wt,b/wt];if(c&&c[3]>=0.6)av=[(av[0]+c[0])/2,(av[1]+c[1])/2,(av[2]+c[2])/2];var mx=Math.max.apply(null,cl.map(function(q){return q[3]}));if(mx>=0.6||(c&&c[3]>=0.6))return av}}
+   if(c&&c[3]>=0.6)return c.slice(0,3);
+   if(bi.indexOf('url(')>=0&&x!==e.ownerDocument.documentElement&&x!==e.ownerDocument.body)return null}
+  return [255,255,255]}
+ function cgRL(c){var a=c.map(function(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]}
+ function cgCR(a,b){var x=cgRL(a),y=cgRL(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)}
+ function cgPass(d,on){try{var H=document.documentElement,sig=on?JSON.stringify([st.c,st.c2,st.wp,st.img,st.tx,st.tc,st.tc2,st.fc,H.classList.contains('vp-dark')]):'';
+   if(d.__cgSig!==sig){[].forEach.call(d.querySelectorAll('[data-vcg]'),function(e){var o=e.__vcg||['',''];if(o[0])e.style.setProperty('color',o[0],o[1]);else e.style.removeProperty('color');e.removeAttribute('data-vcg')});[].forEach.call(d.getElementsByTagName('*'),function(e){e.__vcg2=0});d.__cgSig=sig}
+   if(!on||!d.body)return;var w0=d.defaultView,els=d.body.getElementsByTagName('*'),n=0,fc=(H.style.getPropertyValue('--vp-fc')||'').trim(),fcr=fc?cgRgb(fc)[0]:null;
+   for(var i=0;i<els.length&&n<2500;i++){var e=els[i];if(e.__vcg2)continue;var tg=e.tagName;if(/^(SCRIPT|STYLE|svg|SVG|path|IMG|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OPTION|VIDEO)$/.test(tg))continue;
+    var t=false;for(var c0=e.firstChild;c0;c0=c0.nextSibling)if(c0.nodeType===3&&/\S/.test(c0.nodeValue)){t=true;break}if(!t)continue;if(!e.offsetWidth&&!e.offsetHeight)continue;e.__vcg2=1;n++;
+    if(e.closest('#vpPanel,#vmPanel,#vmBox,#vmTip,#vpTint'))continue;
+    var cs=w0.getComputedStyle(e),col=cgRgb(cs.color)[0];if(!col||col[3]<0.25)continue;if(/transparent|rgba\(0, 0, 0, 0\)/.test(cs.webkitTextFillColor||''))continue;
+    var bg=cgBg(e,w0);if(!bg)continue;var cc=col.slice(0,3);if(cgCR(cc,bg)>=2.5)continue;
+    var pick=fcr&&cgCR(fcr.slice(0,3),bg)>=3?fc:(cgCR([31,41,55],bg)>=cgCR([255,255,255],bg)?'#1f2937':'#ffffff');
+    e.__vcg=[e.style.getPropertyValue('color'),e.style.getPropertyPriority('color')];e.style.setProperty('color',pick,'important');e.setAttribute('data-vcg','')}}catch(_){}}
  function cards(){ if(ct)return; ct=setTimeout(function(){ct=0;palRun()},160)}
  /* v2.17：新加進來的卡片在畫面更新前就套好透明度／字色，不會先閃出原本顏色（同上，連續很多次才退回節流） */
  var pN=0,pAt=0;function palMO(ms){if(!document.documentElement.classList.contains('vp-on'))return;var add=false;for(var q=0;q<ms.length&&!add;q++){var an=ms[q].addedNodes;for(var r=0;r<an.length;r++)if(an[r].nodeType===1){add=true;break}}
