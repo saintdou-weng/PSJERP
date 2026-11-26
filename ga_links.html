@@ -49,7 +49,7 @@ function n(v){v=Number(v);return isFinite(v)?v:0;}
 function fmt(v){return Math.round(n(v)).toLocaleString('en-US');}
 function get(src,q){return fetch(EP[src]+'?'+q).then(function(r){return r.json();}).then(function(j){return j&&j.data&&typeof j.data==='object'&&!Array.isArray(j.data)?j.data:j;});}
 /* 讀近 13 個月的 bucket（含 m:2026-10~16.3 這種分片） */
-var CACHE='vrt_galink_v1';
+var CACHE='vrt_galink_v2';
 function load(src,tool,months){
   return get(src,'action=smartManifest&tool='+tool).then(function(m){
     var ks=Object.keys((m&&m.counts)||{}).filter(function(k){var mm=k.slice(2,9);return k.indexOf('m:')===0&&months.indexOf(mm)>=0;});
@@ -78,11 +78,11 @@ var DEF={
     sub:function(rs){var mx=0,mi=1e9;rs.forEach(function(r){var t=n(r.total||n(r.a)+n(r.b));if(t>mx)mx=t;if(t<mi)mi=t;});return rs.length+' 天有記錄 · 最多 '+fmt(mx)+' · 最少 '+(rs.length?fmt(mi):'—');},
     line:function(r){return ['<b>'+esc(r.date)+'</b><small>A 區 '+fmt(r.a)+' · B 區 '+fmt(r.b)+'</small>','<b>'+fmt(r.total||n(r.a)+n(r.b))+' 台</b>'];},
     grp:null,avg:true,src:'SEC 通勤（摩托車）'},
-  shuttle:{ic:'🚌',t:'交通車（上下班接送）',u:'人次',rows:function(){return (D.commute||[]).filter(function(r){return r._k==='gate'&&r.type==='shuttle';});},
-    val:function(rs){return rs.reduce(function(s,r){return s+n(r.pax);},0);},
-    sub:function(rs){return rs.length+' 車次'+(rs.length?' · 平均每車 '+(rs.reduce(function(s,r){return s+n(r.pax);},0)/rs.length).toFixed(1)+' 人':'');},
-    line:function(r){return ['<b>'+esc(r.date)+' '+esc(r.inTime||'')+'</b><small>'+esc([r.plate,r.driver,r.dept].filter(Boolean).join(' · '))+'</small>','<b>'+fmt(r.pax)+' 人</b>'];},
-    grp:function(r){return r.plate||r.driver||'—';},src:'SEC 通勤（門禁派車，分類＝上下班接送）'}
+  shuttle:{ic:'🚌',t:'交通車（上下班接送）',u:'人／天',rows:function(){var d=(D.commute||[]).filter(function(r){return r._k==='shuttle'&&!r._deleted;});var byM={};d.forEach(function(r){if(!r.monthly)byM[String(r.date).slice(0,7)]=1;});return d.filter(function(r){return !r.monthly||!byM[String(r.date).slice(0,7)];});},
+    val:function(rs){return rs.length?rs.reduce(function(s,r){return s+n(r.am);},0)/rs.length:0;},
+    sub:function(rs){if(!rs.length)return '本月沒有記錄';if(rs[0].monthly)return 'HR 月登記人數（email 匯入）';var pm=rs.reduce(function(s,r){return s+n(r.pm);},0)/rs.length;return rs.length+' 天有記錄 · 下班平均 '+(Math.round(pm*10)/10);},
+    line:function(r){return ['<b>'+esc(r.monthly?String(r.date).slice(0,7)+' 月登記':r.date)+'</b><small>'+(r.monthly?esc(r.remark||''):'上班 '+fmt(r.am)+' · 下班 '+fmt(r.pm)+(r.cars?' · '+fmt(r.cars)+' 台車':''))+'</small>','<b>'+fmt(r.am)+' 人</b>'];},
+    grp:null,avg:true,src:'SEC 通勤（🚌 交通車人數）'}
 };
 function inMonth(rs,m){return rs.filter(function(r){return String(r.date||'').slice(0,7)===m;});}
 function vtxt(def,v){return def.avg?(Math.round(v*10)/10).toLocaleString():fmt(v);}
@@ -114,7 +114,7 @@ document.getElementById('mask').addEventListener('click',function(e){if(e.target
 /* 先顯示上次讀到的，再更新 */
 try{var c=JSON.parse(sessionStorage.getItem(CACHE)||'null');if(c&&c.at&&Date.now()-c.at<30*60e3){D=c.D;draw();}}catch(e){}
 Promise.all([load('GASCHECK','ehs',MS),load('SEC','container',MS),load('SEC','commute',MS)]).then(function(r){D={ehs:r[0],container:r[1],commute:r[2]};try{sessionStorage.setItem(CACHE,JSON.stringify({at:Date.now(),D:D}));}catch(e){}draw();
-  var sh=DEF.shuttle.rows().length;document.getElementById('note').innerHTML='資料直接讀總務原系統（SEC／GASCheck），只讀不改。'+(sh?'':'<br>🚌 交通車：目前 SEC 門禁派車裡還沒有「上下班接送」分類的記錄，所以是 0。若交通車人數記在 HRA 的交通車名單，告訴我就改讀那邊。');
+  var sh=DEF.shuttle.rows().length;document.getElementById('note').innerHTML='資料直接讀總務原系統（SEC／GASCheck），只讀不改。'+(sh?'':'<br>🚌 交通車：SEC 通勤「🚌 交通車人數」還沒有記錄。');
 }).catch(function(e){document.getElementById('grid').innerHTML='<div class="load">讀不到總務資料：'+esc(e&&e.message||e)+'</div>';});
 })();
 </script>
