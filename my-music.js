@@ -105,7 +105,7 @@
   var badRun=0;
   function load(i,at){return tx('readonly',function(s){return s.get(list[i].id);}).then(function(t){if(!t)return;return t.blob.slice(0,16).arrayBuffer().then(function(){badRun=0;if(t.src!=='wav'||t.v16)return t;msg('🔧 第一次播放，正在把「'+t.name+'」轉成手機能播的格式…');return fixWav(t.blob).then(function(x){t.blob=x.blob;t.dur=x.dur;t.size=x.blob.size;t.v16=1;return tx('readwrite',function(s2){s2.put(t);}).then(function(){var ix=idxGet()||[];ix=ix.map(function(z){return z.id===t.id?mOf(t):z;});idxSet(ix);list[i].dur=t.dur;list[i].size=t.size;list[i].bad=0;msg('✅ 「'+t.name+'」已修好');return t;});},function(){return t;});},function(){list[i].bad=1;badRun++;msg('⚠️ 「'+list[i].name+'」的檔案已經讀不到了（手機收回了檔案權限），請按「➕ 加入歌曲」重新加入這首');draw();if(badRun<list.length){setTimeout(function(){next(1);},400);}else{badRun=0;}return null;});}).then(function(t){if(!t)return;ensureA();if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(t.blob);cur=i;A.src=url;A.volume=Math.min(1,volume);if(at>0){var sk=function(){A.removeEventListener('loadedmetadata',sk);try{A.currentTime=at;}catch(e){}};A.addEventListener('loadedmetadata',sk);}
     try{if('mediaSession' in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:t.name,artist:t.album||'我的音樂',album:t.album||''});
-      navigator.mediaSession.setActionHandler('previoustrack',function(){next(-1);});navigator.mediaSession.setActionHandler('nexttrack',function(){next(1);});navigator.mediaSession.setActionHandler('play',function(){tryPlay();});navigator.mediaSession.setActionHandler('pause',function(){A.pause();});}}catch(e){}
+      navigator.mediaSession.setActionHandler('previoustrack',function(){next(-1);});navigator.mediaSession.setActionHandler('nexttrack',function(){next(1);});navigator.mediaSession.setActionHandler('play',function(){tryPlay();});navigator.mediaSession.setActionHandler('pause',function(){want=false;A.pause();});}}catch(e){}
     tryPlay();draw();});}
   /* 換分頁＝換一頁，瀏覽器常常不准「沒按過畫面就出聲」→ 等手指碰一下畫面就接著播（跟電台一樣） */
   var waitG=false;function tryPlay(){if(!A)return;var p=A.play();if(p&&p.catch)p.catch(function(er){if(er&&er.name==='NotAllowedError'&&!waitG){waitG=true;var h=function(){document.removeEventListener('pointerdown',h,true);document.removeEventListener('keydown',h,true);waitG=false;if(A&&A.src)A.play().catch(function(){});};document.addEventListener('pointerdown',h,true);document.addEventListener('keydown',h,true);}});}
@@ -113,8 +113,13 @@
   window.addEventListener('pagehide',savePos);document.addEventListener('visibilitychange',function(){if(document.hidden)savePos();});
   function next(d){if(!list.length)return;var i=shuf&&d>0?Math.floor(Math.random()*list.length):(cur+d+list.length)%list.length;load(i);}
   function refresh(){return meta().then(function(m){var id=cur>=0&&list[cur]?list[cur].id:'';list=m;cur=id?list.findIndex(function(x){return x.id===id;}):-1;return list;});}
-  function play(v){if(v!=null)volume=v;return refresh().then(function(){if(!list.length){open();return false;}if(A&&A.src&&cur>=0){A.volume=Math.min(1,volume);tryPlay();}else{var sv=null;try{sv=JSON.parse(localStorage.getItem('vrt_mymusic_pos')||'null');}catch(e){}var si=sv?list.findIndex(function(x){return x.id===sv.id;}):-1;if(si>=0)load(si,sv.t||0);else load(shuf?Math.floor(Math.random()*list.length):0);}return true;});}
-  function stop(){if(A)A.pause();}
+  function play(v){want=true;if(v!=null)volume=v;return refresh().then(function(){if(!list.length){open();return false;}if(A&&A.src&&cur>=0){A.volume=Math.min(1,volume);tryPlay();}else{var sv=null;try{sv=JSON.parse(localStorage.getItem('vrt_mymusic_pos')||'null');}catch(e){}var si=sv?list.findIndex(function(x){return x.id===sv.id;}):-1;if(si>=0)load(si,sv.t||0);else load(shuf?Math.floor(Math.random()*list.length):0);}return true;});}
+  function stop(){want=false;if(A)A.pause();}
+  /* v7（2026-11-26 Paul：換分頁後還要進去重按播放）：Telegram 裡的網頁規定「要手指碰過才能出聲」。
+     只要還在「要播」的狀態，畫面上任何一次點擊／觸碰都會順手把歌接著播（不用打開我的音樂）。 */
+  var want=false;
+  function kick(){if(want&&A&&A.src&&A.paused){try{A.play().catch(function(){});}catch(e){}}}
+  ['pointerdown','pointerup','touchstart','touchend','click','keydown'].forEach(function(ev){document.addEventListener(ev,kick,true);});
   /* 剩下還沒轉好的 WAV 在背景一首一首先轉好，播到下一首就不用等（等太久會停） */
   var repairing=false;function repairRest(){if(repairing)return;var todo=list.filter(function(t){return t.src==='wav'&&!t.v16&&!t.bad;});if(!todo.length)return;repairing=true;var k=0;
     (function one(){if(k>=todo.length){repairing=false;msg('✅ 全部 '+todo.length+' 首都轉好了，可以連續播');return;}var m=todo[k++];if(cur>=0&&list[cur]&&list[cur].id===m.id)return setTimeout(one,50);
@@ -131,7 +136,7 @@
    +'#mmBox .mmA{padding:10px 14px;border-top:1px solid #e2e8f0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}#mmBox .mmMsg{font-size:12.5px;color:#334155;flex-basis:100%}#mmBox .mmE{padding:26px 18px;text-align:center;color:#475569;line-height:1.7;font-size:14px}';
   function mount(){if(box)return box;var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);box=document.createElement('div');box.id='mmBox';box.hidden=true;document.body.appendChild(box);
     box.addEventListener('click',function(e){if(e.target===box){box.hidden=true;return;}var b=e.target.closest('[data-a]');if(b){var a=b.dataset.a;e.stopPropagation();
-      if(a==='close')box.hidden=true;else if(a==='play'){if(A&&A.src&&!A.paused)A.pause();else play();}else if(a==='prev')next(-1);else if(a==='next')next(1);else if(a==='shuf'){shuf=!shuf;draw();}else if(a==='rep'){rep=rep==='all'?'one':rep==='one'?'off':'all';try{localStorage.setItem('vrt_mymusic_rep',rep);}catch(e){}msg(rep==='one'?'🔂 單曲重複：一直播這首':rep==='off'?'⏹ 播到最後一首就停':'🔁 整張循環：一首接一首，播完從頭再來');draw();}
+      if(a==='close')box.hidden=true;else if(a==='play'){if(A&&A.src&&!A.paused){want=false;A.pause();}else play();}else if(a==='prev')next(-1);else if(a==='next')next(1);else if(a==='shuf'){shuf=!shuf;draw();}else if(a==='rep'){rep=rep==='all'?'one':rep==='one'?'off':'all';try{localStorage.setItem('vrt_mymusic_rep',rep);}catch(e){}msg(rep==='one'?'🔂 單曲重複：一直播這首':rep==='off'?'⏹ 播到最後一首就停':'🔁 整張循環：一首接一首，播完從頭再來');draw();}
       else if(a==='add'||a==='dir'){var inp=document.createElement('input');inp.type='file';inp.multiple=true;if(a==='dir')inp.webkitdirectory=true;else inp.accept='audio/*,.dsf,.flac,.m4a,.opus,.ogg';inp.onchange=function(){importFiles(inp.files,msg).then(function(){refresh().then(draw);});};inp.click();}
       else if(a==='delall'){sel={};list.forEach(function(t){sel[t.id]=1;});msg('☑️ 勾掉要留下的歌，再按「🗑 刪除勾選」');draw();}
       else if(a==='selnone'){if(sel){var any=Object.keys(sel).some(function(k){return sel[k];});list.forEach(function(t){sel[t.id]=any?0:1;});draw();}}
@@ -140,7 +145,7 @@
         tx('readwrite',function(s3){ids.forEach(function(id){s3.delete(id);});}).then(function(){idxSet((idxGet()||[]).filter(function(z){return ids.indexOf(z.id)<0;}));sel=null;msg('🗑 已刪除 '+ids.length+' 首');refresh().then(draw);});}
       else if(a==='del'){var id=b.dataset.id,t=list.find(function(x){return x.id===id;});if(t&&confirm('從這台裝置刪掉「'+t.name+'」？（原始檔不受影響）'))tx('readwrite',function(s){s.delete(id);}).then(function(){idxSet((idxGet()||[]).filter(function(z){return z.id!==id;}));if(cur>=0&&list[cur]&&list[cur].id===id){stop();cur=-1;if(A)A.removeAttribute('src');}refresh().then(draw);});}
       return;}
-      var r=e.target.closest('.mmR');if(r){if(sel){var tt=list[+r.dataset.i];if(tt){sel[tt.id]=sel[tt.id]?0:1;draw();}return;}load(+r.dataset.i);}var pr=e.target.closest('.mmPr');if(pr&&A&&A.duration){var R=pr.getBoundingClientRect();A.currentTime=(e.clientX-R.left)/R.width*A.duration;}});
+      var r=e.target.closest('.mmR');if(r){if(sel){var tt=list[+r.dataset.i];if(tt){sel[tt.id]=sel[tt.id]?0:1;draw();}return;}want=true;load(+r.dataset.i);}var pr=e.target.closest('.mmPr');if(pr&&A&&A.duration){var R=pr.getBoundingClientRect();A.currentTime=(e.clientX-R.left)/R.width*A.duration;}});
     return box;}
   function msg(t){var m=box&&box.querySelector('.mmMsg');if(m)m.textContent=t;}
   function draw(){if(!box||box.hidden)return;var now=cur>=0&&list[cur],tot=list.reduce(function(s,x){return s+(x.size||0);},0),keepMsg=(box.querySelector('.mmMsg')||{}).textContent||'';

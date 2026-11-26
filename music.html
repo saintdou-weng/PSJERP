@@ -30,7 +30,7 @@ button.big{font:inherit;font-size:18px;font-weight:700;border:0;border-radius:14
   document.getElementById('tip').innerHTML=tg
     ?'⚠️ 你現在是在 <b>Telegram</b> 裡開的：切到別的 App 音樂會停。<br>請按右上角 <b>⋮ → 在 Chrome 中開啟</b>，再按 Chrome 的 <b>⋮ → 加到主畫面</b>，以後從主畫面的「🎧 我的音樂」打開，就能像 YouTube 一樣在背景播。'
     :'✅ 在 Chrome 裡：切到別的 App、關螢幕都會繼續播，鎖屏有 ⏮ ⏯ ⏭。<br>想要像 App 一樣：按 Chrome 右上角 <b>⋮ → 加到主畫面</b>。<br>📌 這裡的歌跟 Telegram 裡那份是分開存的，第一次請在這裡用「📁 加入整個資料夾」加一次。';
-  var s=document.createElement('script');s.src='my-music.js?v=6';s.onload=function(){try{VRTMyMusic.open();}catch(e){}};document.head.appendChild(s);
+  var s=document.createElement('script');s.src='my-music.js?v=7';s.onload=function(){try{VRTMyMusic.open();}catch(e){}};document.head.appendChild(s);
   document.getElementById('go').onclick=function(){if(window.VRTMyMusic)VRTMyMusic.open();};
 })();
 </script>
