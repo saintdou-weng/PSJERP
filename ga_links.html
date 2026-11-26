@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>🧹 總務連動 · PSJERP</title>
+<!-- 2026-11-26 Paul（11/25 21:03）：PSJERP 要讀 PSJGA 的資料——裁剪廢料、貨櫃進出、機車、交通車人數。
+     直接讀原系統（SEC／GASCheck 公開唯讀端點，不用密碼）：smartManifest → smartBucket。只讀，不改任何資料。
+     每張卡：點開 → 📋 清單（每一筆）／📈 走勢（近 12 個月，點一條看那個月）／🏢 分布。 -->
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e2e8f0;--pri:#4f46e5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}
+.top{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top a{color:var(--pri);text-decoration:none;font-weight:700;border:1px solid var(--line);border-radius:10px;padding:6px 10px}.top b{font-size:17px;flex:1}
+.top select{font:inherit;border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.wrap{max-width:900px;margin:0 auto;padding:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:transform .12s}
+.card:active{transform:scale(.98)}.card .l{font-size:13px;color:var(--mut);font-weight:700}.card .v{font-size:30px;font-weight:800;margin:4px 0}.card .s{font-size:12px;color:var(--mut);line-height:1.5}.card .go{font-size:12px;color:var(--pri);font-weight:700;margin-top:6px}
+.note{font-size:12.5px;color:var(--mut);margin:12px 2px;line-height:1.6}
+.mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}.mask[hidden]{display:none}
+.box{background:#fff;width:min(720px,100%);max-height:90vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column}
+.bh{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}.bh b{flex:1;font-size:16px}.bh button{font:inherit;border:1px solid var(--line);background:#f8fafc;border-radius:10px;padding:6px 10px;cursor:pointer}
+.tabs{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--line)}.tabs button{font:inherit;border:0;background:none;padding:6px 10px;border-radius:999px;cursor:pointer;color:var(--mut);font-weight:700}.tabs button.on{background:#eef2ff;color:var(--pri)}
+.body{overflow:auto;padding:10px 14px 18px}
+.hero{border:1px solid var(--line);border-radius:14px;padding:12px;background:#f8fafc;margin-bottom:8px}.hero .big{font-size:30px;font-weight:800}.hero .kv{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px;font-size:13px}.hero .kv b{font-size:16px}
+.br{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid #f1f5f9;font-size:13px;cursor:pointer;border-radius:8px}.br:hover{background:#f8fafc}.br.on{background:#eef2ff}
+.br .t{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.br .t i{display:block;height:100%;border-radius:4px;background:#60a5fa}.br.on .t i{background:var(--pri)}.br .v{font-weight:700;text-align:right;min-width:60px}.br small{display:block;color:var(--mut);font-size:10.5px}
+.bx{border-left:3px solid #c7d2fe;margin:2px 0 8px 6px;padding-left:6px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13px}.row small{display:block;color:var(--mut);font-size:11px}.row b{white-space:nowrap}
+.st{font-weight:800;font-size:13px;margin:12px 0 6px}
+.load{padding:30px;text-align:center;color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="top"><a href="./index.html#dashboard">← PSJERP</a><b>🧹 總務連動</b><select id="mon"></select></div>
+<div class="wrap">
+  <div class="grid" id="grid"><div class="load">讀取總務資料中…</div></div>
+  <div class="note" id="note"></div>
+</div>
+<div class="mask" id="mask" hidden><div class="box"><div class="bh"><b id="bt"></b><button id="bx">✕</button></div><div class="tabs" id="tabs"></div><div class="body" id="bd"></div></div></div>
+<script>
+(function(){
+'use strict';
+var EP={SEC:'https://script.google.com/macros/s/AKfycbyxBN_t2AfxTPQ3AYdt7Jxl3pNiJV17H1T0pub4SR8GBgDH47WnDn9JF556KSxUiIU-/exec',
+        GASCHECK:'https://script.google.com/macros/s/AKfycbzRsf_DuYJu0kXxqefR8qbLWhO7uz2flCY7jkPQQ73ZMwptcHDwrtJnhBQFwxG_EM3v/exec'};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function n(v){v=Number(v);return isFinite(v)?v:0;}
+function fmt(v){return Math.round(n(v)).toLocaleString('en-US');}
+function get(src,q){return fetch(EP[src]+'?'+q).then(function(r){return r.json();}).then(function(j){return j&&j.data&&typeof j.data==='object'&&!Array.isArray(j.data)?j.data:j;});}
+/* 讀近 13 個月的 bucket（含 m:2026-10~16.3 這種分片） */
+var CACHE='vrt_galink_v1';
+function load(src,tool,months){
+  return get(src,'action=smartManifest&tool='+tool).then(function(m){
+    var ks=Object.keys((m&&m.counts)||{}).filter(function(k){var mm=k.slice(2,9);return k.indexOf('m:')===0&&months.indexOf(mm)>=0;});
+    var out=[],i=0;
+    function next(){if(i>=ks.length)return Promise.resolve(out);var batch=ks.slice(i,i+6);i+=6;
+      return Promise.all(batch.map(function(b){return get(src,'action=smartBucket&tool='+tool+'&bucket='+encodeURIComponent(b)+'&lite=1').then(function(d){(d.records||[]).forEach(function(r){out.push(r);});},function(){});})).then(next);}
+    return next();});
+}
+function lastMonths(k){var d=new Date(),a=[];for(var i=0;i<k;i++){var x=new Date(d.getFullYear(),d.getMonth()-i,1);a.push(x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2));}return a.reverse();}
+var MS=lastMonths(13),CUR=MS[MS.length-1],D={};
+var sel=document.getElementById('mon');sel.innerHTML=MS.slice().reverse().map(function(m){return '<option>'+m+'</option>';}).join('');sel.onchange=function(){CUR=sel.value;draw();};
+/* 四項的定義：怎麼從原始列算數字、清單一列怎麼寫、分布依什麼 */
+var DEF={
+  waste:{ic:'✂️',t:'裁剪廢料（布）',u:'kg',rows:function(){return (D.ehs||[]).filter(function(r){return r.sourceType==='recycle'||r.fabric_kg!=null;});},
+    val:function(rs){return rs.reduce(function(s,r){return s+n(r.fabric_kg);},0);},
+    sub:function(rs){var p=rs.reduce(function(s,r){return s+n(r.plastic_kg);},0),c=rs.reduce(function(s,r){return s+n(r.core_kg);},0),t=rs.reduce(function(s,r){return s+n(r.total_kg);},0);return rs.length+' 趟 · 塑膠 '+fmt(p)+' kg · 紙管 '+fmt(c)+' kg · 全部 '+fmt(t)+' kg';},
+    line:function(r){return ['<b>'+esc(r.date)+'</b><small>'+esc([r.module,r.remark].filter(Boolean).join(' · '))+'</small>','布 '+fmt(r.fabric_kg)+' kg<small>合計 '+fmt(r.total_kg)+' kg</small>'];},
+    grp:function(r){return r.module||'—';},src:'GASCheck 回收與廢料（EHS）'},
+  cont:{ic:'🚛',t:'貨櫃／貨車進出',u:'車次',rows:function(){return (D.container||[]).filter(function(r){return r._k==='truck';});},
+    val:function(rs){return rs.length;},
+    sub:function(rs){var ex=rs.filter(function(r){return r.isExport;}).length,im=rs.filter(function(r){return r.isImport;}).length,c40=rs.filter(function(r){return String(r.size)==='40';}).length;return '出口 '+ex+' · 進口 '+im+' · 40 呎 '+c40+' · 其他 '+(rs.length-c40);},
+    line:function(r){return ['<b>'+esc(r.date)+' '+esc(r.timeIn||'')+(r.timeOut?'–'+esc(r.timeOut):'')+'</b><small>'+esc([r.containerNo,r.size?r.size+' 呎':'',r.truckNo,r.company].filter(Boolean).join(' · '))+'</small><small>'+esc(r.remark||'')+'</small>',(r.isExport?'📤 出口':r.isImport?'📥 進口':'—')];},
+    grp:function(r){return r.company||'—';},src:'SEC 貨櫃（車輛出入）'},
+  bike:{ic:'🏍️',t:'機車停放',u:'台／天',rows:function(){return (D.commute||[]).filter(function(r){return r._k==='bike';});},
+    val:function(rs){return rs.length?rs.reduce(function(s,r){return s+n(r.total||n(r.a)+n(r.b));},0)/rs.length:0;},
+    sub:function(rs){var mx=0,mi=1e9;rs.forEach(function(r){var t=n(r.total||n(r.a)+n(r.b));if(t>mx)mx=t;if(t<mi)mi=t;});return rs.length+' 天有記錄 · 最多 '+fmt(mx)+' · 最少 '+(rs.length?fmt(mi):'—');},
+    line:function(r){return ['<b>'+esc(r.date)+'</b><small>A 區 '+fmt(r.a)+' · B 區 '+fmt(r.b)+'</small>','<b>'+fmt(r.total||n(r.a)+n(r.b))+' 台</b>'];},
+    grp:null,avg:true,src:'SEC 通勤（摩托車）'},
+  shuttle:{ic:'🚌',t:'交通車（上下班接送）',u:'人次',rows:function(){return (D.commute||[]).filter(function(r){return r._k==='gate'&&r.type==='shuttle';});},
+    val:function(rs){return rs.reduce(function(s,r){return s+n(r.pax);},0);},
+    sub:function(rs){return rs.length+' 車次'+(rs.length?' · 平均每車 '+(rs.reduce(function(s,r){return s+n(r.pax);},0)/rs.length).toFixed(1)+' 人':'');},
+    line:function(r){return ['<b>'+esc(r.date)+' '+esc(r.inTime||'')+'</b><small>'+esc([r.plate,r.driver,r.dept].filter(Boolean).join(' · '))+'</small>','<b>'+fmt(r.pax)+' 人</b>'];},
+    grp:function(r){return r.plate||r.driver||'—';},src:'SEC 通勤（門禁派車，分類＝上下班接送）'}
+};
+function inMonth(rs,m){return rs.filter(function(r){return String(r.date||'').slice(0,7)===m;});}
+function vtxt(def,v){return def.avg?(Math.round(v*10)/10).toLocaleString():fmt(v);}
+function draw(){
+  document.getElementById('grid').innerHTML=Object.keys(DEF).map(function(k){var d=DEF[k],all=d.rows(),rs=inMonth(all,CUR),v=d.val(rs),pm=MS[MS.indexOf(CUR)-1],pv=pm?d.val(inMonth(all,pm)):null;
+    var cmp=pv?((v-pv)/pv*100):null;
+    return '<div class="card" data-k="'+k+'"><div class="l">'+d.ic+' '+esc(d.t)+' · '+CUR+'</div><div class="v">'+vtxt(d,v)+' <span style="font-size:14px;color:#64748b">'+d.u+'</span></div><div class="s">'+esc(d.sub(rs))+'</div>'+
+      '<div class="s">'+(cmp==null?'上個月沒有資料':'比上個月（'+pm+' '+vtxt(d,pv)+'）'+(cmp>=0?'▲ +':'▼ ')+cmp.toFixed(1)+'%')+'</div><div class="go">▸ 點開看清單／走勢</div></div>';}).join('');
+}
+var REG=[],cur=null,tab='list';
+function bars(list,def){var mx=Math.max.apply(null,list.map(function(x){return n(x.v);}))||1;return list.map(function(x){var i=REG.push(x)-1;return '<div class="br'+(x.on?' on':'')+'" data-r="'+i+'"><span>▸ '+esc(x.n)+(x.s?'<small>'+esc(x.s)+'</small>':'')+'</span><span class="t"><i style="width:'+Math.max(3,Math.round(n(x.v)/mx*100))+'%"></i></span><span class="v">'+esc(x.vt)+'</span></div>';}).join('');}
+function list(rs,def){return rs.length?rs.slice().sort(function(a,b){return String(b.date).localeCompare(String(a.date));}).map(function(r){var c=def.line(r);return '<div class="row"><span>'+c[0]+'</span><span style="text-align:right">'+c[1]+'</span></div>';}).join(''):'<div class="load">這個月沒有記錄</div>';}
+function open(k){cur=k;tab='list';document.getElementById('mask').hidden=false;paint();}
+function paint(){var d=DEF[cur],all=d.rows(),rs=inMonth(all,CUR),v=d.val(rs);REG=[];
+  document.getElementById('bt').textContent=d.ic+' '+d.t+' · '+CUR;
+  var T=[['list','📋 清單'],['trend','📈 走勢']];if(d.grp)T.push(['grp','🏢 分布']);
+  document.getElementById('tabs').innerHTML=T.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>';}).join('');
+  var hero='<div class="hero"><div class="big">'+vtxt(d,v)+' '+d.u+'</div><div class="kv">'+esc(d.sub(rs))+'</div><div class="kv" style="color:#64748b">資料來源：'+esc(d.src)+'</div></div>';
+  var body='';
+  if(tab==='list')body='<div class="st">📋 '+CUR+' 每一筆（'+rs.length+'）</div>'+list(rs,d);
+  else if(tab==='trend')body='<div class="st">📈 近 13 個月（點一條看那個月的每一筆）</div>'+bars(MS.slice().reverse().map(function(m){var r=inMonth(all,m),x=d.val(r);return {n:m,s:r.length+' 筆',v:x,vt:vtxt(d,x)+' '+d.u,rows:r,on:m===CUR};}),d);
+  else{var g={};rs.forEach(function(r){var k=d.grp(r);(g[k]=g[k]||[]).push(r);});body='<div class="st">🏢 '+CUR+' 分布（點一條看是哪幾筆）</div>'+bars(Object.keys(g).map(function(k){var x=d.val(g[k]);return {n:k,s:g[k].length+' 筆',v:x,vt:vtxt(d,x)+' '+d.u,rows:g[k]};}).sort(function(a,b){return b.v-a.v;}),d);}
+  document.getElementById('bd').innerHTML=hero+body;}
+document.getElementById('grid').addEventListener('click',function(e){var c=e.target.closest('.card');if(c)open(c.dataset.k);});
+document.getElementById('bx').onclick=function(){document.getElementById('mask').hidden=true;};
+document.getElementById('mask').addEventListener('click',function(e){if(e.target.id==='mask'){e.currentTarget.hidden=true;return;}
+  var t=e.target.closest('[data-t]');if(t){tab=t.dataset.t;paint();return;}
+  var b=e.target.closest('.br[data-r]');if(b){var nx=b.nextElementSibling;if(nx&&nx.classList.contains('bx')){nx.remove();return;}var it=REG[+b.dataset.r];var x=document.createElement('div');x.className='bx';x.innerHTML=list(it.rows||[],DEF[cur]);b.parentNode.insertBefore(x,b.nextSibling);}});
+/* 先顯示上次讀到的，再更新 */
+try{var c=JSON.parse(sessionStorage.getItem(CACHE)||'null');if(c&&c.at&&Date.now()-c.at<30*60e3){D=c.D;draw();}}catch(e){}
+Promise.all([load('GASCHECK','ehs',MS),load('SEC','container',MS),load('SEC','commute',MS)]).then(function(r){D={ehs:r[0],container:r[1],commute:r[2]};try{sessionStorage.setItem(CACHE,JSON.stringify({at:Date.now(),D:D}));}catch(e){}draw();
+  var sh=DEF.shuttle.rows().length;document.getElementById('note').innerHTML='資料直接讀總務原系統（SEC／GASCheck），只讀不改。'+(sh?'':'<br>🚌 交通車：目前 SEC 門禁派車裡還沒有「上下班接送」分類的記錄，所以是 0。若交通車人數記在 HRA 的交通車名單，告訴我就改讀那邊。');
+}).catch(function(e){document.getElementById('grid').innerHTML='<div class="load">讀不到總務資料：'+esc(e&&e.message||e)+'</div>';});
+})();
+</script>
+<script src="music.js?v=2.29" defer></script>
+</body>
+</html>
